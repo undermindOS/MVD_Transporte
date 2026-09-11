@@ -41,15 +41,3 @@ app.*.map.json
 /android/app/profile
 /android/app/release
 
-# Rust/Tauri build artifacts
-src-tauri/target/
-
-# Unrelated project (LiberonVPN) accidentally present in this directory — not part of MVD_Transporte
-src-tauri/
-PRIVACY.md
-SECURITY.md
-THREAT-MODEL.md
-UI_GUIDE.md
-docs/
-config/
-scripts/
