@@ -1,0 +1,665 @@
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import '../models/bus_arrival.dart';
+import '../models/bus_stop.dart';
+import '../models/route_alert.dart';
+import '../services/cache_service.dart';
+import '../services/comoir_scraper.dart';
+import '../services/mvd_api_service.dart';
+
+class StopsPage extends StatefulWidget {
+  const StopsPage({super.key});
+
+  @override
+  State<StopsPage> createState() => _StopsPageState();
+}
+
+class _StopsPageState extends State<StopsPage>
+    with SingleTickerProviderStateMixin {
+  late final TabController _tabController;
+
+  // --- Stops ---
+  List<BusStop> _stops = [];
+  final Map<int, List<BusArrival>> _stopArrivals = {};
+  final Map<int, bool> _stopLoading = {};
+
+  // --- Routes ---
+  List<RouteAlert> _routes = [];
+  // key: routeId → arrivals filtered by preferred lines
+  final Map<int, List<BusArrival>> _routeArrivals = {};
+  final Map<int, bool> _routeLoading = {};
+
+  // Detected from Cómo Ir — offered for quick save
+  DetectedRoute? _detectedRoute;
+
+  @override
+  void initState() {
+    super.initState();
+    _tabController = TabController(length: 2, vsync: this);
+    _loadAll();
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
+  }
+
+  void _loadAll() {
+    _loadStops();
+    _loadRoutes();
+    _checkDetectedRoute();
+  }
+
+  // ---------------------------------------------------------------- Stops ---
+
+  void _loadStops() {
+    setState(() => _stops = CacheService.getAllStops());
+    for (final s in _stops) {
+      _refreshStopArrivals(s.id);
+    }
+  }
+
+  Future<void> _refreshStopArrivals(int stopId) async {
+    setState(() => _stopLoading[stopId] = true);
+    final arrivals = await MvdApiService.getNextArrivals(stopId);
+    if (mounted) {
+      setState(() {
+        _stopArrivals[stopId] = arrivals;
+        _stopLoading[stopId] = false;
+      });
+    }
+  }
+
+  Future<void> _addStop() async {
+    final stopId = await _showAddStopDialog();
+    if (stopId == null || !mounted) return;
+
+    final snack = ScaffoldMessenger.of(context);
+    snack.showSnackBar(const SnackBar(content: Text('Buscando parada…')));
+
+    final resolved = await MvdApiService.resolveStop(stopId);
+    final stop = resolved ?? BusStop(id: stopId, name: 'Parada $stopId');
+    await CacheService.saveStop(stop);
+
+    if (mounted) {
+      snack.clearSnackBars();
+      _loadStops();
+    }
+  }
+
+  Future<int?> _showAddStopDialog() async {
+    final controller = TextEditingController();
+    return showDialog<int>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Agregar parada'),
+        content: TextField(
+          controller: controller,
+          keyboardType: TextInputType.number,
+          inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+          decoration: const InputDecoration(
+            labelText: 'Número de parada',
+            hintText: 'Ej: 1234',
+            prefixIcon: Icon(Icons.directions_bus),
+          ),
+          autofocus: true,
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Cancelar')),
+          FilledButton(
+            onPressed: () =>
+                Navigator.pop(ctx, int.tryParse(controller.text)),
+            child: const Text('Agregar'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _toggleStopNotification(BusStop stop) async {
+    stop.notificationsEnabled = !stop.notificationsEnabled;
+    await stop.save();
+    setState(() {});
+  }
+
+  // ---------------------------------------------------------------- Routes --
+
+  void _loadRoutes() {
+    setState(() => _routes = CacheService.getAllRoutes());
+    for (final r in _routes) {
+      _refreshRouteArrivals(r);
+    }
+  }
+
+  Future<void> _refreshRouteArrivals(RouteAlert route) async {
+    setState(() => _routeLoading[route.id] = true);
+    final all = await MvdApiService.getNextArrivals(route.originStopId);
+    final filtered = route.preferredLines.isEmpty
+        ? all
+        : all.where((a) => route.preferredLines.contains(a.line)).toList();
+
+    if (mounted) {
+      setState(() {
+        _routeArrivals[route.id] = filtered;
+        _routeLoading[route.id] = false;
+      });
+    }
+  }
+
+  void _checkDetectedRoute() {
+    final detected = ComoIrScraper.loadCached();
+    if (detected != null && detected.isValid) {
+      // Don't show if already saved
+      final alreadySaved = _routes.any((r) =>
+          r.originStopId == detected.originStopId &&
+          r.destinationName == detected.destinationName);
+      setState(() => _detectedRoute = alreadySaved ? null : detected);
+    }
+  }
+
+  Future<void> _saveDetectedRoute() async {
+    final detected = _detectedRoute;
+    if (detected == null) return;
+    await ComoIrScraper.saveAsAlert(detected);
+    setState(() => _detectedRoute = null);
+    _loadRoutes();
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+              'Ruta ${detected.originName} → ${detected.destinationName} guardada'),
+          backgroundColor: Theme.of(context).primaryColor,
+        ),
+      );
+    }
+  }
+
+  Future<void> _addRouteManually() async {
+    final result = await _showAddRouteDialog();
+    if (result == null || !mounted) return;
+
+    final snack = ScaffoldMessenger.of(context);
+    snack.showSnackBar(const SnackBar(content: Text('Buscando parada…')));
+
+    final resolved = await MvdApiService.resolveStop(result.originStopId);
+    final id = CacheService.nextRouteId();
+    final route = RouteAlert(
+      id: id,
+      originStopId: result.originStopId,
+      originName: resolved?.name ?? 'Parada ${result.originStopId}',
+      destinationName: result.destinationName,
+      preferredLines: result.preferredLines,
+    );
+    await CacheService.saveRoute(route);
+
+    if (mounted) {
+      snack.clearSnackBars();
+      _loadRoutes();
+    }
+  }
+
+  Future<_RouteFormData?> _showAddRouteDialog() async {
+    final stopCtrl = TextEditingController();
+    final destCtrl = TextEditingController();
+    final lineCtrl = TextEditingController();
+    return showDialog<_RouteFormData>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Agregar ruta'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: stopCtrl,
+              keyboardType: TextInputType.number,
+              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+              decoration: const InputDecoration(
+                labelText: 'Parada de origen *',
+                hintText: 'Ej: 1234',
+                prefixIcon: Icon(Icons.my_location),
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: destCtrl,
+              decoration: const InputDecoration(
+                labelText: 'Destino *',
+                hintText: 'Ej: Centro',
+                prefixIcon: Icon(Icons.place),
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: lineCtrl,
+              decoration: const InputDecoration(
+                labelText: 'Líneas preferidas (opcional)',
+                hintText: 'Ej: 183, 64D',
+                prefixIcon: Icon(Icons.directions_bus),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Cancelar')),
+          FilledButton(
+            onPressed: () {
+              final stopId = int.tryParse(stopCtrl.text);
+              if (stopId == null || destCtrl.text.trim().isEmpty) return;
+              final lines = lineCtrl.text
+                  .split(RegExp(r'[,\s]+'))
+                  .map((s) => s.trim())
+                  .where((s) => s.isNotEmpty)
+                  .toList();
+              Navigator.pop(
+                ctx,
+                _RouteFormData(
+                  originStopId: stopId,
+                  destinationName: destCtrl.text.trim(),
+                  preferredLines: lines,
+                ),
+              );
+            },
+            child: const Text('Guardar'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _toggleRouteEnabled(RouteAlert route) async {
+    route.enabled = !route.enabled;
+    await route.save();
+    setState(() {});
+  }
+
+  Future<void> _deleteRoute(RouteAlert route) async {
+    await CacheService.deleteRoute(route.id);
+    _loadRoutes();
+  }
+
+  // ---------------------------------------------------------------- Build ---
+
+  @override
+  Widget build(BuildContext context) {
+    final primary = Theme.of(context).primaryColor;
+
+    return Scaffold(
+      appBar: AppBar(
+        toolbarHeight: 0,
+        bottom: TabBar(
+          controller: _tabController,
+          labelColor: primary,
+          indicatorColor: primary,
+          tabs: const [
+            Tab(icon: Icon(Icons.place_outlined), text: 'Paradas'),
+            Tab(icon: Icon(Icons.route_outlined), text: 'Rutas'),
+          ],
+        ),
+      ),
+      body: TabBarView(
+        controller: _tabController,
+        children: [
+          _buildStopsTab(primary),
+          _buildRoutesTab(primary),
+        ],
+      ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () => _tabController.index == 0
+            ? _addStop()
+            : _addRouteManually(),
+        backgroundColor: primary,
+        foregroundColor: Colors.white,
+        tooltip: _tabController.index == 0
+            ? 'Agregar parada'
+            : 'Agregar ruta',
+        child: const Icon(Icons.add),
+      ),
+    );
+  }
+
+  // --------------------------------------------------------- Stops tab -----
+
+  Widget _buildStopsTab(Color primary) {
+    if (_stops.isEmpty) {
+      return _buildEmptyState(
+        primary,
+        icon: Icons.directions_bus_outlined,
+        title: 'Sin paradas guardadas',
+        subtitle:
+            'Toca + para agregar una parada\ny recibir alertas cuando llegue el colectivo',
+      );
+    }
+    return RefreshIndicator(
+      onRefresh: () async {
+        for (final s in _stops) {
+          await _refreshStopArrivals(s.id);
+        }
+      },
+      child: ListView.builder(
+        padding: const EdgeInsets.only(bottom: 88),
+        itemCount: _stops.length,
+        itemBuilder: (_, i) => _buildStopCard(_stops[i], primary),
+      ),
+    );
+  }
+
+  Widget _buildStopCard(BusStop stop, Color primary) {
+    final arrivals = _stopArrivals[stop.id] ?? [];
+    final isLoading = _stopLoading[stop.id] ?? false;
+
+    return Dismissible(
+      key: Key('stop_${stop.id}'),
+      direction: DismissDirection.endToStart,
+      background: _deleteBackground(),
+      onDismissed: (_) => CacheService.deleteStop(stop.id).then((_) => _loadStops()),
+      child: Card(
+        margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        elevation: 2,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(children: [
+                Icon(Icons.place, color: primary, size: 20),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(stop.name,
+                      style: const TextStyle(
+                          fontWeight: FontWeight.w600, fontSize: 15)),
+                ),
+                Text('#${stop.id}',
+                    style:
+                        const TextStyle(color: Colors.black38, fontSize: 13)),
+                const SizedBox(width: 4),
+                GestureDetector(
+                  onTap: () => _toggleStopNotification(stop),
+                  child: Icon(
+                    stop.notificationsEnabled
+                        ? Icons.notifications_active
+                        : Icons.notifications_none,
+                    color: stop.notificationsEnabled
+                        ? primary
+                        : Colors.black38,
+                    size: 22,
+                  ),
+                ),
+              ]),
+              const SizedBox(height: 8),
+              _buildArrivalRow(arrivals, isLoading, primary),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // --------------------------------------------------------- Routes tab ----
+
+  Widget _buildRoutesTab(Color primary) {
+    return RefreshIndicator(
+      onRefresh: () async {
+        _checkDetectedRoute();
+        for (final r in _routes) {
+          await _refreshRouteArrivals(r);
+        }
+      },
+      child: ListView(
+        padding: const EdgeInsets.only(bottom: 88),
+        children: [
+          if (_detectedRoute != null) _buildDetectedRouteBanner(primary),
+          if (_routes.isEmpty && _detectedRoute == null)
+            _buildEmptyState(
+              primary,
+              icon: Icons.route_outlined,
+              title: 'Sin rutas guardadas',
+              subtitle:
+                  'Toca + o construye un viaje en "Cómo Ir"\npara guardar una alerta de salida',
+            )
+          else
+            ..._routes.map((r) => _buildRouteCard(r, primary)),
+        ],
+      ),
+    );
+  }
+
+  /// Banner shown when Cómo Ir detected a new route not yet saved.
+  Widget _buildDetectedRouteBanner(Color primary) {
+    final r = _detectedRoute!;
+    return Container(
+      margin: const EdgeInsets.fromLTRB(12, 12, 12, 4),
+      decoration: BoxDecoration(
+        color: primary.withAlpha(20),
+        border: Border.all(color: primary.withAlpha(80)),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      padding: const EdgeInsets.all(12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(children: [
+            Icon(Icons.route, color: primary, size: 18),
+            const SizedBox(width: 6),
+            Text('Ruta detectada en Cómo Ir',
+                style: TextStyle(
+                    color: primary,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 13)),
+            const Spacer(),
+            GestureDetector(
+              onTap: () => setState(() => _detectedRoute = null),
+              child: const Icon(Icons.close, size: 18, color: Colors.black38),
+            ),
+          ]),
+          const SizedBox(height: 6),
+          Text('${r.originName} → ${r.destinationName}',
+              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
+          if (r.lines.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Text('Líneas: ${r.lines.join(", ")}',
+                  style:
+                      const TextStyle(fontSize: 12, color: Colors.black54)),
+            ),
+          const SizedBox(height: 10),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton.icon(
+              onPressed: _saveDetectedRoute,
+              icon: const Icon(Icons.bookmark_add_outlined, size: 18),
+              label: const Text('Guardar ruta'),
+              style: FilledButton.styleFrom(backgroundColor: primary),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildRouteCard(RouteAlert route, Color primary) {
+    final arrivals = _routeArrivals[route.id] ?? [];
+    final isLoading = _routeLoading[route.id] ?? false;
+
+    return Dismissible(
+      key: Key('route_${route.id}'),
+      direction: DismissDirection.endToStart,
+      background: _deleteBackground(),
+      onDismissed: (_) => _deleteRoute(route),
+      child: Card(
+        margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        elevation: 2,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Header
+              Row(children: [
+                Icon(Icons.my_location, color: primary, size: 16),
+                const SizedBox(width: 4),
+                Expanded(
+                  child: Text(route.originName,
+                      style: const TextStyle(
+                          fontSize: 13, color: Colors.black54)),
+                ),
+                GestureDetector(
+                  onTap: () => _toggleRouteEnabled(route),
+                  child: Icon(
+                    route.enabled
+                        ? Icons.notifications_active
+                        : Icons.notifications_off_outlined,
+                    color: route.enabled ? primary : Colors.black38,
+                    size: 22,
+                  ),
+                ),
+              ]),
+              // Arrow + destination
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 2),
+                child: Row(children: [
+                  Icon(Icons.arrow_downward,
+                      color: primary.withAlpha(120), size: 14),
+                  const SizedBox(width: 4),
+                  Expanded(
+                    child: Text(
+                      route.destinationName,
+                      style: const TextStyle(
+                          fontSize: 15, fontWeight: FontWeight.w700),
+                    ),
+                  ),
+                ]),
+              ),
+              if (route.preferredLines.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 6),
+                  child: Text(
+                    'Líneas: ${route.preferredLines.join(", ")}',
+                    style: const TextStyle(
+                        fontSize: 12, color: Colors.black45),
+                  ),
+                ),
+              const SizedBox(height: 4),
+              _buildArrivalRow(arrivals, isLoading, primary),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // --------------------------------------------------------- Shared --------
+
+  Widget _buildArrivalRow(
+      List<BusArrival> arrivals, bool isLoading, Color primary) {
+    if (isLoading) {
+      return const SizedBox(
+        height: 20,
+        child: Center(
+          child: SizedBox(
+            width: 16,
+            height: 16,
+            child: CircularProgressIndicator(strokeWidth: 2),
+          ),
+        ),
+      );
+    }
+    if (arrivals.isEmpty) {
+      return const Text('Sin colectivos próximos',
+          style: TextStyle(color: Colors.black45, fontSize: 13));
+    }
+    return Wrap(
+      spacing: 8,
+      runSpacing: 4,
+      children: arrivals
+          .take(6)
+          .map((a) => _buildArrivalChip(a, primary))
+          .toList(),
+    );
+  }
+
+  Widget _buildArrivalChip(BusArrival arrival, Color primary) {
+    final isImminent = arrival.etaMinutes <= 2;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: isImminent ? primary : primary.withAlpha(30),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            arrival.line,
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 13,
+              color: isImminent ? Colors.white : primary,
+            ),
+          ),
+          const SizedBox(width: 4),
+          Text(
+            arrival.etaLabel,
+            style: TextStyle(
+              fontSize: 12,
+              color: isImminent ? Colors.white70 : primary.withAlpha(180),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEmptyState(
+    Color primary, {
+    required IconData icon,
+    required String title,
+    required String subtitle,
+  }) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(icon, size: 80, color: primary.withAlpha(100)),
+          const SizedBox(height: 16),
+          Text(title,
+              style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.black54)),
+          const SizedBox(height: 8),
+          Text(subtitle,
+              textAlign: TextAlign.center,
+              style:
+                  const TextStyle(color: Colors.black45, fontSize: 14)),
+        ],
+      ),
+    );
+  }
+
+  Widget _deleteBackground() => Container(
+        alignment: Alignment.centerRight,
+        padding: const EdgeInsets.only(right: 20),
+        color: Colors.red,
+        child: const Icon(Icons.delete, color: Colors.white),
+      );
+}
+
+/// Internal form data for the add-route dialog.
+class _RouteFormData {
+  final int originStopId;
+  final String destinationName;
+  final List<String> preferredLines;
+
+  const _RouteFormData({
+    required this.originStopId,
+    required this.destinationName,
+    required this.preferredLines,
+  });
+}
