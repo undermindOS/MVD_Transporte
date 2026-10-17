@@ -14,10 +14,16 @@ class CacheService {
   // Last route detected by ComoIr scraper (JSON string)
   static const String keyLastDetectedRoute = 'last_detected_route';
 
-  static Future<void> init() async {
-    await Hive.initFlutter();
-    Hive.registerAdapter(BusStopAdapter());
-    Hive.registerAdapter(RouteAlertAdapter());
+  /// [path] overrides the storage directory (tests run without path_provider).
+  static Future<void> init({String? path}) async {
+    if (path != null) {
+      Hive.init(path);
+    } else {
+      await Hive.initFlutter();
+    }
+    // Guard against double init (hot restart, background isolate reuse)
+    if (!Hive.isAdapterRegistered(0)) Hive.registerAdapter(BusStopAdapter());
+    if (!Hive.isAdapterRegistered(1)) Hive.registerAdapter(RouteAlertAdapter());
     await Hive.openBox(_settingsBox);
     await Hive.openBox<BusStop>(_stopsBox);
     await Hive.openBox<RouteAlert>(_routesBox);

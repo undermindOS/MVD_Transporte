@@ -6,6 +6,16 @@ class BusArrival {
   final double? busLatitude;
   final double? busLongitude;
 
+  /// Variant destination (e.g. "PLAZA ESPAÑA").
+  final String destination;
+
+  /// true = ETA computed from the bus GPS position;
+  /// false = timetable estimate (bus not tracked yet).
+  final bool isRealTime;
+
+  /// Scheduled pass time ("8:07"), when the API provides it.
+  final String? scheduledTime;
+
   const BusArrival({
     required this.line,
     required this.companyCode,
@@ -13,6 +23,9 @@ class BusArrival {
     required this.etaSeconds,
     this.busLatitude,
     this.busLongitude,
+    this.destination = '',
+    this.isRealTime = true,
+    this.scheduledTime,
   });
 
   String get companyName {
@@ -31,6 +44,8 @@ class BusArrival {
   }
 
   String get etaLabel {
+    // Timetable estimate: show the clock time, not a countdown that looks live
+    if (!isRealTime && scheduledTime != null) return scheduledTime!;
     if (etaMinutes <= 0) return 'Llegando';
     if (etaMinutes == 1) return '1 min';
     return '$etaMinutes min';

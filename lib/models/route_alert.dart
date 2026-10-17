@@ -29,6 +29,13 @@ class RouteAlert extends HiveObject {
   @HiveField(6)
   int alertMinutes;
 
+  /// Case-insensitive ("64d" == "64D"); an empty list accepts every line.
+  bool acceptsLine(String line) {
+    final wanted = line.toUpperCase();
+    return preferredLines.isEmpty ||
+        preferredLines.any((l) => l.toUpperCase() == wanted);
+  }
+
   RouteAlert({
     required this.id,
     required this.originStopId,

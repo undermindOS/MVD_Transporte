@@ -1,12 +1,12 @@
 package com.example.stm_app
 
-import android.app.PendingIntent
 import android.appwidget.AppWidgetManager
 import android.appwidget.AppWidgetProvider
 import android.content.Context
-import android.content.Intent
+import android.net.Uri
 import android.view.View
 import android.widget.RemoteViews
+import es.antonborri.home_widget.HomeWidgetLaunchIntent
 import es.antonborri.home_widget.HomeWidgetPlugin
 
 class MVDTransporteWidgetProvider : AppWidgetProvider() {
@@ -44,36 +44,40 @@ class MVDTransporteWidgetProvider : AppWidgetProvider() {
             views.setTextViewText(R.id.widget_updated, "Actualizado: $updated")
         }
 
+        // Buttons open a tab; Flutter reads the URI via HomeWidget
+        // (a plain "tab" extra was never read by the Dart side)
         // "Inicio" button — opens app at tab 0
-        val inicioIntent = Intent(context, MainActivity::class.java).apply {
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
-            putExtra("tab", 0)
-        }
-        val inicioPending = PendingIntent.getActivity(
-            context, 0, inicioIntent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        views.setOnClickPendingIntent(
+            R.id.widget_btn_inicio,
+            HomeWidgetLaunchIntent.getActivity(
+                context, MainActivity::class.java,
+                Uri.parse("mvdtransporte://tab?index=0")
+            )
         )
-        views.setOnClickPendingIntent(R.id.widget_btn_inicio, inicioPending)
 
         // "Recarga" button — opens app at tab 1
-        val recargaIntent = Intent(context, MainActivity::class.java).apply {
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
-            putExtra("tab", 1)
-        }
-        val recargaPending = PendingIntent.getActivity(
-            context, 1, recargaIntent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        views.setOnClickPendingIntent(
+            R.id.widget_btn_recarga,
+            HomeWidgetLaunchIntent.getActivity(
+                context, MainActivity::class.java,
+                Uri.parse("mvdtransporte://tab?index=1")
+            )
         )
-        views.setOnClickPendingIntent(R.id.widget_btn_recarga, recargaPending)
 
         // Route ETA row (visible only when a route ETA has been saved)
         val routeLine = widgetData.getString("route_line", null)
         val routeEtaMin = widgetData.getInt("route_eta_min", -1)
         val routeDest = widgetData.getString("route_dest", null)
+        // Absolute time stays correct between background refreshes (≥15 min)
+        val routeEtaAt = widgetData.getString("route_eta_at", null)
 
         if (routeLine != null && routeEtaMin >= 0 && routeDest != null) {
             views.setViewVisibility(R.id.widget_route_section, View.VISIBLE)
-            val etaLabel = if (routeEtaMin == 0) "ahora" else "$routeEtaMin min"
+            val etaLabel = when {
+                routeEtaAt != null -> "~$routeEtaAt"
+                routeEtaMin == 0 -> "ahora"
+                else -> "$routeEtaMin min"
+            }
             views.setTextViewText(
                 R.id.widget_route_text,
                 "$routeLine → $routeDest: $etaLabel"

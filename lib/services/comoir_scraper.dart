@@ -39,7 +39,8 @@ class DetectedRoute {
 /// Injects JavaScript into the Cómo Ir page to extract
 /// active route data (origin stop, destination, lines).
 class ComoIrScraper {
-  static const String _comoIrFragment = 'comoir';
+  static const String _comoIrHost = 'm.montevideo.gub.uy';
+  static const String _comoIrPathPrefix = '/comoir';
 
   /// JavaScript that tries multiple strategies to extract route info.
   /// Returns a JSON string or empty string if nothing found.
@@ -61,23 +62,25 @@ class ComoIrScraper {
     });
 
     // Strategy 3: Look for stop names
+    // Note: '[class*="to"]', '[class*="from"]' and '[data-id]' were removed —
+    // they match Ionic "toolbar"/"button"/"bottom" and any generic element,
+    // producing garbage destinations and stop IDs.
     var stopEls = document.querySelectorAll(
-      '[class*="stop"], [class*="parada"], [class*="origin"], [class*="from"]'
+      '[class*="stop"], [class*="parada"], [class*="origin"]'
     );
     var originText = stopEls.length > 0 ? stopEls[0].innerText.trim() : '';
 
     var destEls = document.querySelectorAll(
-      '[class*="destination"], [class*="destino"], [class*="to"], [class*="llegada"]'
+      '[class*="destination"], [class*="destino"], [class*="llegada"]'
     );
     var destText = destEls.length > 0 ? destEls[0].innerText.trim() : '';
 
     // Strategy 4: Look for a data-stop-id attribute on the first leg
     var stopId = 0;
-    var stopIdEl = document.querySelector('[data-stop-id], [data-parada], [data-id]');
+    var stopIdEl = document.querySelector('[data-stop-id], [data-parada]');
     if (stopIdEl) {
       var raw = stopIdEl.getAttribute('data-stop-id') ||
-                stopIdEl.getAttribute('data-parada') ||
-                stopIdEl.getAttribute('data-id');
+                stopIdEl.getAttribute('data-parada');
       stopId = parseInt(raw) || 0;
     }
 
@@ -130,11 +133,16 @@ class ComoIrScraper {
 })()
 ''';
 
-  /// Call from onPageFinished when URL contains 'comoir'.
+  /// Call from onPageFinished; runs only on the official Cómo Ir page.
   /// Returns a [DetectedRoute] if a valid route was found, null otherwise.
   static Future<DetectedRoute?> tryExtract(
       WebViewController controller, String url) async {
-    if (!url.contains(_comoIrFragment)) return null;
+    final uri = Uri.tryParse(url);
+    if (uri == null ||
+        uri.host != _comoIrHost ||
+        !uri.path.startsWith(_comoIrPathPrefix)) {
+      return null;
+    }
 
     try {
       final result =

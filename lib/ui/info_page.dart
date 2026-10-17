@@ -1,14 +1,29 @@
 import 'package:flutter/material.dart';
 
-class InfoPage extends StatelessWidget {
+class InfoPage extends StatefulWidget {
   final bool biometricLockEnabled;
-  final void Function(bool) onToggleBiometricLock;
+
+  /// Returns the lock state after the attempt (unchanged if cancelled).
+  final Future<bool> Function(bool) onToggleBiometricLock;
 
   const InfoPage({
     super.key,
     required this.biometricLockEnabled,
     required this.onToggleBiometricLock,
   });
+
+  @override
+  State<InfoPage> createState() => _InfoPageState();
+}
+
+class _InfoPageState extends State<InfoPage> {
+  // Local copy: the parent's rebuild does not reach a pushed route
+  late bool _biometricLockEnabled = widget.biometricLockEnabled;
+
+  Future<void> _onBiometricChanged(bool value) async {
+    final result = await widget.onToggleBiometricLock(value);
+    if (mounted) setState(() => _biometricLockEnabled = result);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -75,7 +90,21 @@ class InfoPage extends StatelessWidget {
             _buildContactItem(
               context,
               Icons.code,
-              'github.com/undermindOS/mi_Transporte_MVD',
+              'github.com/undermindOS/MVD_Transporte',
+            ),
+            const SizedBox(height: 24),
+            const Divider(),
+            const SizedBox(height: 16),
+            // Data source. Live ETAs come from the Cómo Ir online service, not
+            // from an open dataset — if open datasets (e.g. GTFS) are added,
+            // the "Licencia de Datos Abiertos – Uruguay" origin note must
+            // name the provider, the license, the dataset and any changes.
+            const Text(
+              'Fuente de datos: servicios en línea de la Intendencia de '
+              'Montevideo (los mismos que usa Cómo Ir). Los tiempos de arribo '
+              'son estimados y pueden variar; los marcados con reloj son '
+              'horarios teóricos, sin ubicación GPS del ómnibus.',
+              style: TextStyle(fontSize: 13, height: 1.5, color: Colors.black54),
             ),
             const SizedBox(height: 40),
           ],
@@ -115,8 +144,8 @@ class InfoPage extends StatelessWidget {
             ),
           ),
           Switch(
-            value: biometricLockEnabled,
-            onChanged: onToggleBiometricLock,
+            value: _biometricLockEnabled,
+            onChanged: _onBiometricChanged,
             activeThumbColor: primary,
           ),
         ],

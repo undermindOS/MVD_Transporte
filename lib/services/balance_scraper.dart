@@ -17,13 +17,19 @@ class BalanceScraper {
     '[data-saldo]',
   ];
 
+  static const String _stmHost = 'stm.gub.uy';
   static const String _mainPageFragment = 'principal.xhtml';
 
   /// Call this from onPageFinished in the WebView.
-  /// Only runs on the STM main account page.
+  /// Only runs on the official STM main account page.
   static Future<void> tryExtract(
       WebViewController controller, String url) async {
-    if (!url.contains(_mainPageFragment)) return;
+    final uri = Uri.tryParse(url);
+    if (uri == null ||
+        uri.host != _stmHost ||
+        !uri.path.endsWith(_mainPageFragment)) {
+      return;
+    }
 
     final js = _buildSelectorJs(_balanceSelectors);
     try {
@@ -36,6 +42,10 @@ class BalanceScraper {
       }
 
       final balance = _normalizeBalance(raw);
+      if (balance == null) {
+        debugPrint('⚠️ Balance text not recognized');
+        return;
+      }
       debugPrint('💳 Balance extraído: $balance');
 
       await CacheService.saveCardBalance(balance);
@@ -57,14 +67,22 @@ class BalanceScraper {
     return '($parts) ?? ""';
   }
 
-  static String _normalizeBalance(String raw) {
+  @visibleForTesting
+  static String? normalizeBalance(String raw) => _normalizeBalance(raw);
+
+  static String? _normalizeBalance(String raw) {
     // Strip surrounding quotes added by JS serialization
     var balance = raw.replaceAll(RegExp(r'^"|"$'), '').trim();
+    // A selector may hit a container ("Saldo disponible\n$ 123,50"):
+    // keep only the amount
+    final amount = RegExp(r'\$\s?\d[\d.,]*').firstMatch(balance);
+    if (amount != null) return amount.group(0)!.replaceAll(' ', '');
     // If it's just a number, prefix with $ sign
     if (RegExp(r'^\d+[.,]?\d*$').hasMatch(balance)) {
-      balance = '\$$balance';
+      return '\$$balance';
     }
-    return balance;
+    // Long text without an amount is not a balance — don't put it on the widget
+    return balance.length <= 20 ? balance : null;
   }
 
   static String _formatTimestamp(DateTime dt) {

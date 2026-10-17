@@ -1,19 +1,40 @@
-// This is a basic Flutter widget test for MVD Transporte App.
+// Smoke test for MVD Transporte: the app starts and the bottom navigation works.
 //
-// To perform an interaction with a widget in your test, use the WidgetTester
-// utility in the flutter_test package. For example, you can send tap and scroll
-// gestures. You can also use WidgetTester to find child widgets in the widget
-// tree, read text, and verify that the values of widget properties are correct.
+// Runs with a fake WebView platform (no native WebView in unit tests) and
+// Hive stored in a temp directory (no path_provider in unit tests).
+
+import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:webview_flutter_platform_interface/webview_flutter_platform_interface.dart';
 
 import 'package:stm_app/main.dart';
+import 'package:stm_app/services/cache_service.dart';
 
 void main() {
-  testWidgets('MVD Transporte App loads with bottom navigation', (WidgetTester tester) async {
-    // Build our app and trigger a frame.
+  late Directory hiveDir;
+
+  setUpAll(() async {
+    TestWidgetsFlutterBinding.ensureInitialized();
+    hiveDir = await Directory.systemTemp.createTemp('mvd_hive_test');
+    await CacheService.init(path: hiveDir.path);
+    WebViewPlatform.instance = _FakeWebViewPlatform();
+    // home_widget event channel (widget button clicks): no native side in tests
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(
+            const MethodChannel('home_widget/updates'), (_) async => null);
+  });
+
+  tearDownAll(() async {
+    await hiveDir.delete(recursive: true);
+  });
+
+  testWidgets('MVD Transporte App loads with bottom navigation',
+      (WidgetTester tester) async {
     await tester.pumpWidget(const MiTransporteMVDApp());
+    await tester.pump();
 
     // Verify that bottom navigation bar exists with all 5 items.
     expect(find.byType(NavigationBar), findsOneWidget);
@@ -36,25 +57,97 @@ void main() {
     expect(find.byIcon(Icons.info_outline), findsOneWidget);
   });
 
-  testWidgets('Bottom navigation interaction test', (WidgetTester tester) async {
-    // Build our app and trigger a frame.
+  testWidgets('Bottom navigation interaction test',
+      (WidgetTester tester) async {
     await tester.pumpWidget(const MiTransporteMVDApp());
-
-    // Wait for initial load
-    await tester.pumpAndSettle();
-
-    // Tap on 'Recarga' tab (index 1)
-    await tester.tap(find.text('Recarga'));
     await tester.pump();
 
-    // Verify that the navigation item is still present after tap
-    expect(find.text('Recarga'), findsWidgets); // Nav label + possibly AppBar
+    // Tap on 'Recarga' tab (index 1) — AppBar title follows
+    await tester.tap(find.text('Recarga'));
+    await tester.pump();
+    expect(find.text('Recarga'), findsNWidgets(2));
+
+    // Native tab with saved stops/routes (empty storage)
+    await tester.tap(find.text('Mis paradas'));
+    await tester.pump();
+    expect(find.text('Sin paradas guardadas'), findsOneWidget);
 
     // Tap on 'Avisos' tab (index 4)
     await tester.tap(find.text('Avisos'));
     await tester.pump();
-
-    // Verify that the navigation item is still present after tap
-    expect(find.text('Avisos'), findsWidgets);
+    expect(find.text('Avisos'), findsNWidgets(2));
   });
+}
+
+// --- Fake WebView platform -------------------------------------------------
+
+class _FakeWebViewPlatform extends WebViewPlatform {
+  @override
+  PlatformWebViewController createPlatformWebViewController(
+          PlatformWebViewControllerCreationParams params) =>
+      _FakeController(params);
+
+  @override
+  PlatformNavigationDelegate createPlatformNavigationDelegate(
+          PlatformNavigationDelegateCreationParams params) =>
+      _FakeNavigationDelegate(params);
+
+  @override
+  PlatformWebViewWidget createPlatformWebViewWidget(
+          PlatformWebViewWidgetCreationParams params) =>
+      _FakeWebViewWidget(params);
+}
+
+class _FakeController extends PlatformWebViewController {
+  _FakeController(super.params) : super.implementation();
+
+  @override
+  Future<void> setJavaScriptMode(JavaScriptMode javaScriptMode) async {}
+  @override
+  Future<void> setBackgroundColor(Color color) async {}
+  @override
+  Future<void> setUserAgent(String? userAgent) async {}
+  @override
+  Future<void> enableZoom(bool enabled) async {}
+  @override
+  Future<void> setPlatformNavigationDelegate(
+      PlatformNavigationDelegate handler) async {}
+  @override
+  Future<void> setOnPlatformPermissionRequest(
+      void Function(PlatformWebViewPermissionRequest request)
+          onPermissionRequest) async {}
+  @override
+  Future<void> loadRequest(LoadRequestParams params) async {}
+  @override
+  Future<void> clearCache() async {}
+  @override
+  Future<bool> canGoBack() async => false;
+  @override
+  Future<void> goBack() async {}
+}
+
+class _FakeNavigationDelegate extends PlatformNavigationDelegate {
+  _FakeNavigationDelegate(super.params) : super.implementation();
+
+  @override
+  Future<void> setOnNavigationRequest(
+      NavigationRequestCallback onNavigationRequest) async {}
+  @override
+  Future<void> setOnPageStarted(PageEventCallback onPageStarted) async {}
+  @override
+  Future<void> setOnPageFinished(PageEventCallback onPageFinished) async {}
+  @override
+  Future<void> setOnProgress(ProgressCallback onProgress) async {}
+  @override
+  Future<void> setOnWebResourceError(
+      WebResourceErrorCallback onWebResourceError) async {}
+  @override
+  Future<void> setOnUrlChange(UrlChangeCallback onUrlChange) async {}
+}
+
+class _FakeWebViewWidget extends PlatformWebViewWidget {
+  _FakeWebViewWidget(super.params) : super.implementation();
+
+  @override
+  Widget build(BuildContext context) => const SizedBox.expand();
 }
