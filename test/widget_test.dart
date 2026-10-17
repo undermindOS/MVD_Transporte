@@ -77,11 +77,57 @@ void main() {
     await tester.pump();
     expect(find.text('Avisos'), findsNWidgets(2));
   });
+
+  testWidgets('WebContent crash: one reload, then an error with retry',
+      (WidgetTester tester) async {
+    await tester.pumpWidget(const MiTransporteMVDApp());
+    await tester.pump();
+    _FakeWebViewPlatform.reloads = 0;
+
+    const crash = WebResourceError(
+      errorCode: 2,
+      description: '',
+      errorType: WebResourceErrorType.webContentProcessTerminated,
+      isForMainFrame: true,
+    );
+
+    // First crash: silent reload, still loading
+    _FakeWebViewPlatform.onError!(crash);
+    await tester.pump();
+    expect(_FakeWebViewPlatform.reloads, 1);
+    expect(find.text('No se pudo cargar la página'), findsNothing);
+
+    // Second crash: error screen instead of an endless spinner
+    _FakeWebViewPlatform.onError!(crash);
+    await tester.pump();
+    expect(_FakeWebViewPlatform.reloads, 1);
+    expect(find.text('No se pudo cargar la página'), findsOneWidget);
+    expect(find.text('Cargando...'), findsNothing);
+    expect(find.text('Reintentar'), findsOneWidget);
+  });
+
+  testWidgets('Sub-resource errors keep the page', (WidgetTester tester) async {
+    await tester.pumpWidget(const MiTransporteMVDApp());
+    await tester.pump();
+
+    _FakeWebViewPlatform.onError!(const WebResourceError(
+      errorCode: -1009,
+      description: 'image failed',
+      isForMainFrame: false,
+    ));
+    await tester.pump();
+    expect(find.text('No se pudo cargar la página'), findsNothing);
+  });
 }
 
 // --- Fake WebView platform -------------------------------------------------
 
 class _FakeWebViewPlatform extends WebViewPlatform {
+  // Lets tests fire WebView errors (the old fake never did, which hid the
+  // endless "Cargando..." on a crashed iOS WebContent process).
+  static WebResourceErrorCallback? onError;
+  static int reloads = 0;
+
   @override
   PlatformWebViewController createPlatformWebViewController(
           PlatformWebViewControllerCreationParams params) =>
@@ -124,6 +170,8 @@ class _FakeController extends PlatformWebViewController {
   Future<bool> canGoBack() async => false;
   @override
   Future<void> goBack() async {}
+  @override
+  Future<void> reload() async => _FakeWebViewPlatform.reloads++;
 }
 
 class _FakeNavigationDelegate extends PlatformNavigationDelegate {
@@ -140,7 +188,9 @@ class _FakeNavigationDelegate extends PlatformNavigationDelegate {
   Future<void> setOnProgress(ProgressCallback onProgress) async {}
   @override
   Future<void> setOnWebResourceError(
-      WebResourceErrorCallback onWebResourceError) async {}
+      WebResourceErrorCallback onWebResourceError) async {
+    _FakeWebViewPlatform.onError = onWebResourceError;
+  }
   @override
   Future<void> setOnUrlChange(UrlChangeCallback onUrlChange) async {}
 }

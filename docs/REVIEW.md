@@ -144,6 +144,8 @@ Custom Tabs / SFSafariViewController для входа. Виджет показ�
 | 19 | P2 | `cache_service.dart` | двойная регистрация адаптеров Hive (hot restart) → guard |
 | 20 | P2 | `webview_page.dart` | геолокация при каждом старте, уведомления без алертов → запрос в контексте |
 | 21 | P2 | `info_page.dart` | ссылка на несуществующий репозиторий `mi_Transporte_MVD`; нет источника данных |
+| 22 | P0 | `ios/Podfile`, `project.pbxproj` | iOS не собирался: `workmanager_apple` требует 14.0, Xcode 27 — ≥ 15.0 (у части подов 9.0/11.0) → target 15.0 + `post_install` |
+| 23 | P1 | `webview_page.dart` | гибель WebContent (`WKErrorWebContentProcessTerminated`, код 2) → `onPageFinished` не приходит, «Cargando...» навсегда → 1 автоперезапуск, затем экран ошибки с «Reintentar»; найдено на симуляторе, тест воспроизводит |
 
 ---
 
@@ -193,14 +195,26 @@ Custom Tabs / SFSafariViewController для входа. Виджет показ�
 
 ## 7. Как проверялось
 
-- `flutter analyze` — без замечаний; `flutter test` — 18/18.
+- `flutter analyze` — без замечаний; `flutter test` — 20/20 (тест на гибель WebContent
+  падает без исправления №23 и проходит с ним).
 - Новый `MvdApiService` вызван против живого API: остановка 3140 → «AV RAMON ANADOR y
   TIBURCIO GOMEZ», 3 рейса (1 GPS, 2 по расписанию), id 999999 → `StopNotFoundException`.
 - `flutter build apk --debug` — собирается (Kotlin-виджет и манифест компилируются).
-- **Не проверено на устройстве:** Android-эмулятор не стартует (неполный system image
-  `android-36.1`), Xcode не активирован (`xcode-select` указывает на Command Line Tools).
-  Нужна ручная проверка: геолокация в Cómo Ir, кнопки виджета, биометрия с PIN-фолбэком,
-  фоновые алерты.
+- **iOS-симулятор** (iPhone 17 Pro Max, iOS 26.2, Xcode 27.1), проверено вживую:
+  добавление остановки 3140 — реальное название, рейс по GPS выделен, рейсы по расписанию
+  с часами; несуществующая 31409 — «No existe la parada»; колокольчик — системный запрос
+  уведомлений в момент включения, `BackgroundWorker.sync()` без ошибок; Info — новый текст
+  и ссылка; включение замка — системный запрос кода (не вводился); данные переживают
+  перезапуск; `HomeWidget` без App Group на iOS — ошибка перехвачена, приложение работает.
+- Наблюдение: вход Mi STM — цепочка `stm.gub.uy` → `ih.montevideo.gub.uy/samlsso` →
+  `auth.iduruguay.gub.uy` → `mi.iduruguay.gub.uy/login`, то есть **ID Uruguay** во встроенном WebView.
+- **Не удалось проверить:** страницы WebView — в этом симуляторе процесс WebKit падает
+  у всех, включая Safari (проблема среды, не приложения); Android-эмулятор не стартует
+  (неполный образ `android-36.1`). Вручную на устройстве: геолокация в Cómo Ir, кнопки
+  виджета, биометрия, фоновые алерты.
+- Тулчейн: Flutter 3.41.1 + Xcode 27 — `flutter build ios --simulator` падает
+  (`lipo -verify_arch` в Xcode 27 принимает одну архитектуру, Flutter передаёт две);
+  `flutter run -d <симулятор>` работает. Обновить Flutter.
 
 ## Источники
 

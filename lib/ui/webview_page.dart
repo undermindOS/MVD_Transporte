@@ -60,6 +60,10 @@ class _TransporteWebViewPageState extends State<TransporteWebViewPage>
   bool _isLoading = true;
   bool _canGoBack = false;
   int _currentIndex = 0;
+  // Main-frame load failure: replaces the endless "Cargando..." overlay
+  bool _loadFailed = false;
+  // Auto-reloads after a WebContent process crash (reset on a good load)
+  int _crashReloads = 0;
 
   // Cache native page widgets to avoid recreating on every rebuild
   final Map<int, Widget> _nativePageCache = {};
@@ -398,10 +402,16 @@ class _TransporteWebViewPageState extends State<TransporteWebViewPage>
       ..setNavigationDelegate(
         NavigationDelegate(
           onPageStarted: (_) {
-            if (mounted) setState(() => _isLoading = true);
+            if (mounted) {
+              setState(() {
+                _isLoading = true;
+                _loadFailed = false;
+              });
+            }
           },
           onPageFinished: (url) async {
             if (!mounted) return;
+            _crashReloads = 0;
             setState(() => _isLoading = false);
             await _updateCanGoBack();
             // Try to extract card balance for home screen widget
@@ -414,6 +424,25 @@ class _TransporteWebViewPageState extends State<TransporteWebViewPage>
           onWebResourceError: (error) {
             debugPrint(
                 '❌ WebView Error ${error.errorCode}: ${error.description}');
+            // iOS kills the WebContent process under memory pressure; then
+            // onPageFinished never fires and the overlay would spin forever.
+            // Retry once, then show an error with a retry button.
+            if (error.errorType ==
+                    WebResourceErrorType.webContentProcessTerminated &&
+                _crashReloads < 1) {
+              _crashReloads++;
+              _controller.reload();
+              return;
+            }
+            // Sub-resource failures (images, trackers) must not hide the page
+            if (error.isForMainFrame ?? false) {
+              if (mounted) {
+                setState(() {
+                  _isLoading = false;
+                  _loadFailed = true;
+                });
+              }
+            }
           },
           onNavigationRequest: (request) {
             debugPrint('🔗 Navigating to: ${request.url}');
@@ -454,7 +483,10 @@ class _TransporteWebViewPageState extends State<TransporteWebViewPage>
   }
 
   void _switchToTab(int index) {
-    setState(() => _currentIndex = index);
+    setState(() {
+      _currentIndex = index;
+      _loadFailed = false;
+    });
     final tab = _tabs[index];
     if (tab.isWebView && tab.url != null) {
       _controller.loadRequest(Uri.parse(tab.url!));
@@ -537,6 +569,7 @@ class _TransporteWebViewPageState extends State<TransporteWebViewPage>
       return Stack(
         children: [
           WebViewWidget(controller: _controller),
+          if (_loadFailed) _buildLoadError(tab),
           if (_isLoading)
             Container(
               color: Colors.white,
@@ -569,6 +602,44 @@ class _TransporteWebViewPageState extends State<TransporteWebViewPage>
     return _nativePageCache.putIfAbsent(
       _currentIndex,
       () => tab.pageBuilder!(),
+    );
+  }
+
+  Widget _buildLoadError(_TabDef tab) {
+    final primary = Theme.of(context).primaryColor;
+    return Container(
+      color: Colors.white,
+      padding: const EdgeInsets.all(32),
+      child: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.cloud_off, size: 64, color: primary.withAlpha(150)),
+            const SizedBox(height: 16),
+            const Text(
+              'No se pudo cargar la página',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'Verificá tu conexión e intentá de nuevo.',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: Colors.black54),
+            ),
+            const SizedBox(height: 24),
+            FilledButton.icon(
+              onPressed: () {
+                setState(() => _loadFailed = false);
+                _crashReloads = 0;
+                _controller.loadRequest(Uri.parse(tab.url ?? _mainUrl));
+              },
+              icon: const Icon(Icons.refresh),
+              label: const Text('Reintentar'),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
