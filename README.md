@@ -1,9 +1,10 @@
 # MVD_Transporte
 
-Неофициальное Flutter-приложение для общественного транспорта Монтевидео: личный кабинет
-Mi STM и пополнение карты (WebView официального сайта), Cómo Ir, а также нативная вкладка
+Неофициальное Flutter-приложение для общественного транспорта Монтевидео: нативная вкладка
 «Mis paradas» — сохранённые остановки и маршруты с временем прибытия автобусов,
-уведомления и Android-виджет.
+уведомления и Android-виджет, — и быстрый доступ к официальным сайтам (Mi STM, пополнение
+карты, Cómo Ir, Avisos), которые открываются в системном браузере (Custom Tabs /
+SFSafariViewController), а не во встроенном WebView.
 
 Не аффилировано с Intendencia de Montevideo.
 
@@ -26,7 +27,8 @@ flutter run
 - `lib/services/mvd_api_service.dart` — клиент API (ETA, остановки)
 - `lib/services/background_worker.dart` — фоновая проверка алертов (WorkManager, ≥15 мин)
 - `lib/ui/stops_page.dart` — остановки и маршруты
-- `lib/ui/webview_page.dart` — вкладки, WebView, биометрический замок
+- `lib/ui/home_page.dart` — вкладки, биометрический замок
+- `lib/ui/services_page.dart`, `lib/services/official_sites.dart` — официальные сайты в системном браузере
 - `android/.../MVDTransporteWidgetProvider.kt` — виджет домашнего экрана
 
 История изменений — [CHANGELOG.md](CHANGELOG.md).

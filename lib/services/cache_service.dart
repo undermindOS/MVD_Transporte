@@ -8,11 +8,6 @@ class CacheService {
   static const String _routesBox = 'routes';
 
   static const String keyBiometricEnabled = 'biometric_lock_enabled';
-  static const String keyLastActiveTime = 'last_active_time';
-  static const String keyCardBalance = 'cached_card_balance';
-  static const String keyCardBalanceUpdatedAt = 'cached_balance_updated_at';
-  // Last route detected by ComoIr scraper (JSON string)
-  static const String keyLastDetectedRoute = 'last_detected_route';
 
   /// [path] overrides the storage directory (tests run without path_provider).
   static Future<void> init({String? path}) async {
@@ -76,20 +71,5 @@ class CacheService {
   static int nextRouteId() {
     if (_routes.isEmpty) return 1;
     return (_routes.keys.cast<int>().reduce((a, b) => a > b ? a : b)) + 1;
-  }
-
-  // --- Card balance helpers ---
-
-  static String? get cardBalance => get<String>(keyCardBalance);
-
-  static DateTime? get cardBalanceUpdatedAt {
-    final raw = get<String>(keyCardBalanceUpdatedAt);
-    if (raw == null) return null;
-    return DateTime.tryParse(raw);
-  }
-
-  static Future<void> saveCardBalance(String balance) async {
-    await set(keyCardBalance, balance);
-    await set(keyCardBalanceUpdatedAt, DateTime.now().toIso8601String());
   }
 }

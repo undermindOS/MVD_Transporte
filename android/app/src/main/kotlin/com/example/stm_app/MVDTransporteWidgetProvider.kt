@@ -1,15 +1,23 @@
 package com.example.stm_app
 
+import android.app.PendingIntent
 import android.appwidget.AppWidgetManager
 import android.appwidget.AppWidgetProvider
 import android.content.Context
+import android.content.Intent
 import android.net.Uri
-import android.view.View
 import android.widget.RemoteViews
-import es.antonborri.home_widget.HomeWidgetLaunchIntent
 import es.antonborri.home_widget.HomeWidgetPlugin
 
 class MVDTransporteWidgetProvider : AppWidgetProvider() {
+
+    companion object {
+        // Same pages as OfficialSite in lib/services/official_sites.dart
+        private const val MI_STM_URL =
+            "https://stm.gub.uy/app/mistm/cuenta/pages/principal.xhtml"
+        private const val RECARGA_URL =
+            "https://stm.gub.uy/app/mistm/cuenta/recargaRapida.xhtml"
+    }
 
     override fun onUpdate(
         context: Context,
@@ -28,43 +36,21 @@ class MVDTransporteWidgetProvider : AppWidgetProvider() {
     ) {
         val widgetData = HomeWidgetPlugin.getData(context)
 
-        val balance = widgetData.getString("card_balance", null)
-        val updated = widgetData.getString("balance_updated", null)
-
         val views = RemoteViews(context.packageName, R.layout.mvd_transporte_widget)
 
-        // Set balance text
-        views.setTextViewText(
-            R.id.widget_balance,
-            balance ?: "Sin datos"
-        )
-
-        // Set timestamp
-        if (updated != null) {
-            views.setTextViewText(R.id.widget_updated, "Actualizado: $updated")
-        }
-
-        // Buttons open a tab; Flutter reads the URI via HomeWidget
-        // (a plain "tab" extra was never read by the Dart side)
-        // "Inicio" button — opens app at tab 0
+        // Buttons open the official site in the browser. There is no card
+        // balance here any more: the app no longer embeds Mi STM in a
+        // WebView, so it cannot read the balance from the page.
         views.setOnClickPendingIntent(
-            R.id.widget_btn_inicio,
-            HomeWidgetLaunchIntent.getActivity(
-                context, MainActivity::class.java,
-                Uri.parse("mvdtransporte://tab?index=0")
-            )
+            R.id.widget_btn_mistm,
+            browserIntent(context, 0, MI_STM_URL)
         )
-
-        // "Recarga" button — opens app at tab 1
         views.setOnClickPendingIntent(
             R.id.widget_btn_recarga,
-            HomeWidgetLaunchIntent.getActivity(
-                context, MainActivity::class.java,
-                Uri.parse("mvdtransporte://tab?index=1")
-            )
+            browserIntent(context, 1, RECARGA_URL)
         )
 
-        // Route ETA row (visible only when a route ETA has been saved)
+        // Route ETA row (saved by the background alert check)
         val routeLine = widgetData.getString("route_line", null)
         val routeEtaMin = widgetData.getInt("route_eta_min", -1)
         val routeDest = widgetData.getString("route_dest", null)
@@ -72,7 +58,6 @@ class MVDTransporteWidgetProvider : AppWidgetProvider() {
         val routeEtaAt = widgetData.getString("route_eta_at", null)
 
         if (routeLine != null && routeEtaMin >= 0 && routeDest != null) {
-            views.setViewVisibility(R.id.widget_route_section, View.VISIBLE)
             val etaLabel = when {
                 routeEtaAt != null -> "~$routeEtaAt"
                 routeEtaMin == 0 -> "ahora"
@@ -83,9 +68,18 @@ class MVDTransporteWidgetProvider : AppWidgetProvider() {
                 "$routeLine → $routeDest: $etaLabel"
             )
         } else {
-            views.setViewVisibility(R.id.widget_route_section, View.GONE)
+            // No enabled route alert, or none of its lines is coming
+            views.setTextViewText(R.id.widget_route_text, "Sin próximos ómnibus en tus rutas")
         }
 
         appWidgetManager.updateAppWidget(widgetId, views)
     }
+
+    private fun browserIntent(context: Context, requestCode: Int, url: String): PendingIntent =
+        PendingIntent.getActivity(
+            context,
+            requestCode,
+            Intent(Intent.ACTION_VIEW, Uri.parse(url)),
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
 }

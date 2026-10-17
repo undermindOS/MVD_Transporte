@@ -5,12 +5,14 @@ import '../models/bus_stop.dart';
 import '../models/route_alert.dart';
 import '../services/background_worker.dart';
 import '../services/cache_service.dart';
-import '../services/comoir_scraper.dart';
 import '../services/mvd_api_service.dart';
 import '../services/notification_service.dart';
 
 class StopsPage extends StatefulWidget {
-  const StopsPage({super.key});
+  /// Opens the stop in Cómo Ir (official deep link).
+  final ValueChanged<int> onOpenStopInComoIr;
+
+  const StopsPage({super.key, required this.onOpenStopInComoIr});
 
   @override
   State<StopsPage> createState() => _StopsPageState();
@@ -32,9 +34,6 @@ class _StopsPageState extends State<StopsPage>
   final Map<int, List<BusArrival>?> _routeArrivals = {};
   final Map<int, bool> _routeLoading = {};
 
-  // Detected from Cómo Ir — offered for quick save
-  DetectedRoute? _detectedRoute;
-
   @override
   void initState() {
     super.initState();
@@ -55,7 +54,6 @@ class _StopsPageState extends State<StopsPage>
   void _loadAll() {
     _loadStops();
     _loadRoutes();
-    _checkDetectedRoute();
   }
 
   /// Keeps notification permission and the background task in step with
@@ -189,37 +187,6 @@ class _StopsPageState extends State<StopsPage>
         _routeArrivals[route.id] = filtered;
         _routeLoading[route.id] = false;
       });
-    }
-  }
-
-  void _checkDetectedRoute() {
-    final detected = ComoIrScraper.loadCached();
-    if (detected != null && detected.isValid) {
-      // Don't show if already saved
-      final alreadySaved = _routes.any((r) =>
-          r.originStopId == detected.originStopId &&
-          r.destinationName == detected.destinationName);
-      setState(() => _detectedRoute = alreadySaved ? null : detected);
-    }
-  }
-
-  Future<void> _saveDetectedRoute() async {
-    final detected = _detectedRoute;
-    if (detected == null) return;
-    await ComoIrScraper.saveAsAlert(detected);
-    if (!mounted) return;
-    setState(() => _detectedRoute = null);
-    _loadRoutes();
-    // Saved routes are enabled by default
-    await _syncAlerts(enabling: true);
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-              'Ruta ${detected.originName} → ${detected.destinationName} guardada'),
-          backgroundColor: Theme.of(context).primaryColor,
-        ),
-      );
     }
   }
 
@@ -453,6 +420,18 @@ class _StopsPageState extends State<StopsPage>
               ]),
               const SizedBox(height: 8),
               _buildArrivalRow(arrivals, isLoading, failed, primary),
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton.icon(
+                  onPressed: () => widget.onOpenStopInComoIr(stop.id),
+                  icon: const Icon(Icons.map_outlined, size: 18),
+                  label: const Text('Ver en Cómo Ir'),
+                  style: TextButton.styleFrom(
+                    foregroundColor: primary,
+                    visualDensity: VisualDensity.compact,
+                  ),
+                ),
+              ),
             ],
           ),
         ),
@@ -465,7 +444,6 @@ class _StopsPageState extends State<StopsPage>
   Widget _buildRoutesTab(Color primary) {
     return RefreshIndicator(
       onRefresh: () async {
-        _checkDetectedRoute();
         for (final r in _routes) {
           await _refreshRouteArrivals(r);
         }
@@ -473,70 +451,15 @@ class _StopsPageState extends State<StopsPage>
       child: ListView(
         padding: const EdgeInsets.only(bottom: 88),
         children: [
-          if (_detectedRoute != null) _buildDetectedRouteBanner(primary),
-          if (_routes.isEmpty && _detectedRoute == null)
+          if (_routes.isEmpty)
             _buildEmptyState(
               primary,
               icon: Icons.route_outlined,
               title: 'Sin rutas guardadas',
-              subtitle:
-                  'Toca + o construye un viaje en "Cómo Ir"\npara guardar una alerta de salida',
+              subtitle: 'Toca + para guardar una alerta de salida',
             )
           else
             ..._routes.map((r) => _buildRouteCard(r, primary)),
-        ],
-      ),
-    );
-  }
-
-  /// Banner shown when Cómo Ir detected a new route not yet saved.
-  Widget _buildDetectedRouteBanner(Color primary) {
-    final r = _detectedRoute!;
-    return Container(
-      margin: const EdgeInsets.fromLTRB(12, 12, 12, 4),
-      decoration: BoxDecoration(
-        color: primary.withAlpha(20),
-        border: Border.all(color: primary.withAlpha(80)),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      padding: const EdgeInsets.all(12),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(children: [
-            Icon(Icons.route, color: primary, size: 18),
-            const SizedBox(width: 6),
-            Text('Ruta detectada en Cómo Ir',
-                style: TextStyle(
-                    color: primary,
-                    fontWeight: FontWeight.w600,
-                    fontSize: 13)),
-            const Spacer(),
-            GestureDetector(
-              onTap: () => setState(() => _detectedRoute = null),
-              child: const Icon(Icons.close, size: 18, color: Colors.black38),
-            ),
-          ]),
-          const SizedBox(height: 6),
-          Text('${r.originName} → ${r.destinationName}',
-              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
-          if (r.lines.isNotEmpty)
-            Padding(
-              padding: const EdgeInsets.only(top: 4),
-              child: Text('Líneas: ${r.lines.join(", ")}',
-                  style:
-                      const TextStyle(fontSize: 12, color: Colors.black54)),
-            ),
-          const SizedBox(height: 10),
-          SizedBox(
-            width: double.infinity,
-            child: FilledButton.icon(
-              onPressed: _saveDetectedRoute,
-              icon: const Icon(Icons.bookmark_add_outlined, size: 18),
-              label: const Text('Guardar ruta'),
-              style: FilledButton.styleFrom(backgroundColor: primary),
-            ),
-          ),
         ],
       ),
     );

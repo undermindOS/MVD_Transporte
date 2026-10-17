@@ -4,7 +4,7 @@ import 'package:flutter_native_splash/flutter_native_splash.dart';
 import 'services/background_worker.dart';
 import 'services/cache_service.dart';
 import 'services/notification_service.dart';
-import 'ui/webview_page.dart';
+import 'ui/home_page.dart';
 
 void main() async {
   final binding = WidgetsFlutterBinding.ensureInitialized();
@@ -40,7 +40,7 @@ class MiTransporteMVDApp extends StatelessWidget {
         scaffoldBackgroundColor: Colors.white,
         useMaterial3: true,
       ),
-      home: const TransporteWebViewPage(),
+      home: const HomePage(),
     );
   }
 }

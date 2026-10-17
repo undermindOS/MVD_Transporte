@@ -5,6 +5,16 @@
 
 ## [Unreleased]
 
+### Изменено
+- Mi STM, Recarga, Cómo Ir и Avisos открываются в системном браузере — Chrome Custom Tabs на Android,
+  SFSafariViewController на iOS — вместо встроенного WebView. Google Play (Spam policy) запрещает
+  «webview of a website without permission», а вход через ID Uruguay должен идти во внешнем браузере
+  (RFC 8252), а не в WebView с внедрённым JS. Нижняя навигация — две нативные вкладки:
+  «Mis paradas» (главная) и «Servicios» с плитками официальных сайтов.
+- Кнопки Android-виджета — «Mi STM» и «Recarga», открывают сайт в браузере.
+- Биометрический замок защищает сохранённые остановки и маршруты (подпись в Info исправлена);
+  возврат из браузера не блокирует приложение повторно.
+
 ### Исправлено
 - ETA снова работают: старый `m.montevideo.gub.uy/stmonlineRest/nextETA` отвечал
   `400 Argumentos invalidos`, теперь используется `api.montevideo.gub.uy/transporteRest/siguientesParada/{id}` —
@@ -38,11 +48,17 @@
   «No se pudo cargar la página» с кнопкой «Reintentar»; так же обрабатываются ошибки основного фрейма.
 
 ### Добавлено
+- «Ver en Cómo Ir» на карточке остановки — официальный deep link `/comoir/parada?numero=N` в браузере.
 - Иконка «по расписанию» у рейсов без GPS, их время показывается часами («8:07»).
 - Указание источника данных на странице Info; исправлена ссылка на GitHub.
 - `docs/REVIEW.md` — ревью, карта API Intendencia de Montevideo, правовые рамки, предложения.
 
 ### Удалено
+- Баланс карты в Android-виджете и `BalanceScraper`: из системного браузера баланс не прочитать,
+  открытого API баланса нет (в `api.montevideo.gub.uy` только `transporte` и `playas`).
+- `ComoIrScraper` и баннер «Ruta detectada en Cómo Ir» (не срабатывал: Cómo Ir — Ionic SPA).
+- Зависимости `webview_flutter`, `webview_flutter_android`, `permission_handler`; сброс кэша WebView
+  после 2 ч неактивности.
 - Разрешение `SCHEDULE_EXACT_ALARM` (не использовалось; Google Play ограничивает его).
 - Cleartext HTTP (`usesCleartextTraffic="false"`): все эндпоинты на HTTPS.
 - Запрос геолокации при каждом запуске и запрос уведомлений без активных алертов.

@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">MVD Transporte</string>
-    <string name="widget_description">Muestra el saldo de tu tarjeta STM y accesos rápidos</string>
+    <string name="widget_description">Próximo ómnibus de tus rutas y accesos a Mi STM y Recarga</string>
 </resources>
