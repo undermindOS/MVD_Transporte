@@ -1,104 +1,29 @@
-# MVD Transporte - App Icon Setup
+# MVD Transporte - App Icon
 
-## 🎨 Icon Design Concept
+## Design
 
-**Minimalist design featuring:**
-- 🚌 Bus icon (simple silhouette)
-- 🛡️ Escudo de Montevideo (coat of arms)
-- Clean, modern look
-- Blue color scheme (#0066CC)
+White front-view bus on the app's brand blue (#0066CC). Nothing else.
 
-## 📐 Icon Requirements
+**Do not use official symbols** — no Escudo de Montevideo, no national flag
+or Sol de Mayo, no STM / Intendencia branding. This is an unofficial app:
+Google Play's Misleading Claims policy and Apple's guidelines treat
+government-looking icons as false affiliation. (The previous icon combined a
+bus with the Montevideo coat of arms and was replaced for this reason.)
 
-- **Format:** PNG (with transparent background preferred)
-- **Size:** 1024x1024 pixels (recommended)
-- **Minimum:** 512x512 pixels
-- **Aspect Ratio:** 1:1 (square)
-- **File name:** `app_icon.png` (must be exactly this name)
-- **Location:** Place in this `assets/` folder
+## Files
 
-## 🎨 Design Guidelines
+| File | Use |
+|---|---|
+| `app_icon.png` | Full icon, blue background: iOS and legacy Android launcher |
+| `app_icon_foreground.png` | Transparent bus inside the 66% safe zone: Android adaptive foreground and splash screens |
 
-### Color Palette
-- **Primary Blue:** #0066CC
-- **Secondary Blue:** #0099FF
-- **White:** #FFFFFF
-- **Gray:** #666666 (for details)
+Both are 1024×1024. The adaptive background color (#0066CC) is set in
+`pubspec.yaml` (`flutter_launcher_icons`); splash colors are in
+`flutter_native_splash.yaml`.
 
-### Design Elements
-
-1. **Bus Icon:**
-   - Simple, minimalist bus silhouette
-   - Front or side view
-   - Clean lines, no excessive detail
-
-2. **Escudo de Montevideo:**
-   - Stylized coat of arms
-   - Can be simplified for clarity
-   - Reference: [Escudo de Montevideo](https://es.wikipedia.org/wiki/Escudo_de_Montevideo)
-
-3. **Layout:**
-   - Center the main icon (bus)
-   - Add coat of arms as subtle element (corner or integrated)
-   - Maintain clean, professional appearance
-   - Ensure visibility at small sizes (48x48px)
-
-## 🛠️ Creating the Icon
-
-### Option 1: Use Design Tools
-
-**Figma / Canva / Inkscape:**
-1. Create 1024x1024px canvas
-2. Add bus icon (simple vector shape)
-3. Add Montevideo coat of arms
-4. Use #0066CC blue background or white background
-5. Export as PNG
-
-### Option 2: Online Icon Generators
-
-**Flaticon / Icons8:**
-1. Search for "bus icon" and "montevideo coat of arms"
-2. Combine elements in image editor
-3. Resize to 1024x1024px
-4. Save as `app_icon.png`
-
-### Option 3: AI Image Generation
-
-Use DALL-E, Midjourney, or similar:
-```
-Prompt: "minimalist app icon, blue bus silhouette with Montevideo
-coat of arms, clean design, blue and white colors, 1024x1024px"
-```
-
-## ⚡ Quick Test with Placeholder
-
-You can use a temporary icon:
-1. Find any bus icon PNG online
-2. Resize to 512x512+ pixels
-3. Name it `app_icon.png`
-4. Place in this folder
-5. Replace with final design later
-
-## 🚀 Once Icon is Ready
-
-After saving your icon as `app_icon.png` in this folder:
+## Regenerate platform icons
 
 ```bash
-cd /Users/undermind/Documents/liberonvpn/MiSTM_pre_alpha_v0/stm_app
-flutter pub get
 dart run flutter_launcher_icons
-flutter clean
-flutter build apk --release
+dart run flutter_native_splash:create
 ```
-
-## 📚 Resources
-
-- **Escudo de Montevideo:** https://commons.wikimedia.org/wiki/File:Coat_of_arms_of_Montevideo.svg
-- **Free Icons:** https://www.flaticon.com/search?word=bus
-- **Icon Generators:** https://www.canva.com/create/app-icons/
-- **Color Picker:** Use #0066CC for primary blue
-
----
-
-**Note:** This is an unofficial app. The design should be unique and not copy
-any official branding from government agencies or transport companies.

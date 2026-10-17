@@ -18,14 +18,14 @@ flutter_launcher_icons:
   ios: true
   image_path: "assets/app_icon.png"
   adaptive_icon_background: "#0066CC"  # Blue color
-  adaptive_icon_foreground: "assets/app_icon.png"
+  adaptive_icon_foreground: "assets/app_icon_foreground.png"
 ```
 
 ### Step 3: Create Your App Icon
 
 **Design Requirements:**
 - 🚌 **Minimalist bus icon** (simple silhouette)
-- 🛡️ **Escudo de Montevideo** (Montevideo coat of arms)
+- 🚫 **No official symbols** — no coat of arms, flag or STM/IM branding (unofficial app; store policies treat them as false affiliation)
 - **Size:** 1024x1024 pixels (PNG format)
 - **Colors:** Blue (#0066CC) and white
 - **Style:** Clean, modern, professional
@@ -37,12 +37,8 @@ flutter_launcher_icons:
 
 **Design Elements:**
 - Simple bus silhouette (front or side view)
-- Montevideo coat of arms (subtle integration)
 - Clean lines, minimalist style
 - Must be legible at 48x48px size
-
-**Reference:**
-- Escudo de Montevideo: https://commons.wikimedia.org/wiki/File:Coat_of_arms_of_Montevideo.svg
 
 Save your final icon as `app_icon.png` in the `assets/` folder.
 

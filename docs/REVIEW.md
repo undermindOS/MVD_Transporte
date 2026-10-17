@@ -172,9 +172,11 @@ Custom Tabs / SFSafariViewController для входа. Виджет показ�
 |---|---|---|
 | `applicationId`/`namespace` = `com.example.stm_app`; release подписан debug-ключом ✔︎ | Google Play не примет `com.example`; смена ID = новое приложение для установленных копий | выбрать ID (на iOS уже `com.liberontech.stmapp`), завести keystore |
 | ~~WebView-обёртка сайтов IM (политики сторов)~~ | — | **решено:** системный браузер вместо WebView, см. §5.1 |
-| Иконка с госсимволикой | дизайн | заменить щит/солнце на нейтральный символ |
+| ~~Иконка с госсимволикой~~ | **сделано** в `chore/store-compliance`: в старой был герб Монтевидео (так написано в `assets/README.md`) | — |
 | ~~Вход в Mi STM внутри WebView + `BalanceScraper`~~ | — | **решено:** Custom Tabs/SFSafariViewController, скрейпинг и баланс в виджете удалены, §5.1 |
 | ~~`ComoIrScraper` фактически не работает~~ ✔︎ | — | **решено:** удалён (в браузере JS не внедрить); вместо него deep link «Ver en Cómo Ir», §5.1 |
+| Политика конфиденциальности в приложении | Google Play требует ссылку и в консоли, и внутри приложения | текст готов (`docs/privacy-policy.md`); опубликовать (GitHub Pages) и добавить ссылку в Info (`url_launcher` уже есть) |
+| Лицензия репозитория | репозиторий публичный, но без `LICENSE` — это «исходники видны», а не open source | выбрать лицензию (MIT/Apache-2.0/GPL) или явно оставить «все права защищены» |
 | Hive открыт одновременно в UI- и WorkManager-изоляте ✔︎ | миграция хранилища | Hive 2.x не многоизолятный → `hive_ce` с `IsolatedHive` или `shared_preferences` для фоновых данных |
 | iOS: фон и виджет не настроены ✔︎ | нужен Xcode, App Group, BGTask | `BGTaskSchedulerPermittedIdentifiers`, `UIBackgroundModes`, регистрация в AppDelegate, App Group для home_widget |
 | WorkManager ≥ 15 мин | ограничение Android | порог алерта 5 мин часто проскакивает — см. «режим ожидания» в §6 |
