@@ -1,7 +1,13 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:home_widget/home_widget.dart';
+import 'package:local_auth/error_codes.dart' as auth_error;
 import 'package:local_auth/local_auth.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:webview_flutter/webview_flutter.dart';
+import 'package:webview_flutter_android/webview_flutter_android.dart';
 
 import '../services/balance_scraper.dart';
 import '../services/background_worker.dart';
@@ -54,14 +60,32 @@ class _TransporteWebViewPageState extends State<TransporteWebViewPage>
   bool _isLoading = true;
   bool _canGoBack = false;
   int _currentIndex = 0;
+  // Main-frame load failure: replaces the endless "Cargando..." overlay
+  bool _loadFailed = false;
+  // Auto-reloads after a WebContent process crash (reset on a good load)
+  int _crashReloads = 0;
 
   // Cache native page widgets to avoid recreating on every rebuild
   final Map<int, Widget> _nativePageCache = {};
+
+  StreamSubscription<Uri?>? _widgetClickSub;
 
   // Authentication
   final LocalAuthentication _localAuth = LocalAuthentication();
   bool _isAuthenticated = false;
   bool _biometricLockEnabled = false;
+  // The system auth UI (esp. PIN/pattern fallback on Android) pauses and
+  // resumes the activity; without this guard resume would re-lock in a loop.
+  bool _isAuthenticating = false;
+  DateTime? _lastAuthFinishedAt;
+  bool _setupDone = false;
+
+  // Device has no usable lock method — locking would trap the user forever.
+  static const _authUnavailableCodes = {
+    auth_error.notAvailable,
+    auth_error.notEnrolled,
+    auth_error.passcodeNotSet,
+  };
 
   // Session freshness tracking
   static const Duration _sessionRefreshThreshold = Duration(hours: 2);
@@ -122,15 +146,34 @@ class _TransporteWebViewPageState extends State<TransporteWebViewPage>
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _loadBiometricSetting();
-    _requestLocationPermission();
+    // Location is requested in context, when Cómo Ir asks for it
     _initializeWebView();
     _loadInitialUrl();
+    // Home screen widget buttons while the app is already running
+    _widgetClickSub = HomeWidget.widgetClicked.listen(
+      (uri) {
+        final index = _tabIndexFromWidgetUri(uri);
+        if (index != null && mounted) _switchToTab(index);
+      },
+      onError: (Object e) => debugPrint('⚠️ widgetClicked error: $e'),
+    );
   }
 
   @override
   void dispose() {
+    _widgetClickSub?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
+  }
+
+  /// Widget buttons send mvdtransporte://tab?index=N (see
+  /// MVDTransporteWidgetProvider.kt).
+  static int? _tabIndexFromWidgetUri(Uri? uri) {
+    if (uri == null || uri.scheme != 'mvdtransporte' || uri.host != 'tab') {
+      return null;
+    }
+    final index = int.tryParse(uri.queryParameters['index'] ?? '');
+    return index != null && index >= 0 && index < _tabs.length ? index : null;
   }
 
   @override
@@ -143,7 +186,10 @@ class _TransporteWebViewPageState extends State<TransporteWebViewPage>
   }
 
   Future<void> _handleResume() async {
-    if (_biometricLockEnabled) {
+    final justAuthenticated = _lastAuthFinishedAt != null &&
+        DateTime.now().difference(_lastAuthFinishedAt!) <
+            const Duration(seconds: 2);
+    if (_biometricLockEnabled && !_isAuthenticating && !justAuthenticated) {
       setState(() => _isAuthenticated = false);
       await _authenticate();
     }
@@ -180,6 +226,19 @@ class _TransporteWebViewPageState extends State<TransporteWebViewPage>
       }
     }
 
+    // Cold start from a home screen widget button opens that tab
+    Uri? launchUri;
+    try {
+      launchUri = await HomeWidget.initiallyLaunchedFromHomeWidget();
+    } catch (e) {
+      debugPrint('⚠️ HomeWidget launch check error: $e');
+    }
+    final widgetTab = _tabIndexFromWidgetUri(launchUri);
+    if (widgetTab != null && mounted) {
+      _switchToTab(widgetTab);
+      return;
+    }
+
     await _controller.loadRequest(Uri.parse(_mainUrl));
   }
 
@@ -209,13 +268,6 @@ class _TransporteWebViewPageState extends State<TransporteWebViewPage>
 
   // --- Permissions & auth ---
 
-  Future<void> _requestLocationPermission() async {
-    final status = await Permission.location.request();
-    debugPrint(status.isGranted
-        ? '✅ Location permission granted'
-        : '❌ Location permission denied');
-  }
-
   Future<void> _loadBiometricSetting() async {
     final enabled =
         CacheService.get<bool>(CacheService.keyBiometricEnabled) ?? false;
@@ -224,26 +276,36 @@ class _TransporteWebViewPageState extends State<TransporteWebViewPage>
     if (_biometricLockEnabled) {
       await _authenticate();
     } else {
-      setState(() => _isAuthenticated = true);
-      await _setupAfterAuth();
+      await _unlock();
     }
   }
 
+  Future<void> _unlock() async {
+    if (!mounted) return;
+    setState(() => _isAuthenticated = true);
+    await _setupAfterAuth();
+  }
+
+  /// One-time setup after the first unlock. Notification permission is asked
+  /// only if the user already has alerts (otherwise when enabling one).
   Future<void> _setupAfterAuth() async {
-    await NotificationService.requestPermissions();
-    if (CacheService.getStopsWithNotificationsEnabled().isNotEmpty) {
-      await BackgroundWorker.registerPeriodicTask();
+    if (_setupDone) return;
+    _setupDone = true;
+    if (BackgroundWorker.hasActiveAlerts) {
+      await NotificationService.requestPermissions();
     }
+    await BackgroundWorker.sync();
   }
 
   Future<void> _authenticate() async {
+    if (_isAuthenticating) return;
+    _isAuthenticating = true;
     try {
       final canAuth = await _localAuth.canCheckBiometrics;
       final isSupported = await _localAuth.isDeviceSupported();
 
       if (!canAuth && !isSupported) {
-        setState(() => _isAuthenticated = true);
-        await _setupAfterAuth();
+        await _unlock();
         return;
       }
 
@@ -255,20 +317,31 @@ class _TransporteWebViewPageState extends State<TransporteWebViewPage>
         ),
       );
 
-      setState(() => _isAuthenticated = ok);
       if (ok) {
-        await _setupAfterAuth();
+        await _unlock();
+      } else if (mounted) {
+        setState(() => _isAuthenticated = false);
       }
       // При неудачной аутентификации оставляем экран блокировки
       // с кнопкой «Desbloquear» для повторной попытки
+    } on PlatformException catch (e) {
+      debugPrint('❌ Authentication error: ${e.code} ${e.message}');
+      // Fail closed: LockedOut / PermanentlyLockedOut keep the lock screen.
+      // Only open when the device has no lock method at all.
+      if (_authUnavailableCodes.contains(e.code)) {
+        await _unlock();
+      }
     } catch (e) {
       debugPrint('❌ Authentication error: $e');
-      setState(() => _isAuthenticated = true);
-      await _setupAfterAuth();
+    } finally {
+      _isAuthenticating = false;
+      _lastAuthFinishedAt = DateTime.now();
     }
   }
 
-  Future<void> _toggleBiometricLock(bool value) async {
+  /// Returns the resulting state of the lock (so the Info page switch can
+  /// reflect a cancelled confirmation).
+  Future<bool> _toggleBiometricLock(bool value) async {
     if (value) {
       final canAuth = await _localAuth.canCheckBiometrics;
       final isSupported = await _localAuth.isDeviceSupported();
@@ -281,9 +354,10 @@ class _TransporteWebViewPageState extends State<TransporteWebViewPage>
             backgroundColor: Colors.red,
           ));
         }
-        return;
+        return _biometricLockEnabled;
       }
 
+      _isAuthenticating = true;
       try {
         final ok = await _localAuth.authenticate(
           localizedReason: 'Confirma para activar el bloqueo biométrico',
@@ -292,15 +366,18 @@ class _TransporteWebViewPageState extends State<TransporteWebViewPage>
             biometricOnly: false,
           ),
         );
-        if (!ok) return;
+        if (!ok) return _biometricLockEnabled;
       } catch (e) {
         debugPrint('❌ Authentication error: $e');
-        return;
+        return _biometricLockEnabled;
+      } finally {
+        _isAuthenticating = false;
+        _lastAuthFinishedAt = DateTime.now();
       }
     }
 
     await CacheService.set(CacheService.keyBiometricEnabled, value);
-    setState(() => _biometricLockEnabled = value);
+    if (mounted) setState(() => _biometricLockEnabled = value);
 
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
@@ -310,6 +387,7 @@ class _TransporteWebViewPageState extends State<TransporteWebViewPage>
         backgroundColor: value ? Colors.green : Colors.orange,
       ));
     }
+    return value;
   }
 
   // --- WebView ---
@@ -323,19 +401,48 @@ class _TransporteWebViewPageState extends State<TransporteWebViewPage>
       ..enableZoom(true)
       ..setNavigationDelegate(
         NavigationDelegate(
-          onPageStarted: (_) => setState(() => _isLoading = true),
+          onPageStarted: (_) {
+            if (mounted) {
+              setState(() {
+                _isLoading = true;
+                _loadFailed = false;
+              });
+            }
+          },
           onPageFinished: (url) async {
+            if (!mounted) return;
+            _crashReloads = 0;
             setState(() => _isLoading = false);
-            final canGoBack = await _controller.canGoBack();
-            setState(() => _canGoBack = canGoBack);
+            await _updateCanGoBack();
             // Try to extract card balance for home screen widget
             await BalanceScraper.tryExtract(_controller, url);
             // Try to extract active route from Cómo Ir page
             await ComoIrScraper.tryExtract(_controller, url);
           },
+          // SPA navigation (Cómo Ir) changes history without onPageFinished
+          onUrlChange: (_) => _updateCanGoBack(),
           onWebResourceError: (error) {
             debugPrint(
                 '❌ WebView Error ${error.errorCode}: ${error.description}');
+            // iOS kills the WebContent process under memory pressure; then
+            // onPageFinished never fires and the overlay would spin forever.
+            // Retry once, then show an error with a retry button.
+            if (error.errorType ==
+                    WebResourceErrorType.webContentProcessTerminated &&
+                _crashReloads < 1) {
+              _crashReloads++;
+              _controller.reload();
+              return;
+            }
+            // Sub-resource failures (images, trackers) must not hide the page
+            if (error.isForMainFrame ?? false) {
+              if (mounted) {
+                setState(() {
+                  _isLoading = false;
+                  _loadFailed = true;
+                });
+              }
+            }
           },
           onNavigationRequest: (request) {
             debugPrint('🔗 Navigating to: ${request.url}');
@@ -343,10 +450,43 @@ class _TransporteWebViewPageState extends State<TransporteWebViewPage>
           },
         ),
       );
+
+    // Android WebView denies the Geolocation API unless the host app grants
+    // it per origin — without this, "mi ubicación" in Cómo Ir never works.
+    // (iOS WKWebView asks the user on its own.)
+    final platform = _controller.platform;
+    if (platform is AndroidWebViewController) {
+      platform.setGeolocationPermissionsPromptCallbacks(
+        onShowPrompt: (request) async {
+          final host = Uri.tryParse(request.origin)?.host ?? '';
+          if (!_isOfficialHost(host)) {
+            return const GeolocationPermissionsResponse(
+                allow: false, retain: false);
+          }
+          final status = await Permission.location.request();
+          return GeolocationPermissionsResponse(
+              allow: status.isGranted, retain: false);
+        },
+      );
+    }
+  }
+
+  static bool _isOfficialHost(String host) =>
+      host == 'montevideo.gub.uy' ||
+      host.endsWith('.montevideo.gub.uy') ||
+      host == 'stm.gub.uy' ||
+      host.endsWith('.stm.gub.uy');
+
+  Future<void> _updateCanGoBack() async {
+    final canGoBack = await _controller.canGoBack();
+    if (mounted) setState(() => _canGoBack = canGoBack);
   }
 
   void _switchToTab(int index) {
-    setState(() => _currentIndex = index);
+    setState(() {
+      _currentIndex = index;
+      _loadFailed = false;
+    });
     final tab = _tabs[index];
     if (tab.isWebView && tab.url != null) {
       _controller.loadRequest(Uri.parse(tab.url!));
@@ -429,6 +569,7 @@ class _TransporteWebViewPageState extends State<TransporteWebViewPage>
       return Stack(
         children: [
           WebViewWidget(controller: _controller),
+          if (_loadFailed) _buildLoadError(tab),
           if (_isLoading)
             Container(
               color: Colors.white,
@@ -461,6 +602,44 @@ class _TransporteWebViewPageState extends State<TransporteWebViewPage>
     return _nativePageCache.putIfAbsent(
       _currentIndex,
       () => tab.pageBuilder!(),
+    );
+  }
+
+  Widget _buildLoadError(_TabDef tab) {
+    final primary = Theme.of(context).primaryColor;
+    return Container(
+      color: Colors.white,
+      padding: const EdgeInsets.all(32),
+      child: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.cloud_off, size: 64, color: primary.withAlpha(150)),
+            const SizedBox(height: 16),
+            const Text(
+              'No se pudo cargar la página',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'Verificá tu conexión e intentá de nuevo.',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: Colors.black54),
+            ),
+            const SizedBox(height: 24),
+            FilledButton.icon(
+              onPressed: () {
+                setState(() => _loadFailed = false);
+                _crashReloads = 0;
+                _controller.loadRequest(Uri.parse(tab.url ?? _mainUrl));
+              },
+              icon: const Icon(Icons.refresh),
+              label: const Text('Reintentar'),
+            ),
+          ],
+        ),
+      ),
     );
   }
 

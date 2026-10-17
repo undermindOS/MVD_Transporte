@@ -3,9 +3,11 @@ import 'package:flutter/services.dart';
 import '../models/bus_arrival.dart';
 import '../models/bus_stop.dart';
 import '../models/route_alert.dart';
+import '../services/background_worker.dart';
 import '../services/cache_service.dart';
 import '../services/comoir_scraper.dart';
 import '../services/mvd_api_service.dart';
+import '../services/notification_service.dart';
 
 class StopsPage extends StatefulWidget {
   const StopsPage({super.key});
@@ -20,13 +22,14 @@ class _StopsPageState extends State<StopsPage>
 
   // --- Stops ---
   List<BusStop> _stops = [];
-  final Map<int, List<BusArrival>> _stopArrivals = {};
+  // null value = last request failed (network/server error)
+  final Map<int, List<BusArrival>?> _stopArrivals = {};
   final Map<int, bool> _stopLoading = {};
 
   // --- Routes ---
   List<RouteAlert> _routes = [];
-  // key: routeId → arrivals filtered by preferred lines
-  final Map<int, List<BusArrival>> _routeArrivals = {};
+  // key: routeId → arrivals filtered by preferred lines (null = failed)
+  final Map<int, List<BusArrival>?> _routeArrivals = {};
   final Map<int, bool> _routeLoading = {};
 
   // Detected from Cómo Ir — offered for quick save
@@ -36,6 +39,10 @@ class _StopsPageState extends State<StopsPage>
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
+    // Rebuild so the FAB tooltip follows the selected tab
+    _tabController.addListener(() {
+      if (!_tabController.indexIsChanging) setState(() {});
+    });
     _loadAll();
   }
 
@@ -49,6 +56,21 @@ class _StopsPageState extends State<StopsPage>
     _loadStops();
     _loadRoutes();
     _checkDetectedRoute();
+  }
+
+  /// Keeps notification permission and the background task in step with
+  /// alert changes (previously the task was registered only at app start).
+  Future<void> _syncAlerts({bool enabling = false}) async {
+    if (enabling) await NotificationService.requestPermissions();
+    await BackgroundWorker.sync();
+  }
+
+  void _showError(String message) {
+    if (!mounted) return;
+    final messenger = ScaffoldMessenger.of(context);
+    messenger.clearSnackBars();
+    messenger.showSnackBar(
+        SnackBar(content: Text(message), backgroundColor: Colors.red));
   }
 
   // ---------------------------------------------------------------- Stops ---
@@ -75,10 +97,23 @@ class _StopsPageState extends State<StopsPage>
     final stopId = await _showAddStopDialog();
     if (stopId == null || !mounted) return;
 
+    // Re-adding would overwrite the saved alert settings
+    if (CacheService.getStop(stopId) != null) {
+      _showError('La parada $stopId ya está guardada');
+      return;
+    }
+
     final snack = ScaffoldMessenger.of(context);
     snack.showSnackBar(const SnackBar(content: Text('Buscando parada…')));
 
-    final resolved = await MvdApiService.resolveStop(stopId);
+    final BusStop? resolved;
+    try {
+      resolved = await MvdApiService.resolveStop(stopId);
+    } on StopNotFoundException {
+      _showError('No existe la parada $stopId');
+      return;
+    }
+    // Offline: keep the stop with a placeholder name
     final stop = resolved ?? BusStop(id: stopId, name: 'Parada $stopId');
     await CacheService.saveStop(stop);
 
@@ -123,6 +158,16 @@ class _StopsPageState extends State<StopsPage>
     stop.notificationsEnabled = !stop.notificationsEnabled;
     await stop.save();
     setState(() {});
+    await _syncAlerts(enabling: stop.notificationsEnabled);
+  }
+
+  void _deleteStop(BusStop stop) {
+    // Dismissible requires the item to leave the list synchronously
+    setState(() {
+      _stops.removeWhere((s) => s.id == stop.id);
+      _stopArrivals.remove(stop.id);
+    });
+    CacheService.deleteStop(stop.id).then((_) => _syncAlerts());
   }
 
   // ---------------------------------------------------------------- Routes --
@@ -137,9 +182,7 @@ class _StopsPageState extends State<StopsPage>
   Future<void> _refreshRouteArrivals(RouteAlert route) async {
     setState(() => _routeLoading[route.id] = true);
     final all = await MvdApiService.getNextArrivals(route.originStopId);
-    final filtered = route.preferredLines.isEmpty
-        ? all
-        : all.where((a) => route.preferredLines.contains(a.line)).toList();
+    final filtered = all?.where((a) => route.acceptsLine(a.line)).toList();
 
     if (mounted) {
       setState(() {
@@ -164,8 +207,11 @@ class _StopsPageState extends State<StopsPage>
     final detected = _detectedRoute;
     if (detected == null) return;
     await ComoIrScraper.saveAsAlert(detected);
+    if (!mounted) return;
     setState(() => _detectedRoute = null);
     _loadRoutes();
+    // Saved routes are enabled by default
+    await _syncAlerts(enabling: true);
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -184,7 +230,13 @@ class _StopsPageState extends State<StopsPage>
     final snack = ScaffoldMessenger.of(context);
     snack.showSnackBar(const SnackBar(content: Text('Buscando parada…')));
 
-    final resolved = await MvdApiService.resolveStop(result.originStopId);
+    final BusStop? resolved;
+    try {
+      resolved = await MvdApiService.resolveStop(result.originStopId);
+    } on StopNotFoundException {
+      _showError('No existe la parada ${result.originStopId}');
+      return;
+    }
     final id = CacheService.nextRouteId();
     final route = RouteAlert(
       id: id,
@@ -198,6 +250,7 @@ class _StopsPageState extends State<StopsPage>
     if (mounted) {
       snack.clearSnackBars();
       _loadRoutes();
+      await _syncAlerts(enabling: true);
     }
   }
 
@@ -252,7 +305,8 @@ class _StopsPageState extends State<StopsPage>
               if (stopId == null || destCtrl.text.trim().isEmpty) return;
               final lines = lineCtrl.text
                   .split(RegExp(r'[,\s]+'))
-                  .map((s) => s.trim())
+                  // API line names are upper case ("64D", "G8")
+                  .map((s) => s.trim().toUpperCase())
                   .where((s) => s.isNotEmpty)
                   .toList();
               Navigator.pop(
@@ -275,11 +329,16 @@ class _StopsPageState extends State<StopsPage>
     route.enabled = !route.enabled;
     await route.save();
     setState(() {});
+    await _syncAlerts(enabling: route.enabled);
   }
 
-  Future<void> _deleteRoute(RouteAlert route) async {
-    await CacheService.deleteRoute(route.id);
-    _loadRoutes();
+  void _deleteRoute(RouteAlert route) {
+    // Dismissible requires the item to leave the list synchronously
+    setState(() {
+      _routes.removeWhere((r) => r.id == route.id);
+      _routeArrivals.remove(route.id);
+    });
+    CacheService.deleteRoute(route.id).then((_) => _syncAlerts());
   }
 
   // ---------------------------------------------------------------- Build ---
@@ -349,14 +408,15 @@ class _StopsPageState extends State<StopsPage>
   }
 
   Widget _buildStopCard(BusStop stop, Color primary) {
-    final arrivals = _stopArrivals[stop.id] ?? [];
+    final arrivals = _stopArrivals[stop.id];
+    final failed = _stopArrivals.containsKey(stop.id) && arrivals == null;
     final isLoading = _stopLoading[stop.id] ?? false;
 
     return Dismissible(
       key: Key('stop_${stop.id}'),
       direction: DismissDirection.endToStart,
       background: _deleteBackground(),
-      onDismissed: (_) => CacheService.deleteStop(stop.id).then((_) => _loadStops()),
+      onDismissed: (_) => _deleteStop(stop),
       child: Card(
         margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         elevation: 2,
@@ -392,7 +452,7 @@ class _StopsPageState extends State<StopsPage>
                 ),
               ]),
               const SizedBox(height: 8),
-              _buildArrivalRow(arrivals, isLoading, primary),
+              _buildArrivalRow(arrivals, isLoading, failed, primary),
             ],
           ),
         ),
@@ -483,7 +543,8 @@ class _StopsPageState extends State<StopsPage>
   }
 
   Widget _buildRouteCard(RouteAlert route, Color primary) {
-    final arrivals = _routeArrivals[route.id] ?? [];
+    final arrivals = _routeArrivals[route.id];
+    final failed = _routeArrivals.containsKey(route.id) && arrivals == null;
     final isLoading = _routeLoading[route.id] ?? false;
 
     return Dismissible(
@@ -546,7 +607,7 @@ class _StopsPageState extends State<StopsPage>
                   ),
                 ),
               const SizedBox(height: 4),
-              _buildArrivalRow(arrivals, isLoading, primary),
+              _buildArrivalRow(arrivals, isLoading, failed, primary),
             ],
           ),
         ),
@@ -556,8 +617,8 @@ class _StopsPageState extends State<StopsPage>
 
   // --------------------------------------------------------- Shared --------
 
-  Widget _buildArrivalRow(
-      List<BusArrival> arrivals, bool isLoading, Color primary) {
+  Widget _buildArrivalRow(List<BusArrival>? arrivals, bool isLoading,
+      bool failed, Color primary) {
     if (isLoading) {
       return const SizedBox(
         height: 20,
@@ -570,7 +631,12 @@ class _StopsPageState extends State<StopsPage>
         ),
       );
     }
-    if (arrivals.isEmpty) {
+    // Offline must not look like "no buses are coming"
+    if (failed) {
+      return const Text('No se pudo actualizar. Deslizá para reintentar',
+          style: TextStyle(color: Colors.redAccent, fontSize: 13));
+    }
+    if (arrivals == null || arrivals.isEmpty) {
       return const Text('Sin colectivos próximos',
           style: TextStyle(color: Colors.black45, fontSize: 13));
     }
@@ -585,7 +651,7 @@ class _StopsPageState extends State<StopsPage>
   }
 
   Widget _buildArrivalChip(BusArrival arrival, Color primary) {
-    final isImminent = arrival.etaMinutes <= 2;
+    final isImminent = arrival.isRealTime && arrival.etaMinutes <= 2;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
@@ -604,6 +670,11 @@ class _StopsPageState extends State<StopsPage>
             ),
           ),
           const SizedBox(width: 4),
+          // Timetable estimate, not a GPS-tracked bus
+          if (!arrival.isRealTime) ...[
+            Icon(Icons.schedule, size: 12, color: primary.withAlpha(180)),
+            const SizedBox(width: 2),
+          ],
           Text(
             arrival.etaLabel,
             style: TextStyle(
