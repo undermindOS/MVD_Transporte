@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import '../models/bus_arrival.dart';
 import '../models/bus_stop.dart';
+import '../models/scheduled_pass.dart';
 
 /// The stop code does not exist in the STM network.
 class StopNotFoundException implements Exception {
@@ -27,6 +28,11 @@ class MvdApiService {
   static const _timeout = Duration(seconds: 10);
   static const _headers = {'Accept': 'application/json'};
 
+  // Timetables change rarely: keep each answer for the app session
+  static const _scheduleTtl = Duration(hours: 6);
+  static final Map<String, (DateTime, List<ScheduledPass>)> _scheduleCache =
+      {};
+
   /// Returns upcoming buses for a stop, soonest first.
   /// Returns null on network/server error so callers can tell
   /// "no buses" apart from "could not check".
@@ -44,6 +50,38 @@ class MvdApiService {
       return parseArrivals(jsonDecode(utf8.decode(response.bodyBytes)));
     } catch (e) {
       debugPrint('❌ ETA API error: $e');
+      return null;
+    }
+  }
+
+  /// Theoretical timetable of a stop: about 50 passes from [hour]:[minute]
+  /// on, for the given day type, wrapping past midnight.
+  /// Returns null on network/server error.
+  static Future<List<ScheduledPass>?> getSchedule(
+      int stopId, DayType day, int hour, int minute) async {
+    final time = '$hour:${minute.toString().padLeft(2, '0')}';
+    final key = '$stopId/${day.apiValue}/$time';
+    final hit = _scheduleCache[key];
+    if (hit != null && DateTime.now().difference(hit.$1) < _scheduleTtl) {
+      return hit.$2;
+    }
+
+    try {
+      final uri = Uri.parse('$_baseUrl$_nextBusesPath/$key');
+      final response =
+          await http.get(uri, headers: _headers).timeout(_timeout);
+
+      if (response.statusCode != 200) {
+        debugPrint('❌ Schedule API ${response.statusCode}: ${response.body}');
+        return null;
+      }
+
+      final passes =
+          parseSchedule(jsonDecode(utf8.decode(response.bodyBytes)));
+      _scheduleCache[key] = (DateTime.now(), passes);
+      return passes;
+    } catch (e) {
+      debugPrint('❌ Schedule API error: $e');
       return null;
     }
   }
@@ -79,7 +117,8 @@ class MvdApiService {
 
   /// Parses `GET /transporteRest/siguientesParada/{id}`:
   /// `[{"linea":"145","minutos":5,"real":true,"destino":"PLAZA ESPAÑA",
-  ///    "idEmpresa":50,"horaDesc":"7:39","coordinates":[lng,lat], ...}]`
+  ///    "idEmpresa":50,"horaDesc":"7:39","coordinates":[lng,lat],
+  ///    "accesibilidad":true,"tipoAccesibilidad":2, ...}]`
   @visibleForTesting
   static List<BusArrival> parseArrivals(dynamic data) {
     final arrivals = <BusArrival>[];
@@ -111,6 +150,10 @@ class MvdApiService {
           destination: item['destino']?.toString() ?? '',
           isRealTime: item['real'] == true,
           scheduledTime: item['horaDesc']?.toString(),
+          accessible: item['accesibilidad'] == true,
+          accessibilityType: item['tipoAccesibilidad'] == null
+              ? null
+              : _safeInt(item['tipoAccesibilidad']),
         ));
       } catch (e) {
         debugPrint('⚠️ Parse arrival error: $e');
@@ -119,6 +162,30 @@ class MvdApiService {
 
     arrivals.sort((a, b) => a.etaSeconds.compareTo(b.etaSeconds));
     return arrivals;
+  }
+
+  /// Parses `GET /transporteRest/siguientesParada/{id}/{tipoDia}/{H:MM}` —
+  /// the same items as [parseArrivals], with `minutos: null`, `real: false`:
+  /// `[{"linea":"145","destino":"PLAZA ESPAÑA","hora":803,"horaDesc":"8:03"}]`
+  /// Keeps the API order (chronological, wrapping past midnight).
+  @visibleForTesting
+  static List<ScheduledPass> parseSchedule(dynamic data) {
+    final passes = <ScheduledPass>[];
+    if (data is! List) return passes;
+
+    for (final item in data) {
+      if (item is! Map) continue;
+      final line = item['linea']?.toString() ?? '';
+      final time = item['horaDesc']?.toString() ?? '';
+      if (line.isEmpty || time.isEmpty) continue;
+      passes.add(ScheduledPass(
+        line: line,
+        destination: item['destino']?.toString() ?? '',
+        time: time,
+        hhmm: _safeInt(item['hora']),
+      ));
+    }
+    return passes;
   }
 
   /// Parses `GET /transporteRest/lineas/{id}`:

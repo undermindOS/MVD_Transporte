@@ -8,6 +8,12 @@ class CacheService {
   static const String _routesBox = 'routes';
 
   static const String keyBiometricEnabled = 'biometric_lock_enabled';
+  // Transport news: cached messages (JSON string), paging start, last
+  // fetch (ms since epoch) and the highest idMensaje the user has seen
+  static const String keyNewsCache = 'news_cache';
+  static const String keyNewsFromId = 'news_from_id';
+  static const String keyNewsFetchedAt = 'news_fetched_at';
+  static const String keyNewsLastReadId = 'news_last_read_id';
 
   /// [path] overrides the storage directory (tests run without path_provider).
   static Future<void> init({String? path}) async {

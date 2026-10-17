@@ -45,11 +45,11 @@ Flutter-приложение (Android основной таргет, iOS ско�
 |---|---|
 | `GET api.montevideo.gub.uy/transporteRest/siguientesParada/{parada}` | ближайшие автобусы (POST с `[codigoLinea…]` — фильтр по линиям) |
 | `GET …/transporteRest/lineas/{parada}` | `{"descripcion":"<угол улиц>","lineas":[{"descripcion":"G8","codigo":437}]}` |
-| `GET …/transporteRest/siguientesParada/{parada}/{HABIL\|SABADO\|DOMINGO}/{H:MM}` | расписание по типу дня |
+| `GET …/transporteRest/siguientesParada/{parada}/{HABIL\|SABADO\|DOMINGO}/{H:MM}` | расписание по типу дня: ~50 рейсов от `H:MM` (`8:05` и `8:5` равноценны), через полночь; `minutos:null`, `real:false`, `accesibilidad:false/0`; иной `tipoDia` → 500 |
 | `POST …/transporteRest/siguientesRuteo/…`, `…/partesCirculares/` | ETA по маршруту, кольцевые |
 | `api.montevideo.gub.uy/comoirRest/rest/comoir/{caminando,bus,cortarRecorrido,duracionRuteo}` | построение маршрута |
 | `api.montevideo.gub.uy/ubicacionesRest/…` | геокодирование: углы, адреса, POI |
-| `GET api.montevideo.gub.uy/notificacion/mensajes?idApp=1&fromIdMessage=N` | официальные новости транспорта (объезды, изменения) |
+| `GET api.montevideo.gub.uy/notificacion/mensajes?idApp=1&fromIdMessage=N` | официальные новости транспорта (объезды, изменения): до 10 сообщений с `id > N` **в порядке хранения, не по id**, `count` — сколько всего выше `N`; `N=0` — самые старые (2020). `fecha` — мс |
 | `GET pci.montevideo.gub.uy/buses/control` | % GPS-покрытия по операторам `[{"empresa":"CUTCSA","valor":100}…]` |
 | `geoserver.montevideo.gub.uy/geoserver/ows` WFS `imm:v_uptu_paradas` | 42 672 записи «остановка × вариант», EPSG:32721 (`srsName=EPSG:4326` для lat/lon) ✔︎ |
 | `https://m.montevideo.gub.uy/comoir/parada?numero={id}` | deep link: открыть остановку в Cómo Ir (сервер отдаёт SPA, код обрабатывает `numero`) |
@@ -243,11 +243,11 @@ SnackBar, «Ver en Cómo Ir» → `/comoir/parada?numero=1234`, возврат �
    `/buses/busstops` → «остановки рядом» по геолокации и поиск по улице.
 3. **«Ver en Cómo Ir»** на карточке остановки — deep link `/comoir/parada?numero={id}`:
    официальная интеграция без скрейпинга.
-4. **Новости транспорта.** `notificacion/mensajes` — объезды и изменения линий, которые
+4. ✅ **Новости транспорта.** `notificacion/mensajes` — объезды и изменения линий, которые
    публикует сама IM, нативным списком.
-5. **Индикатор качества данных.** `pci.../buses/control` — «данные GPS CUTCSA сейчас 40%»,
+5. ✅ **Индикатор качества данных.** `pci.../buses/control` — «данные GPS CUTCSA сейчас 40%»,
    чтобы пользователь понимал, почему ETA неточны.
-6. **Доступность.** Поля `accesibilidad`/`tipoAccesibilidad` (и `access` в официальном API) —
+6. ✅ **Доступность.** Поля `accesibilidad`/`tipoAccesibilidad` (и `access` в официальном API) —
    значок низкопольного автобуса.
 7. **Офлайн-расписание.** GTFS (`google_transit.zip`) или набор «Horarios por parada» —
    работает без сети. Требует Nota de Origen (§3).
@@ -255,6 +255,19 @@ SnackBar, «Ver en Cómo Ir» → `/comoir/parada?numero=1234`, возврат �
    уведомлением (foreground service, тип `shortService`/`dataSync` по правилам Play)
    вместо 15-минутного WorkManager.
 9. **Карта автобуса.** У `real:true` есть `coordinates` — показать, где сейчас автобус.
+
+**Сделано в ветке `feat/open-data-features` (4, 5, 6 и расписание по типу дня):**
+вкладка «Novedades» в «Mis paradas» (бейдж непрочитанных, текст HTML без WebView/JS, ссылка —
+в системном браузере), ♿ на чипе рейса, экран «Horarios» на карточке остановки
+(Hábiles/Sábados/Domingos + время), предупреждение «Datos GPS parciales» при `valor < 70`.
+Только на переднем плане, без фонового опроса: новости — не чаще раза в 10 мин (кэш в Hive),
+статус GPS — раз в минуту, расписание — кэш 6 ч. Находка: листание `notificacion/mensajes`
+по максимальному id (как в Cómo Ir) теряет сообщения — 17.10.2026 после id 148 пришла страница
+с 171, и 161…170 не показывались; приложение поднимает `fromIdMessage` по `count`, пока остаток
+не влезет в одну страницу (с нуля — 4 запроса, дальше 1). Проверено: тесты на сохранённых живых
+ответах (`test/fixtures/`), iOS-симулятор с живым API (новости, деталь, «Ver más» → Safari,
+расписание и смена дня, ♿ на остановке 4018; баннер GPS — с подставленным статусом, сейчас у
+всех операторов 100 %).
 
 ---
 
