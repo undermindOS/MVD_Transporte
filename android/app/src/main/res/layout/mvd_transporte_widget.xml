@@ -30,47 +30,14 @@
 
     </LinearLayout>
 
-    <!-- Balance label -->
-    <TextView
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="6dp"
-        android:text="Saldo STM"
-        android:textColor="#FFFFFFFF"
-        android:textSize="11sp"
-        android:alpha="0.7" />
-
-    <!-- Balance value -->
-    <TextView
-        android:id="@+id/widget_balance"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="—"
-        android:textColor="#FFFFFFFF"
-        android:textSize="26sp"
-        android:textStyle="bold"
-        android:layout_marginTop="2dp" />
-
-    <!-- Timestamp -->
-    <TextView
-        android:id="@+id/widget_updated"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text=""
-        android:textColor="#FFFFFFFF"
-        android:textSize="10sp"
-        android:alpha="0.6"
-        android:layout_marginTop="2dp" />
-
-    <!-- Route ETA section (visible only when a route is saved) -->
+    <!-- Route ETA: next bus of the first enabled route alert -->
     <LinearLayout
         android:id="@+id/widget_route_section"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="horizontal"
-        android:layout_marginTop="6dp"
-        android:gravity="center_vertical"
-        android:visibility="gone">
+        android:layout_marginTop="10dp"
+        android:gravity="center_vertical">
 
         <ImageView
             android:layout_width="12dp"
@@ -102,10 +69,10 @@
         android:gravity="start">
 
         <TextView
-            android:id="@+id/widget_btn_inicio"
+            android:id="@+id/widget_btn_mistm"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Inicio"
+            android:text="Mi STM"
             android:textColor="#FFFFFFFF"
             android:textSize="12sp"
             android:background="@drawable/widget_button_bg"

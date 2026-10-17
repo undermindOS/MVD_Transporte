@@ -136,8 +136,10 @@ class _InfoPageState extends State<InfoPage> {
                     color: Colors.black87,
                   ),
                 ),
+                // Mi STM lives in the browser now: the lock guards only
+                // what the app stores (saved stops and route alerts)
                 Text(
-                  'Protege tu información con huella o Face ID',
+                  'Protege tus paradas y rutas guardadas',
                   style: TextStyle(fontSize: 13, color: Colors.black54),
                 ),
               ],

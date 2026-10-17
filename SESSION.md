@@ -39,3 +39,31 @@
 ### Next steps
 - Закоммитить iOS-фиксы, создать PR в undermindOS/MVD_Transporte.
 - Обновить Flutter (lipo `-verify_arch` в Xcode 27).
+
+## 2026-10-17 (вечер) — системный браузер вместо WebView (`feat/custom-tabs`)
+
+### What was done
+- Ветка `feat/custom-tabs` от `fix/api-migration-review` (0f73dd0), worktree
+  `.claude/worktrees/optimistic-antonelli-e27470/MVD_Transporte`.
+- Mi STM, Recarga, Cómo Ir, Avisos — плитки во вкладке «Servicios», открываются через `url_launcher`
+  (`inAppBrowserView` = Custom Tabs / SFSafariViewController); главная — «Mis paradas».
+- «Ver en Cómo Ir» на карточке остановки (тот же API `onOpenStopInComoIr`, что в `claude/nearby-stops-comoir`).
+- Удалены `BalanceScraper`, `ComoIrScraper`, баланс в виджете, WebView-зависимости, `permission_handler`.
+- Кнопки виджета «Mi STM»/«Recarga» открывают сайт в браузере (PendingIntent ACTION_VIEW).
+
+### Current state
+- What works: analyze чисто, 20/20 тестов; iOS-симулятор: тап «Mi STM» открывает SFSafariViewController.
+- What's broken/pending: Android не проверен (эмулятор не стартует). Конфликты при слиянии с
+  `claude/nearby-stops-comoir`: `webview_page.dart` (переименован в `home_page.dart` — брать нашу версию),
+  импорты `stops_page.dart`, `CHANGELOG.md`, `SESSION.md`, `test/widget_test.dart`.
+
+### Next steps
+- Решение владельца по биометрическому замку (docs/REVIEW.md §5.1).
+- Проверка на Android-устройстве: Custom Tabs, кнопки виджета, возврат без повторной блокировки.
+
+### Key decisions made
+- `url_launcher`, не `flutter_custom_tabs`: first-party, кастомизация не нужна; WebView-фолбэк
+  `url_launcher` обойдён проверкой `supportsLaunchMode` + `<queries>` CustomTabsService.
+- На iOS показ SFSafariViewController ставит приложение на паузу (проверено) → возврат из браузера
+  не блокирует повторно, если пауза началась ≤ 3 с после открытия.
+- Разрешения геолокации оставлены: нужны ветке «Paradas cercanas».

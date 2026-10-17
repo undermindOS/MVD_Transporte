@@ -34,10 +34,6 @@ dependencies:
   # The following adds the Cupertino Icons font to your application.
   # Use with the CupertinoIcons class for iOS style icons.
   cupertino_icons: ^1.0.8
-  webview_flutter: ^4.13.1
-  # Android-specific WebView API (geolocation prompt for Cómo Ir)
-  webview_flutter_android: ^4.10.11
-  permission_handler: ^11.3.1
   geolocator: ^13.0.2
   local_auth: ^2.3.0
   shared_preferences: ^2.3.3
@@ -60,11 +56,16 @@ dependencies:
   # HTTP client for Montevideo transit API
   http: ^1.3.0
 
+  # Official sites (Mi STM, Recarga, Cómo Ir, Avisos) open in the system browser:
+  # Chrome Custom Tabs on Android, SFSafariViewController on iOS
+  url_launcher: ^6.3.3
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
-  # Fake WebView platform for widget tests
-  webview_flutter_platform_interface: ^2.14.0
+  # Fake browser launcher and biometrics for widget tests
+  url_launcher_platform_interface: ^2.3.2
+  local_auth_platform_interface: ^1.1.0
 
   # The "flutter_lints" package below contains a set of recommended lints to
   # encourage good coding practices. The lint set provided by the package is

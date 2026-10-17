@@ -154,18 +154,83 @@ Custom Tabs / SFSafariViewController для входа. Виджет показ�
 | Тема | Почему не трогал | Рекомендация |
 |---|---|---|
 | `applicationId`/`namespace` = `com.example.stm_app`; release подписан debug-ключом ✔︎ | Google Play не примет `com.example`; смена ID = новое приложение для установленных копий | выбрать ID (на iOS уже `com.liberontech.stmapp`), завести keystore |
-| WebView-обёртка сайтов IM (политики сторов) | продуктовое решение | письмо в `pci@imm.gub.uy` за разрешением; либо Custom Tabs вместо WebView для Mi STM/Recarga |
+| ~~WebView-обёртка сайтов IM (политики сторов)~~ | — | **решено:** системный браузер вместо WebView, см. §5.1 |
 | Иконка с госсимволикой | дизайн | заменить щит/солнце на нейтральный символ |
-| Вход в Mi STM внутри WebView + `BalanceScraper` | убирает фичу баланса | Custom Tabs/SFSafariViewController, отказ от скрейпинга баланса |
-| `ComoIrScraper` фактически не работает ✔︎ | удаление фичи | Ionic SPA: `onPageFinished` срабатывает один раз на пустой странице; заменить нативным выбором остановки (§6) |
+| ~~Вход в Mi STM внутри WebView + `BalanceScraper`~~ | — | **решено:** Custom Tabs/SFSafariViewController, скрейпинг и баланс в виджете удалены, §5.1 |
+| ~~`ComoIrScraper` фактически не работает~~ ✔︎ | — | **решено:** удалён (в браузере JS не внедрить); вместо него deep link «Ver en Cómo Ir», §5.1 |
 | Hive открыт одновременно в UI- и WorkManager-изоляте ✔︎ | миграция хранилища | Hive 2.x не многоизолятный → `hive_ce` с `IsolatedHive` или `shared_preferences` для фоновых данных |
 | iOS: фон и виджет не настроены ✔︎ | нужен Xcode, App Group, BGTask | `BGTaskSchedulerPermittedIdentifiers`, `UIBackgroundModes`, регистрация в AppDelegate, App Group для home_widget |
 | WorkManager ≥ 15 мин | ограничение Android | порог алерта 5 мин часто проскакивает — см. «режим ожидания» в §6 |
-| Один `WebViewController` на 4 вкладки ✔︎ | рефакторинг навигации | история вкладок смешивается, перезагрузка при каждом переключении; `_nativePageCache` кэширует Widget, а не State — `IndexedStack` |
+| ~~Один `WebViewController` на 4 вкладки~~ ✔︎ | — | **решено:** WebView нет, две нативные вкладки в `IndexedStack`, §5.1 |
 | Устаревшие зависимости | апгрейд ломает API | `local_auth` 3.x удалил `AuthenticationOptions` ✔︎, `workmanager` 0.10, `hive_flutter` заброшен; `geolocator`, `shared_preferences` не используются |
-| UA «Android 10 / Chrome 120» и на iOS ✔︎ | влияет на сайт STM | убрать подмену или задавать по платформе — проверить вручную |
+| ~~UA «Android 10 / Chrome 120» и на iOS~~ ✔︎ | — | **решено:** подмены нет, браузер шлёт свой UA |
+| Биометрический замок после ухода Mi STM в браузер | продуктовое решение | см. §5.1 «Биометрический замок» |
+| Разрешения геолокации в манифестах | нужны ветке «Paradas cercanas» | на `feat/custom-tabs` геолокацию никто не запрашивает; если `claude/nearby-stops-comoir` не вливается — удалить `ACCESS_*_LOCATION` и `NSLocation*` |
+| Старые данные баланса на устройствах | безвредно | Hive `cached_card_balance`, `last_detected_route`, `last_active_time` и `card_balance` в данных виджета остаются после обновления; при желании — разовая очистка при старте |
 | «colectivo» → «ómnibus» ✔︎ | тексты | в Уругвае говорят «ómnibus» |
 | `NSLocationAlwaysAndWhenInUseUsageDescription` ✔︎ | не нужен | удалить из Info.plist |
+
+### 5.1 Решено: системный браузер вместо WebView (ветка `feat/custom-tabs`)
+
+**Что сделано.** Встроенного WebView в приложении больше нет (`webview_flutter*` и
+`permission_handler` удалены из зависимостей).
+
+| Было | Стало |
+|---|---|
+| Вкладки Inicio, Recarga, Cómo Ir, Avisos — WebView с JS-инъекцией | вкладка «Servicios» с плитками Mi STM, Recarga, Cómo Ir, Avisos; каждая открывает официальный сайт в **Chrome Custom Tabs** (Android) / **SFSafariViewController** (iOS) |
+| Главная — WebView Mi STM | главная — нативная «Mis paradas»; нижняя навигация из двух нативных вкладок (`IndexedStack`, состояние вкладок сохраняется) |
+| Cómo Ir — вкладка-WebView | плитка + «Ver en Cómo Ir» на карточке остановки: deep link `/comoir/parada?numero=N` в том же браузере |
+| `BalanceScraper` → баланс в Android-виджете | удалён; в виджете строка ближайшего автобуса и кнопки «Mi STM»/«Recarga», открывающие сайт в браузере |
+| `ComoIrScraper` → баннер «Ruta detectada» во вкладке «Rutas» | удалён вместе с баннером; маршрут добавляется кнопкой «+» |
+| Сброс кэша WebView после 2 ч неактивности | удалён (сессией управляет браузер) |
+
+**Почему `url_launcher`, а не `flutter_custom_tabs`.** `url_launcher` — пакет команды Flutter:
+`LaunchMode.inAppBrowserView` = `CustomTabsIntent` на Android и `SFSafariViewController` на iOS,
+этого достаточно. `flutter_custom_tabs` даёт цвет тулбара, анимации, partial tabs — нам не нужны,
+а это лишняя сторонняя зависимость. Нюанс `url_launcher`: если на Android нет браузера с
+Custom Tabs, он молча открывает **собственный WebView-activity**. Поэтому `SystemBrowser.open`
+сначала проверяет `supportsLaunchMode(inAppBrowserView)` и иначе открывает полный браузер;
+для проверки на Android 11+ в манифест добавлен `<queries>` с `CustomTabsService`.
+
+**Что пользователь теряет.**
+- **Баланс карты в виджете и в приложении.** В Custom Tabs/Safari нельзя выполнить JS, а открытого
+  API баланса нет: каталог `api.montevideo.gub.uy` содержит только `transporte` и `playas`.
+  Баланс теперь — одно нажатие «Mi STM» (в приложении или на виджете).
+- **Вход «внутри приложения»**: Mi STM открывается поверх приложения в браузерном окне
+  (на Android сессия общая с Chrome — один раз вошёл, дальше залогинен и в Chrome).
+- **Баннер «Ruta detectada en Cómo Ir»** — он и так не срабатывал (Ionic SPA).
+- **Вкладка Cómo Ir** как часть приложения: теперь это браузерное окно с кнопкой «Готово/×».
+
+**Что пользователь получает.**
+- Соответствие Google Play Spam policy («webview of a website without permission») и меньше
+  риска по Apple 4.2: приложение больше не обёртка сайтов IM, его ядро — нативные остановки и алерты.
+- Логин ID Uruguay вводится в браузере, который приложение не может читать и в который не может
+  внедрять код (RFC 8252); видна настоящая адресная строка, работают менеджеры паролей и autofill.
+- Геолокацию для Cómo Ir запрашивает браузер, а не приложение — без самописного callback’а
+  (на устройстве не проверено).
+- Меньше кода и зависимостей: −2 скрейпера, −WebView-плагины, −`permission_handler`.
+
+**Биометрический замок — нужно решение.** Раньше он закрывал WebView с живой сессией Mi STM.
+Теперь сессия живёт в браузере (Chrome/Safari) и замком не защищена, так что он закрывает только
+сохранённые остановки и маршруты (по ним можно понять, где человек живёт и работает).
+Сделано: подпись в Info исправлена на «Protege tus paradas y rutas guardadas»; возврат из
+браузера больше не блокирует приложение повторно (Custom Tab — отдельная activity, а на iOS показ
+SFSafariViewController тоже даёт `inactive → hidden → paused`; пропускается только пауза,
+начавшаяся в первые 3 с после открытия браузера, тест это проверяет). Варианты: (а) оставить как приватность сохранённых данных — текущее состояние;
+(б) убрать замок, `local_auth` и `USE_BIOMETRIC`/`NSFaceIDUsageDescription` — проще, меньше
+вопросов в ревью сторов. Рекомендация — (а), он выключен по умолчанию и ничего не стоит.
+
+**Проверено.** `flutter analyze` — чисто; `flutter test` — 20/20 (новые тесты: две нативные вкладки,
+плитки, Mi STM → `inAppBrowserView`, без Custom Tabs → `externalApplication`, ошибка запуска →
+SnackBar, «Ver en Cómo Ir» → `/comoir/parada?numero=1234`, возврат из браузера не блокирует, а
+следующий уход в фон — блокирует; последний тест падает, если убрать проверку). iOS-симулятор
+(iPhone 17 Pro, iOS 26.2): приложение открывается на «Mis paradas»; настоящий тап «Servicios» →
+«Mi STM» (временный integration-тест, не в репозитории) открывает SFSafariViewController с доменом
+`stm.gub.uy`; приложение уходит в `inactive` через 18 мс после тапа, `paused` — через 0,6 с.
+Содержимое страницы пустое — в этом симуляторе WebKit не рендерит страницы (см. §7).
+`flutter build apk --debug` — собирается (Kotlin-виджет, `<queries>`).
+**Не проверено:** Android вживую (Custom Tabs, кнопки виджета) — эмулятор не стартует; вход в Mi STM
+и баланс на реальном устройстве.
 
 ---
 
