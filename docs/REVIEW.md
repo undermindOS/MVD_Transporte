@@ -39,7 +39,8 @@ Flutter-приложение (Android основной таргет, iOS ско�
 
 ### 2.2 Открытые эндпоинты Cómo Ir (без авторизации)
 
-Найдены в конфиге `m.montevideo.gub.uy/comoir/build/main.js`. Теперь приложение использует первые два.
+Найдены в конфиге `m.montevideo.gub.uy/comoir/build/main.js`. Теперь приложение использует первые два,
+WFS `imm:v_uptu_paradas` («Paradas cercanas») и deep link `/comoir/parada` («Ver en Cómo Ir»).
 
 | Эндпоинт | Назначение |
 |---|---|
@@ -61,6 +62,22 @@ Flutter-приложение (Android основной таргет, iOS ско�
  "coordinates":[-56.142532,-34.88331],"idEmpresa":50,"idBus":247,
  "horaDesc":"7:39","accesibilidad":true,"parada_actual":"BV JOSE BATLLE Y ORDOÑEZ y LUCIANO ROMERO"}
 ```
+
+WFS остановок (используется в «Paradas cercanas», `lib/services/nearby_stops_service.dart`):
+
+```
+GET geoserver.montevideo.gub.uy/geoserver/ows?service=wfs&version=2.0.0&request=GetFeature
+    &typename=imm:v_uptu_paradas&outputFormat=application/json&srsName=EPSG:4326
+    &propertyName=cod_ubic_parada,desc_linea,calle,esquina,the_geom
+    &bbox={minLon},{minLat},{maxLon},{maxLat},EPSG:4326
+```
+
+- Одна запись = «остановка × вариант линии»; группировать по `cod_ubic_parada` — это тот же номер,
+  что в `transporteRest` и в deep link Cómo Ir (574 → «SAN JOSE y ANDES», те же линии, что в `lineas/574`).
+- BBOX с суффиксом `EPSG:4326` — порядок **lon,lat**; lat,lon молча возвращает 0 записей.
+  Координаты в ответе — `[lon, lat]`.
+- Центр, радиус 400 м: ~1 070 записей / 39 остановок в боксе, 287 КБ JSON, 8 КБ в gzip (сервер сжимает).
+- Фикстура для тестов — `test/fixtures/wfs_paradas_18_de_julio.json` (живой ответ от 2026-10-17).
 
 `real:false` — расписание без GPS (`coordinates:null`, `minutos` может быть 945).
 `idEmpresa`: 10 COETC, 20 COME, 50 CUTCSA, 70 UCOT. Несуществующая остановка → `500 "No existe…"`.
@@ -241,8 +258,9 @@ SnackBar, «Ver en Cómo Ir» → `/comoir/parada?numero=1234`, возврат �
    и ответов. Это легальный канал с явными условиями и защита от поломок, как с `stmonlineRest`.
 2. **Поиск остановок без номера.** WFS `imm:v_uptu_paradas` (`srsName=EPSG:4326`) или
    `/buses/busstops` → «остановки рядом» по геолокации и поиск по улице.
+   ✅ «Остановки рядом» сделаны через WFS («Paradas cercanas», §2.2); поиск по улице — нет.
 3. **«Ver en Cómo Ir»** на карточке остановки — deep link `/comoir/parada?numero={id}`:
-   официальная интеграция без скрейпинга.
+   официальная интеграция без скрейпинга. ✅ Сделано.
 4. ✅ **Новости транспорта.** `notificacion/mensajes` — объезды и изменения линий, которые
    публикует сама IM, нативным списком.
 5. ✅ **Индикатор качества данных.** `pci.../buses/control` — «данные GPS CUTCSA сейчас 40%»,
