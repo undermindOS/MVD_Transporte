@@ -1,10 +1,8 @@
 # Política de privacidad — MVD Transporte
 
-> Borrador. Describe la app **después** de abrir Mi STM y Recarga en el
-> navegador del sistema (sin WebView propio ni lectura del saldo). Revisarlo
-> con un asesor legal y actualizar la fecha antes de publicarlo. Las tiendas
-> piden una URL pública (por ejemplo GitHub Pages) y Google Play también un
-> enlace dentro de la app.
+> Borrador. Revisarlo con un asesor legal y actualizar la fecha antes de
+> publicarlo. Las tiendas piden una URL pública (por ejemplo GitHub Pages) y
+> Google Play también un enlace dentro de la app.
 
 **Última actualización:** [fecha]
 
@@ -26,8 +24,10 @@ que guardás, y la configuración del bloqueo biométrico, se almacenan solo en
 tu dispositivo. Se borran al eliminar los datos de la app o desinstalarla.
 
 **Consultas a la Intendencia de Montevideo.** Para mostrar tiempos de
-arribo y nombres de paradas, la app envía el número de parada a los
-servicios públicos de la Intendencia (`api.montevideo.gub.uy`). Esas
+arribo, horarios, nombres de paradas, novedades y el estado de los datos
+GPS, la app consulta los servicios públicos de la Intendencia
+(`api.montevideo.gub.uy`, `pci.montevideo.gub.uy`), enviando como mucho el
+número de parada. Esas
 solicitudes llegan directamente a la Intendencia, que las trata según sus
 propias políticas; incluyen datos técnicos como tu dirección IP.
 

@@ -1,9 +1,9 @@
 # Ficha de la tienda (Google Play / App Store)
 
-> Borrador para publicar **después** de pasar Mi STM y Recarga al navegador del
-> sistema (rama de Custom Tabs). Si la app sigue mostrando esos sitios en un
-> WebView propio, la descripción de abajo no es exacta y la app arriesga la
-> política de Spam de Google Play («webview of a website without permission»).
+> Borrador. Corresponde a la app con Mi STM, Recarga, Cómo Ir y Avisos
+> abiertos en el navegador del sistema (sin WebView propio): mantenerlo así,
+> la política de Spam de Google Play prohíbe «a webview of a website without
+> permission».
 >
 > Requisito de Google Play para apps no oficiales con información de gobierno:
 > fuentes verificables en la descripción y aclarar que la app no es un
@@ -23,8 +23,13 @@ MVD Transporte te muestra cuándo llega tu ómnibus a las paradas que usás todo
 los días y te avisa cuando se está acercando.
 
 • Mis paradas: guardá tus paradas y mirá los próximos ómnibus de un vistazo.
+• Paradas cercanas: encontrá las paradas a tu alrededor sin saber el número.
 • En vivo o por horario: los ómnibus con ubicación GPS se marcan distinto de
   los horarios teóricos, para que sepas qué tan confiable es cada tiempo.
+• Accesibilidad: los ómnibus accesibles se marcan con ♿.
+• Horarios: consultá el horario teórico de una parada para días hábiles,
+  sábados o domingos.
+• Novedades: desvíos y cambios de líneas publicados por la Intendencia.
 • Alertas: recibí una notificación cuando el ómnibus está a pocos minutos.
 • Rutas: guardá un trayecto con tus líneas preferidas.
 • Accesos rápidos a Mi STM, Recarga y Cómo Ir, que se abren en los sitios
@@ -36,8 +41,9 @@ afiliada al Sistema de Transporte Metropolitano (STM) ni a las empresas de
 transporte.
 
 **Fuentes de la información:**
-• Tiempos de arribo y paradas: servicios en línea de la Intendencia de
-  Montevideo, los mismos que usa Cómo Ir — https://m.montevideo.gub.uy/comoir/
+• Tiempos de arribo, horarios, paradas y novedades: servicios en línea de la
+  Intendencia de Montevideo, los mismos que usa Cómo Ir —
+  https://m.montevideo.gub.uy/comoir/
 • Mi STM y recarga de tarjeta: sitio oficial — https://stm.gub.uy
 • Información del transporte: https://montevideo.gub.uy
 
@@ -68,7 +74,7 @@ Revisar contra la implementación final antes de enviar.
 
 | Pregunta | Respuesta propuesta | Por qué |
 |---|---|---|
-| ¿Recopila o comparte datos? | Ubicación aproximada: solo si se publica la búsqueda de «Paradas cercanas» | Esa función envía un área alrededor del usuario al servicio público de la Intendencia (WFS) para obtener paradas; no se envía al desarrollador |
+| ¿Recopila o comparte datos? | Ubicación aproximada, para «Paradas cercanas» | Esa función envía un área alrededor del usuario al servicio público de la Intendencia (WFS) para obtener paradas; no se envía al desarrollador |
 | Paradas y rutas guardadas | No recopilado | Quedan en el dispositivo (Hive) |
 | Credenciales de Mi STM | No recopilado | Se ingresan en el sitio oficial, en el navegador del sistema |
 | Biometría | No recopilado | La valida el sistema operativo; la app recibe solo sí/no |
@@ -76,5 +82,4 @@ Revisar contra la implementación final antes de enviar.
 | Eliminación de datos | El usuario borra los datos de la app o la desinstala | No hay datos en servidores del desarrollador |
 
 Apple App Privacy: «Data Not Collected», salvo la ubicación aproximada de
-«Paradas cercanas» si se publica (App Functionality, no vinculada al usuario,
-sin tracking).
+«Paradas cercanas» (App Functionality, no vinculada al usuario, sin tracking).
