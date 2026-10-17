@@ -60,6 +60,12 @@ dependencies:
   # HTTP client for Montevideo transit API
   http: ^1.3.0
 
+  # Transport news: links open in the system browser
+  url_launcher: ^6.3.3
+
+  # Transport news: HTML parsed to text widgets (no JS engine involved)
+  html: ^0.15.7
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

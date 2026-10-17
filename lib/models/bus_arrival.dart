@@ -16,6 +16,14 @@ class BusArrival {
   /// Scheduled pass time ("8:07"), when the API provides it.
   final String? scheduledTime;
 
+  /// Wheelchair-accessible bus (API `accesibilidad`).
+  final bool accessible;
+
+  /// API `tipoAccesibilidad`: Cómo Ir shows the "universal accessibility"
+  /// icon for 2 and the plain accessibility icon for 3; 1 = not accessible,
+  /// 0 = unknown (timetable queries).
+  final int? accessibilityType;
+
   const BusArrival({
     required this.line,
     required this.companyCode,
@@ -26,6 +34,8 @@ class BusArrival {
     this.destination = '',
     this.isRealTime = true,
     this.scheduledTime,
+    this.accessible = false,
+    this.accessibilityType,
   });
 
   String get companyName {

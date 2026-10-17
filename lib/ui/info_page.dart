@@ -101,9 +101,11 @@ class _InfoPageState extends State<InfoPage> {
             // name the provider, the license, the dataset and any changes.
             const Text(
               'Fuente de datos: servicios en línea de la Intendencia de '
-              'Montevideo (los mismos que usa Cómo Ir). Los tiempos de arribo '
-              'son estimados y pueden variar; los marcados con reloj son '
-              'horarios teóricos, sin ubicación GPS del ómnibus.',
+              'Montevideo (los mismos que usa Cómo Ir): tiempos de arribo, '
+              'horarios por parada, novedades del transporte y estado del '
+              'GPS por empresa. Los tiempos de arribo son estimados y pueden '
+              'variar; los marcados con reloj son horarios teóricos, sin '
+              'ubicación GPS del ómnibus.',
               style: TextStyle(fontSize: 13, height: 1.5, color: Colors.black54),
             ),
             const SizedBox(height: 40),

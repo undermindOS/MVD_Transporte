@@ -3,11 +3,16 @@ import 'package:flutter/services.dart';
 import '../models/bus_arrival.dart';
 import '../models/bus_stop.dart';
 import '../models/route_alert.dart';
+import '../models/transport_news.dart';
 import '../services/background_worker.dart';
+import '../services/bus_status_service.dart';
 import '../services/cache_service.dart';
 import '../services/comoir_scraper.dart';
 import '../services/mvd_api_service.dart';
 import '../services/notification_service.dart';
+import '../services/transport_news_service.dart';
+import 'news_list.dart';
+import 'schedule_page.dart';
 
 class StopsPage extends StatefulWidget {
   const StopsPage({super.key});
@@ -35,13 +40,34 @@ class _StopsPageState extends State<StopsPage>
   // Detected from Cómo Ir — offered for quick save
   DetectedRoute? _detectedRoute;
 
+  // GPS data quality per operator (null = unknown)
+  List<OperatorGpsStatus>? _gpsStatus;
+
+  // --- News ---
+  static const _newsTab = 2;
+  int _shownTab = 0;
+  List<TransportNews> _news = [];
+  bool _newsLoading = false;
+  bool _newsFailed = false;
+  // Ids above this were unread when the news tab was opened (highlighted)
+  int? _newsReadBefore;
+
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
+    _tabController = TabController(length: 3, vsync: this);
     // Rebuild so the FAB tooltip follows the selected tab
     _tabController.addListener(() {
-      if (!_tabController.indexIsChanging) setState(() {});
+      if (_tabController.indexIsChanging) return;
+      // Swipes also notify (offset changes) without changing the tab
+      if (_tabController.index != _shownTab) {
+        _shownTab = _tabController.index;
+        if (_shownTab == _newsTab) {
+          _newsReadBefore = TransportNewsService.lastReadId;
+          _markNewsRead();
+        }
+      }
+      setState(() {});
     });
     _loadAll();
   }
@@ -56,6 +82,14 @@ class _StopsPageState extends State<StopsPage>
     _loadStops();
     _loadRoutes();
     _checkDetectedRoute();
+    _loadNews();
+    _loadGpsStatus();
+  }
+
+  /// Rate-limited inside the service (once a minute at most).
+  Future<void> _loadGpsStatus() async {
+    final status = await BusStatusService.getStatus();
+    if (mounted) setState(() => _gpsStatus = status);
   }
 
   /// Keeps notification permission and the background task in step with
@@ -341,11 +375,34 @@ class _StopsPageState extends State<StopsPage>
     CacheService.deleteRoute(route.id).then((_) => _syncAlerts());
   }
 
+  // ---------------------------------------------------------------- News ----
+
+  Future<void> _loadNews({bool force = false}) async {
+    setState(() {
+      if (_news.isEmpty) _news = TransportNewsService.cached();
+      _newsLoading = true;
+    });
+    final fresh = await TransportNewsService.refresh(force: force);
+    if (!mounted) return;
+    setState(() {
+      if (fresh != null) _news = fresh;
+      _newsFailed = fresh == null;
+      _newsLoading = false;
+    });
+    if (_tabController.index == _newsTab) _markNewsRead();
+  }
+
+  Future<void> _markNewsRead() async {
+    await TransportNewsService.markRead(_news);
+    if (mounted) setState(() {});
+  }
+
   // ---------------------------------------------------------------- Build ---
 
   @override
   Widget build(BuildContext context) {
     final primary = Theme.of(context).primaryColor;
+    final unread = TransportNewsService.unreadCount(_news);
 
     return Scaffold(
       appBar: AppBar(
@@ -354,9 +411,17 @@ class _StopsPageState extends State<StopsPage>
           controller: _tabController,
           labelColor: primary,
           indicatorColor: primary,
-          tabs: const [
-            Tab(icon: Icon(Icons.place_outlined), text: 'Paradas'),
-            Tab(icon: Icon(Icons.route_outlined), text: 'Rutas'),
+          tabs: [
+            const Tab(icon: Icon(Icons.place_outlined), text: 'Paradas'),
+            const Tab(icon: Icon(Icons.route_outlined), text: 'Rutas'),
+            Tab(
+              icon: Badge(
+                isLabelVisible: unread > 0,
+                label: Text('$unread'),
+                child: const Icon(Icons.campaign_outlined),
+              ),
+              text: 'Novedades',
+            ),
           ],
         ),
       ),
@@ -365,19 +430,28 @@ class _StopsPageState extends State<StopsPage>
         children: [
           _buildStopsTab(primary),
           _buildRoutesTab(primary),
+          NewsList(
+            news: _news,
+            readBefore: _newsReadBefore,
+            isLoading: _newsLoading,
+            failed: _newsFailed,
+            onRefresh: () => _loadNews(force: true),
+          ),
         ],
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () => _tabController.index == 0
-            ? _addStop()
-            : _addRouteManually(),
-        backgroundColor: primary,
-        foregroundColor: Colors.white,
-        tooltip: _tabController.index == 0
-            ? 'Agregar parada'
-            : 'Agregar ruta',
-        child: const Icon(Icons.add),
-      ),
+      floatingActionButton: _tabController.index == _newsTab
+          ? null
+          : FloatingActionButton(
+              onPressed: () => _tabController.index == 0
+                  ? _addStop()
+                  : _addRouteManually(),
+              backgroundColor: primary,
+              foregroundColor: Colors.white,
+              tooltip: _tabController.index == 0
+                  ? 'Agregar parada'
+                  : 'Agregar ruta',
+              child: const Icon(Icons.add),
+            ),
     );
   }
 
@@ -395,14 +469,17 @@ class _StopsPageState extends State<StopsPage>
     }
     return RefreshIndicator(
       onRefresh: () async {
+        _loadGpsStatus();
         for (final s in _stops) {
           await _refreshStopArrivals(s.id);
         }
       },
       child: ListView.builder(
         padding: const EdgeInsets.only(bottom: 88),
-        itemCount: _stops.length,
-        itemBuilder: (_, i) => _buildStopCard(_stops[i], primary),
+        itemCount: _stops.length + 1,
+        itemBuilder: (_, i) => i == 0
+            ? _buildGpsWarning()
+            : _buildStopCard(_stops[i - 1], primary),
       ),
     );
   }
@@ -438,6 +515,20 @@ class _StopsPageState extends State<StopsPage>
                     style:
                         const TextStyle(color: Colors.black38, fontSize: 13)),
                 const SizedBox(width: 4),
+                Tooltip(
+                  message: 'Horarios',
+                  child: GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTap: () => Navigator.of(context).push(MaterialPageRoute(
+                        builder: (_) => SchedulePage(stop: stop))),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 4),
+                      child: Icon(Icons.schedule,
+                          color: primary, size: 22, semanticLabel: 'Horarios'),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 4),
                 GestureDetector(
                   onTap: () => _toggleStopNotification(stop),
                   child: Icon(
@@ -466,6 +557,7 @@ class _StopsPageState extends State<StopsPage>
     return RefreshIndicator(
       onRefresh: () async {
         _checkDetectedRoute();
+        _loadGpsStatus();
         for (final r in _routes) {
           await _refreshRouteArrivals(r);
         }
@@ -474,6 +566,7 @@ class _StopsPageState extends State<StopsPage>
         padding: const EdgeInsets.only(bottom: 88),
         children: [
           if (_detectedRoute != null) _buildDetectedRouteBanner(primary),
+          if (_routes.isNotEmpty) _buildGpsWarning(),
           if (_routes.isEmpty && _detectedRoute == null)
             _buildEmptyState(
               primary,
@@ -617,6 +710,32 @@ class _StopsPageState extends State<StopsPage>
 
   // --------------------------------------------------------- Shared --------
 
+  /// Shown when an operator reports GPS for less than 70 % of its buses.
+  Widget _buildGpsWarning() {
+    final text = BusStatusService.partialWarning(_gpsStatus);
+    if (text == null) return const SizedBox.shrink();
+    return Container(
+      margin: const EdgeInsets.fromLTRB(12, 12, 12, 4),
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: Colors.amber.withAlpha(40),
+        border: Border.all(color: Colors.amber.shade700.withAlpha(120)),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(Icons.gps_off, size: 18, color: Colors.amber.shade900),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(text,
+                style: const TextStyle(fontSize: 13, color: Colors.black87)),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildArrivalRow(List<BusArrival>? arrivals, bool isLoading,
       bool failed, Color primary) {
     if (isLoading) {
@@ -670,6 +789,14 @@ class _StopsPageState extends State<StopsPage>
             ),
           ),
           const SizedBox(width: 4),
+          // Wheelchair-accessible bus (API `accesibilidad`)
+          if (arrival.accessible) ...[
+            Icon(Icons.accessible,
+                size: 13,
+                semanticLabel: 'Accesible',
+                color: isImminent ? Colors.white : primary),
+            const SizedBox(width: 2),
+          ],
           // Timetable estimate, not a GPS-tracked bus
           if (!arrival.isRealTime) ...[
             Icon(Icons.schedule, size: 12, color: primary.withAlpha(180)),

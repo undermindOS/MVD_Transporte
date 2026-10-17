@@ -39,3 +39,27 @@
 ### Next steps
 - Закоммитить iOS-фиксы, создать PR в undermindOS/MVD_Transporte.
 - Обновить Flutter (lipo `-verify_arch` в Xcode 27).
+
+## 2026-10-17 (позже) — функции на открытых данных Cómo Ir (ветка feat/open-data-features)
+
+### What was done
+- «Novedades» (новости IM, `notificacion/mensajes`), ♿ на чипе рейса, экран «Horarios»
+  (`siguientesParada/{id}/{tipoDia}/{H:MM}`), предупреждение «Datos GPS parciales» (`pci…/buses/control`).
+- Перепроверены все эндпоинты curl'ом; живые ответы сохранены в `test/fixtures/`.
+- Находка: `notificacion/mensajes` отдаёт 10 сообщений с `id > N` в порядке хранения; листание по
+  максимальному id (как в Cómo Ir) теряет сообщения → поиск «верхнего окна» по `count`.
+
+### Current state
+- What works: `flutter analyze` чисто, `flutter test` 53/53; iOS-симулятор с живым API — новости,
+  деталь, «Ver más» → Safari, «Horarios» и смена дня, ♿ (остановка 4018), баннер GPS (подставленный статус).
+- What's broken/pending: не закоммичено в main, не запушено. Ветка `claude/nearby-stops-comoir`
+  правит те же места `stops_page.dart` (импорты, шапка карточки) — при слиянии будут простые конфликты.
+
+### Next steps
+- Слить с `claude/nearby-stops-comoir`, решить конфликты в `stops_page.dart`/`CHANGELOG.md`/`SESSION.md`.
+- README: перечислить новые источники данных.
+
+### Key decisions made
+- HTML новостей — разбор `package:html` в текст, без WebView/JS; ссылки только http(s), в системном браузере.
+- Без фонового опроса: только по открытию/pull-to-refresh, с минимальными интервалами и кэшем.
+- Непрочитанные = `idMensaje` больше последнего прочитанного; при первом открытии все новые.

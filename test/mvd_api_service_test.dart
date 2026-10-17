@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:stm_app/models/bus_arrival.dart';
@@ -41,6 +42,24 @@ void main() {
       expect(bus.etaLabel, '8:07');
     });
 
+    test('maps wheelchair accessibility', () {
+      final accessible = arrivals.firstWhere((a) => a.line == '145');
+      expect(accessible.accessible, isTrue);
+      expect(accessible.accessibilityType, 2);
+
+      final notAccessible = arrivals.firstWhere((a) => a.line == '143');
+      expect(notAccessible.accessible, isFalse);
+      expect(notAccessible.accessibilityType, 1);
+    });
+
+    test('accessibility defaults when the fields are missing', () {
+      final bus = MvdApiService.parseArrivals([
+        {'linea': '1', 'minutos': 3, 'real': true},
+      ]).single;
+      expect(bus.accessible, isFalse);
+      expect(bus.accessibilityType, isNull);
+    });
+
     test('ignores malformed payloads', () {
       expect(MvdApiService.parseArrivals({'error': 'x'}), isEmpty);
       expect(
@@ -49,6 +68,18 @@ void main() {
             'garbage',
           ]),
           isEmpty);
+    });
+  });
+
+  group('parseArrivals on a saved live response', () {
+    // test/fixtures/siguientes_parada_3140.json, captured 2026-10-17
+    final arrivals = MvdApiService.parseArrivals(jsonDecode(
+        File('test/fixtures/siguientes_parada_3140.json').readAsStringSync()));
+
+    test('flags only the accessible GPS bus', () {
+      expect(arrivals.map((a) => a.line), ['145', '494', '143']);
+      expect(arrivals.map((a) => a.accessible), [true, false, false]);
+      expect(arrivals.map((a) => a.accessibilityType), [2, 1, 1]);
     });
   });
 

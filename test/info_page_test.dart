@@ -41,5 +41,8 @@ void main() {
     await pumpInfo(tester, (value) async => value);
     expect(find.textContaining('Fuente de datos'), findsOneWidget);
     expect(find.textContaining('Intendencia de Montevideo'), findsWidgets);
+    // Covers every IM service the native screens read
+    expect(find.textContaining('novedades del transporte'), findsOneWidget);
+    expect(find.textContaining('estado del GPS'), findsOneWidget);
   });
 }
