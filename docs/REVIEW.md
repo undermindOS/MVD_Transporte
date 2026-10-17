@@ -155,7 +155,9 @@ Custom Tabs / SFSafariViewController для входа. Виджет показ�
 |---|---|---|
 | `applicationId`/`namespace` = `com.example.stm_app`; release подписан debug-ключом ✔︎ | Google Play не примет `com.example`; смена ID = новое приложение для установленных копий | выбрать ID (на iOS уже `com.liberontech.stmapp`), завести keystore |
 | WebView-обёртка сайтов IM (политики сторов) | продуктовое решение | письмо в `pci@imm.gub.uy` за разрешением; либо Custom Tabs вместо WebView для Mi STM/Recarga |
-| Иконка с госсимволикой | дизайн | заменить щит/солнце на нейтральный символ |
+| ~~Иконка с госсимволикой~~ | **сделано** в `chore/store-compliance`: в старой был герб Монтевидео (так написано в `assets/README.md`) | — |
+| Политика конфиденциальности в приложении | Google Play требует ссылку и в консоли, и внутри приложения | текст готов (`docs/privacy-policy.md`); опубликовать (GitHub Pages) и добавить ссылку в Info после ветки Custom Tabs (там появится `url_launcher`) |
+| Лицензия репозитория | репозиторий публичный, но без `LICENSE` — это «исходники видны», а не open source | выбрать лицензию (MIT/Apache-2.0/GPL) или явно оставить «все права защищены» |
 | Вход в Mi STM внутри WebView + `BalanceScraper` | убирает фичу баланса | Custom Tabs/SFSafariViewController, отказ от скрейпинга баланса |
 | `ComoIrScraper` фактически не работает ✔︎ | удаление фичи | Ionic SPA: `onPageFinished` срабатывает один раз на пустой странице; заменить нативным выбором остановки (§6) |
 | Hive открыт одновременно в UI- и WorkManager-изоляте ✔︎ | миграция хранилища | Hive 2.x не многоизолятный → `hive_ce` с `IsolatedHive` или `shared_preferences` для фоновых данных |
