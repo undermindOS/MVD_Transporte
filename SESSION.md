@@ -22,3 +22,28 @@
 - Использован открытый `transporteRest` (бэкенд Cómo Ir), а не официальный OAuth-API: секрет нельзя класть в приложение, нужен прокси — это отдельная задача.
 - Атрибуция без ссылки на Licencia de Datos Abiertos: живые ETA — сервис, не открытый набор данных.
 - Не менял applicationId, иконку, архитектуру вкладок — продуктовые решения.
+
+## 2026-10-17 — Paradas cercanas (WFS) + «Ver en Cómo Ir»
+
+### What was done
+- «Paradas cercanas» в диалоге «Agregar parada»: геолокация по нажатию → WFS
+  `imm:v_uptu_paradas` (BBOX 400 м, lon,lat) → группировка по `cod_ubic_parada`, сортировка по расстоянию.
+  Выбор → существующий `_addStop` (`resolveStop` → `saveStop`).
+- «Ver en Cómo Ir» на карточке остановки → вкладка Cómo Ir с `/comoir/parada?numero={id}`.
+- Тесты: `nearby_stops_service_test.dart` (фикстура — живой ответ WFS), `stops_page_test.dart`
+  (диалог → список → сохранение; отказ в разрешении; кнопка), WebView-связка в `widget_test.dart`. 33/33.
+
+### Current state
+- What works: analyze чистый, тесты зелёные, debug APK собирается, живой WFS отвечает на URI из Dart
+  (центр — 32 остановки в 400 м, Colón — 17).
+- What's broken/pending: на устройстве не проверено (диалог разрешения, реальный GPS, загрузка deep link
+  в WebView). Работа в отдельном worktree `claude/nearby-stops-comoir`, не закоммичено.
+
+### Next steps
+- Ручная проверка на Android/iOS; коммит после разрешения владельца.
+
+### Key decisions made
+- Разрешение через `Geolocator.requestPermission`, а не permission_handler: на iOS permission_handler
+  требует макрос `PERMISSION_LOCATION` в Podfile, его нет.
+- Радиус 400 м: в центре 8 КБ gzip, в пригороде остановки находятся (Colón — 17).
+- Сохранение по-прежнему через `transporteRest/lineas` — название/линии из того же источника, что и ETA.

@@ -2,15 +2,20 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../models/bus_arrival.dart';
 import '../models/bus_stop.dart';
+import '../models/nearby_stop.dart';
 import '../models/route_alert.dart';
 import '../services/background_worker.dart';
 import '../services/cache_service.dart';
 import '../services/comoir_scraper.dart';
 import '../services/mvd_api_service.dart';
+import '../services/nearby_stops_service.dart';
 import '../services/notification_service.dart';
 
 class StopsPage extends StatefulWidget {
-  const StopsPage({super.key});
+  /// Opens the stop in the Cómo Ir tab (official deep link).
+  final ValueChanged<int> onOpenStopInComoIr;
+
+  const StopsPage({super.key, required this.onOpenStopInComoIr});
 
   @override
   State<StopsPage> createState() => _StopsPageState();
@@ -123,36 +128,10 @@ class _StopsPageState extends State<StopsPage>
     }
   }
 
-  Future<int?> _showAddStopDialog() async {
-    final controller = TextEditingController();
-    return showDialog<int>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Agregar parada'),
-        content: TextField(
-          controller: controller,
-          keyboardType: TextInputType.number,
-          inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-          decoration: const InputDecoration(
-            labelText: 'Número de parada',
-            hintText: 'Ej: 1234',
-            prefixIcon: Icon(Icons.directions_bus),
-          ),
-          autofocus: true,
-        ),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text('Cancelar')),
-          FilledButton(
-            onPressed: () =>
-                Navigator.pop(ctx, int.tryParse(controller.text)),
-            child: const Text('Agregar'),
-          ),
-        ],
-      ),
-    );
-  }
+  Future<int?> _showAddStopDialog() => showDialog<int>(
+        context: context,
+        builder: (_) => const _AddStopDialog(),
+      );
 
   Future<void> _toggleStopNotification(BusStop stop) async {
     stop.notificationsEnabled = !stop.notificationsEnabled;
@@ -453,6 +432,18 @@ class _StopsPageState extends State<StopsPage>
               ]),
               const SizedBox(height: 8),
               _buildArrivalRow(arrivals, isLoading, failed, primary),
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton.icon(
+                  onPressed: () => widget.onOpenStopInComoIr(stop.id),
+                  icon: const Icon(Icons.map_outlined, size: 18),
+                  label: const Text('Ver en Cómo Ir'),
+                  style: TextButton.styleFrom(
+                    foregroundColor: primary,
+                    visualDensity: VisualDensity.compact,
+                  ),
+                ),
+              ),
             ],
           ),
         ),
@@ -719,6 +710,164 @@ class _StopsPageState extends State<StopsPage>
         padding: const EdgeInsets.only(right: 20),
         color: Colors.red,
         child: const Icon(Icons.delete, color: Colors.white),
+      );
+}
+
+/// Add-stop dialog: type the stop number or pick one of the stops around
+/// the user ("Paradas cercanas"). Pops with the chosen stop ID.
+class _AddStopDialog extends StatefulWidget {
+  const _AddStopDialog();
+
+  @override
+  State<_AddStopDialog> createState() => _AddStopDialogState();
+}
+
+class _AddStopDialogState extends State<_AddStopDialog> {
+  final _controller = TextEditingController();
+  bool _searching = false;
+  List<NearbyStop>? _nearby;
+  NearbyStopsError? _error;
+
+  static final _radiusLabel = '${NearbyStopsService.radiusMeters.round()} m';
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  Future<void> _findNearby() async {
+    // Hide the keyboard so the list has room
+    FocusScope.of(context).unfocus();
+    setState(() {
+      _searching = true;
+      _error = null;
+      _nearby = null;
+    });
+    try {
+      final stops = await NearbyStopsService.findNearMe();
+      if (mounted) setState(() => _nearby = stops);
+    } on NearbyStopsException catch (e) {
+      if (mounted) setState(() => _error = e.error);
+    } catch (e) {
+      debugPrint('❌ Nearby stops error: $e');
+      if (mounted) setState(() => _error = NearbyStopsError.locationUnavailable);
+    } finally {
+      if (mounted) setState(() => _searching = false);
+    }
+  }
+
+  String _errorMessage(NearbyStopsError error) => switch (error) {
+        NearbyStopsError.serviceDisabled =>
+          'Activá la ubicación del teléfono para buscar paradas cercanas.',
+        NearbyStopsError.permissionDenied =>
+          'Sin permiso de ubicación no se pueden buscar paradas cercanas.',
+        NearbyStopsError.permissionDeniedForever =>
+          'El permiso de ubicación está desactivado para la app.',
+        NearbyStopsError.locationUnavailable =>
+          'No se pudo obtener tu ubicación. Probá de nuevo.',
+        NearbyStopsError.network =>
+          'No se pudieron cargar las paradas cercanas. Revisá la conexión.',
+      };
+
+  @override
+  Widget build(BuildContext context) {
+    final primary = Theme.of(context).primaryColor;
+    final nearby = _nearby;
+    final error = _error;
+
+    return AlertDialog(
+      title: const Text('Agregar parada'),
+      content: SizedBox(
+        // A ListView inside AlertDialog needs a definite width
+        width: double.maxFinite,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            TextField(
+              controller: _controller,
+              keyboardType: TextInputType.number,
+              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+              decoration: const InputDecoration(
+                labelText: 'Número de parada',
+                hintText: 'Ej: 1234',
+                prefixIcon: Icon(Icons.directions_bus),
+              ),
+              autofocus: true,
+            ),
+            const SizedBox(height: 12),
+            OutlinedButton.icon(
+              onPressed: _searching ? null : _findNearby,
+              icon: const Icon(Icons.near_me_outlined),
+              label: const Text('Paradas cercanas'),
+            ),
+            if (_searching)
+              const Padding(
+                padding: EdgeInsets.all(16),
+                child: Center(child: CircularProgressIndicator()),
+              ),
+            if (error != null) ...[
+              const SizedBox(height: 12),
+              Text(_errorMessage(error),
+                  style:
+                      const TextStyle(color: Colors.redAccent, fontSize: 13)),
+              if (error == NearbyStopsError.permissionDeniedForever)
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: TextButton(
+                    onPressed: NearbyStopsService.openAppSettings,
+                    child: const Text('Abrir ajustes'),
+                  ),
+                ),
+            ],
+            if (nearby != null && nearby.isEmpty)
+              Padding(
+                padding: const EdgeInsets.only(top: 12),
+                child: Text('No hay paradas a menos de $_radiusLabel',
+                    style:
+                        const TextStyle(color: Colors.black45, fontSize: 13)),
+              ),
+            if (nearby != null && nearby.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Flexible(
+                child: ListView.builder(
+                  shrinkWrap: true,
+                  itemCount: nearby.length,
+                  itemBuilder: (_, i) =>
+                      _buildNearbyTile(nearby[i], primary),
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancelar')),
+        FilledButton(
+          onPressed: () =>
+              Navigator.pop(context, int.tryParse(_controller.text)),
+          child: const Text('Agregar'),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildNearbyTile(NearbyStop stop, Color primary) => ListTile(
+        contentPadding: EdgeInsets.zero,
+        dense: true,
+        leading: Icon(Icons.place, color: primary),
+        title: Text(stop.name,
+            style: const TextStyle(fontWeight: FontWeight.w600)),
+        subtitle: Text(
+          '#${stop.id} · ${stop.distanceMeters.round()} m'
+          '${stop.lines.isEmpty ? '' : ' · ${stop.lines.join(', ')}'}',
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+        ),
+        onTap: () => Navigator.pop(context, stop.id),
       );
 }
 

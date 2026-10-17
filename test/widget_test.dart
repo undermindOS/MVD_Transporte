@@ -11,6 +11,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:webview_flutter_platform_interface/webview_flutter_platform_interface.dart';
 
 import 'package:stm_app/main.dart';
+import 'package:stm_app/models/bus_stop.dart';
 import 'package:stm_app/services/cache_service.dart';
 
 void main() {
@@ -77,9 +78,32 @@ void main() {
     await tester.pump();
     expect(find.text('Avisos'), findsNWidgets(2));
   });
+
+  testWidgets('Ver en Cómo Ir opens the stop in the Cómo Ir tab',
+      (WidgetTester tester) async {
+    await tester.runAsync(() => CacheService.saveStop(
+        BusStop(id: 574, name: 'SAN JOSE y ANDES')));
+
+    await tester.pumpWidget(const MiTransporteMVDApp());
+    await tester.pump();
+    await tester.tap(find.text('Mis paradas'));
+    await tester.pump();
+
+    _loadedUrls.clear();
+    await tester.tap(find.text('Ver en Cómo Ir'));
+    await tester.pump();
+
+    expect(find.text('Cómo Ir'), findsNWidgets(2)); // AppBar title + nav
+    expect(_loadedUrls,
+        [Uri.parse('https://m.montevideo.gub.uy/comoir/parada?numero=574')]);
+
+    await tester.runAsync(() => CacheService.deleteStop(574));
+  });
 }
 
 // --- Fake WebView platform -------------------------------------------------
+
+final _loadedUrls = <Uri>[];
 
 class _FakeWebViewPlatform extends WebViewPlatform {
   @override
@@ -117,7 +141,8 @@ class _FakeController extends PlatformWebViewController {
       void Function(PlatformWebViewPermissionRequest request)
           onPermissionRequest) async {}
   @override
-  Future<void> loadRequest(LoadRequestParams params) async {}
+  Future<void> loadRequest(LoadRequestParams params) async =>
+      _loadedUrls.add(params.uri);
   @override
   Future<void> clearCache() async {}
   @override

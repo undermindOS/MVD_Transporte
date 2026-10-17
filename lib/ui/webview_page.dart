@@ -29,7 +29,7 @@ class _TabDef {
   final IconData selectedIcon;
   final _TabKind kind;
   final String? url;
-  final Widget Function()? pageBuilder;
+  final Widget Function(ValueChanged<int> openStopInComoIr)? pageBuilder;
 
   const _TabDef({
     required this.label,
@@ -95,6 +95,10 @@ class _TransporteWebViewPageState extends State<TransporteWebViewPage>
       'https://stm.gub.uy/app/mistm/cuenta/pages/notificaciones.xhtml';
   static const String _howToGoUrl = 'https://m.montevideo.gub.uy/comoir/';
 
+  /// Official deep link: the Cómo Ir SPA reads /comoir/parada?numero=N.
+  static Uri _comoIrStopUri(int stopId) =>
+      Uri.parse('${_howToGoUrl}parada?numero=$stopId');
+
   // --- Tab definitions (order matters) ---
   static final List<_TabDef> _tabs = [
     const _TabDef(
@@ -116,7 +120,8 @@ class _TransporteWebViewPageState extends State<TransporteWebViewPage>
       icon: Icons.directions_bus_outlined,
       selectedIcon: Icons.directions_bus,
       kind: _TabKind.native,
-      pageBuilder: () => const StopsPage(),
+      pageBuilder: (openStopInComoIr) =>
+          StopsPage(onOpenStopInComoIr: openStopInComoIr),
     ),
     const _TabDef(
       label: 'Cómo Ir',
@@ -461,6 +466,13 @@ class _TransporteWebViewPageState extends State<TransporteWebViewPage>
     }
   }
 
+  /// "Ver en Cómo Ir" on a saved stop: the Cómo Ir tab, at that stop.
+  void _openStopInComoIr(int stopId) {
+    setState(() =>
+        _currentIndex = _tabs.indexWhere((t) => t.url == _howToGoUrl));
+    _controller.loadRequest(_comoIrStopUri(stopId));
+  }
+
   void _openInfoPage() async {
     await Navigator.of(context).push(
       MaterialPageRoute(
@@ -568,7 +580,7 @@ class _TransporteWebViewPageState extends State<TransporteWebViewPage>
     // Native tab — cache widget to avoid recreating on every rebuild
     return _nativePageCache.putIfAbsent(
       _currentIndex,
-      () => tab.pageBuilder!(),
+      () => tab.pageBuilder!(_openStopInComoIr),
     );
   }
 
