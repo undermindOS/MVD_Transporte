@@ -10,7 +10,10 @@ import 'package:geolocator/geolocator.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 
+import 'package:stm_app/models/bus_arrival.dart';
 import 'package:stm_app/models/bus_stop.dart';
+import 'package:stm_app/models/bus_wait.dart';
+import 'package:stm_app/services/bus_wait_service.dart';
 import 'package:stm_app/services/cache_service.dart';
 import 'package:stm_app/ui/stops_page.dart';
 
@@ -183,6 +186,77 @@ void main() {
     }, () => etaClient);
   });
 
+  testWidgets('Tapping a bus starts and stops "Estoy esperando"',
+      (tester) async {
+    final fake = _FakeWaitPlatform();
+    final previous = BusWaitService.platform;
+    BusWaitService.platform = fake;
+    addTearDown(() {
+      BusWaitService.platform = previous;
+      BusWaitService.current.value = null;
+    });
+    final etaClient = MockClient((request) async {
+      if (request.url.path == '/transporteRest/siguientesParada/574') {
+        return http.Response(
+            '[{"linea":"121","destino":"CENTRO","minutos":2,"real":true,'
+            '"idEmpresa":50,"horaDesc":"8:00"},'
+            '{"linea":"116","destino":"POCITOS","minutos":9,"real":true,'
+            '"idEmpresa":50,"horaDesc":"8:07"}]',
+            200);
+      }
+      return http.Response('[]', 200);
+    });
+    CacheService.saveStop(BusStop(id: 574, name: 'SAN JOSE y ANDES'));
+    await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 100)));
+    await tester.pump();
+
+    Finder bell(String line) => find.descendant(
+        of: find.widgetWithText(InkWell, line),
+        matching: find.byIcon(Icons.notifications_active));
+
+    await http.runWithClient(() async {
+      await tester.pumpWidget(app());
+      await tester.pump();
+
+      // 2 min away with the default 5 min threshold: nothing to wait for
+      await tester.tap(find.text('121'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Avisarme cuando llegue'));
+      await tester.pumpAndSettle();
+      expect(fake.started, isEmpty);
+      expect(find.text('El 121 ya está a 2 min'), findsOneWidget);
+      await tester.pump(const Duration(seconds: 5)); // snack bar goes away
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('116'));
+      await tester.pumpAndSettle();
+      expect(find.text('116 → POCITOS'), findsOneWidget);
+      expect(find.text('Llega en 9 min · SAN JOSE y ANDES'), findsOneWidget);
+      await tester.tap(find.text('3 min'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Avisarme cuando llegue'));
+      await tester.pumpAndSettle();
+
+      final wait = fake.started.single;
+      expect(
+          (wait.stopId, wait.stopName, wait.line, wait.destination,
+              wait.alertMinutes),
+          (574, 'SAN JOSE y ANDES', '116', 'POCITOS', 3));
+      expect(find.text('Te avisamos cuando el 116 esté a 3 min'),
+          findsOneWidget);
+      expect(bell('116'), findsOneWidget);
+      expect(bell('121'), findsNothing);
+
+      await tester.tap(find.text('116'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Dejar de esperar'));
+      await tester.pumpAndSettle();
+      expect(fake.stopped, isTrue);
+      expect(bell('116'), findsNothing);
+    }, () => etaClient);
+  });
+
   testWidgets('Denied location explains how to enable it', (tester) async {
     geolocator.answer = LocationPermission.deniedForever;
     await http.runWithClient(() async {
@@ -199,6 +273,30 @@ void main() {
           isEmpty);
     }, () => client);
   });
+}
+
+class _FakeWaitPlatform implements BusWaitPlatform {
+  final started = <BusWait>[];
+  bool stopped = false;
+
+  @override
+  Future<void> init({required ValueChanged<DateTime> onEnded}) async {}
+
+  @override
+  Future<BusWait?> restore() async => null;
+
+  @override
+  Future<bool> start(BusWait wait, BusArrival trip) async {
+    started.add(wait);
+    return true;
+  }
+
+  @override
+  Future<void> stop() async => stopped = true;
+
+  @override
+  Future<bool> onArrivals(BusWait wait, List<BusArrival>? arrivals) async =>
+      false;
 }
 
 class _FakeGeolocator extends GeolocatorPlatform {

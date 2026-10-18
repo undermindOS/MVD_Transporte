@@ -31,6 +31,8 @@ los días y te avisa cuando se está acercando.
   sábados o domingos.
 • Novedades: desvíos y cambios de líneas publicados por la Intendencia.
 • Alertas: recibí una notificación cuando el ómnibus está a pocos minutos.
+• Estoy esperando: tocá un ómnibus y la app lo sigue mientras esperás, con la
+  pantalla apagada, y te avisa cuando está por llegar.
 • Rutas: guardá un trayecto con tus líneas preferidas.
 • Accesos rápidos a Mi STM, Recarga y Cómo Ir, que se abren en los sitios
   oficiales desde tu navegador.
@@ -80,6 +82,17 @@ Revisar contra la implementación final antes de enviar.
 | Biometría | No recopilado | La valida el sistema operativo; la app recibe solo sí/no |
 | Cifrado en tránsito | Sí | Todas las solicitudes son HTTPS |
 | Eliminación de datos | El usuario borra los datos de la app o la desinstala | No hay datos en servidores del desarrollador |
+
+## Permisos de servicio en primer plano (Play Console → Contenido de la app)
+
+Obligatorio desde Android 14: declarar el tipo y adjuntar un video por función.
+
+| Tipo | Función | Descripción propuesta |
+|---|---|---|
+| `dataSync` (`FOREGROUND_SERVICE_DATA_SYNC`) | «Estoy esperando» | El usuario toca un ómnibus y elige «Avisarme cuando llegue». Mientras espera, la app descarga cada 30 s el tiempo de arribo de esa parada desde el servicio público de la Intendencia y lo muestra en una notificación fija con el botón «Dejar de esperar». El servicio termina solo cuando el ómnibus está a los minutos elegidos (avisa), cuando el viaje ya pasó o a los 60 min. No arranca solo ni al reiniciar el teléfono. |
+
+Video: tocar un ómnibus en «Mis paradas» → «Avisarme cuando llegue» → apagar
+la pantalla → notificación fija que se actualiza → aviso de llegada.
 
 Apple App Privacy: «Data Not Collected», salvo la ubicación aproximada de
 «Paradas cercanas» (App Functionality, no vinculada al usuario, sin tracking).

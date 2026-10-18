@@ -30,6 +30,9 @@ flutter run
 - `lib/services/mvd_api_service.dart` — клиент API (ETA, остановки)
 - `lib/services/nearby_stops_service.dart` — остановки рядом (геолокация + WFS)
 - `lib/services/background_worker.dart` — фоновая проверка алертов (WorkManager, ≥15 мин)
+- `lib/models/bus_wait.dart`, `lib/services/bus_wait_service.dart`, `lib/services/bus_wait_task.dart` —
+  «Estoy esperando»: Android — служба переднего плана (опрос раз в 30 с), iOS — напоминание на
+  прогнозное время
 - `lib/ui/stops_page.dart` — остановки и маршруты
 - `lib/ui/home_page.dart` — вкладки, биометрический замок
 - `lib/ui/services_page.dart`, `lib/services/official_sites.dart` — официальные сайты в системном браузере

@@ -271,9 +271,12 @@ SnackBar, «Ver en Cómo Ir» → `/comoir/parada?numero=1234`, возврат �
    значок низкопольного автобуса.
 7. **Офлайн-расписание.** GTFS (`google_transit.zip`) или набор «Horarios por parada» —
    работает без сети. Требует Nota de Origen (§3).
-8. **Режим ожидания.** Пока пользователь ждёт автобус — опрос раз в 20–30 с с постоянным
+8. ✅ **Режим ожидания.** Пока пользователь ждёт автобус — опрос раз в 20–30 с с постоянным
    уведомлением (foreground service, тип `shortService`/`dataSync` по правилам Play)
-   вместо 15-минутного WorkManager.
+   вместо 15-минутного WorkManager. Сделано как «Estoy esperando»: тап по рейсу; Android —
+   `flutter_foreground_task`, тип `dataSync` (`shortService` ограничен ~3 мин), опрос раз в 30 с;
+   iOS — напоминание на прогнозное время, переставляется при каждом обновлении в приложении.
+   Нужна декларация типа и видео в Play Console (`docs/store-listing.md`).
 9. **Карта автобуса.** У `real:true` есть `coordinates` — показать, где сейчас автобус.
 
 **Сделано в ветке `feat/open-data-features` (4, 5, 6 и расписание по типу дня):**
