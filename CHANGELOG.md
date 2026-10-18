@@ -6,6 +6,9 @@
 ## [Unreleased]
 
 ### Изменено
+- Android `applicationId` и пакет — `com.liberontech.stmapp` вместо шаблонного `com.example.stm_app`
+  (Google Play не принимает `com.example`), как bundle id на iOS. Это другое приложение для системы:
+  установленная ранее debug-сборка не обновится, а встанет рядом.
 - Mi STM, Recarga, Cómo Ir и Avisos открываются в системном браузере — Chrome Custom Tabs на Android,
   SFSafariViewController на iOS — вместо встроенного WebView. Google Play (Spam policy) запрещает
   «webview of a website without permission», а вход через ID Uruguay должен идти во внешнем браузере
