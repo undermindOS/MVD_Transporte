@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../models/bus_arrival.dart';
@@ -21,13 +23,20 @@ class StopsPage extends StatefulWidget {
 
   const StopsPage({super.key, required this.onOpenStopInComoIr});
 
+  /// Arrival times go stale within a minute: refresh this often while the
+  /// app is in the foreground.
+  static const autoRefreshInterval = Duration(seconds: 30);
+
   @override
   State<StopsPage> createState() => _StopsPageState();
 }
 
 class _StopsPageState extends State<StopsPage>
-    with SingleTickerProviderStateMixin {
+    with SingleTickerProviderStateMixin, WidgetsBindingObserver {
   late final TabController _tabController;
+  // null while the app is in the background
+  Timer? _autoRefreshTimer;
+  bool _autoRefreshing = false;
 
   // --- Stops ---
   List<BusStop> _stops = [];
@@ -71,12 +80,71 @@ class _StopsPageState extends State<StopsPage>
       setState(() {});
     });
     _loadAll();
+    WidgetsBinding.instance.addObserver(this);
+    _startAutoRefresh();
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _autoRefreshTimer?.cancel();
     _tabController.dispose();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    switch (state) {
+      case AppLifecycleState.resumed:
+        // Back from the background (not from a system dialog, which only
+        // makes the app inactive): what is on screen may be minutes old
+        if (_autoRefreshTimer == null) {
+          _autoRefresh();
+          _startAutoRefresh();
+        }
+      case AppLifecycleState.hidden:
+      case AppLifecycleState.paused:
+        _autoRefreshTimer?.cancel();
+        _autoRefreshTimer = null;
+      case AppLifecycleState.inactive:
+      case AppLifecycleState.detached:
+        break;
+    }
+  }
+
+  void _startAutoRefresh() {
+    _autoRefreshTimer?.cancel();
+    _autoRefreshTimer =
+        Timer.periodic(StopsPage.autoRefreshInterval, (_) => _autoRefresh());
+  }
+
+  /// Refreshes stops and routes without spinners, so the chips do not
+  /// flicker. A stop that is also a route origin is requested once.
+  Future<void> _autoRefresh() async {
+    if (_autoRefreshing) return; // slow network: don't pile up requests
+    _autoRefreshing = true;
+    _loadGpsStatus();
+    final ids = {
+      ..._stops.map((s) => s.id),
+      ..._routes.map((r) => r.originStopId),
+    };
+    final results = <int, List<BusArrival>?>{};
+    await Future.wait(ids.map((id) async =>
+        results[id] = await MvdApiService.getNextArrivals(id)));
+    _autoRefreshing = false;
+    if (!mounted) return;
+    // Stops added meanwhile are loaded by _loadStops/_loadRoutes
+    setState(() {
+      for (final s in _stops) {
+        if (results.containsKey(s.id)) _stopArrivals[s.id] = results[s.id];
+      }
+      for (final r in _routes) {
+        if (!results.containsKey(r.originStopId)) continue;
+        _routeArrivals[r.id] = results[r.originStopId]
+            ?.where((a) => r.acceptsLine(a.line))
+            .toList();
+      }
+    });
   }
 
   void _loadAll() {

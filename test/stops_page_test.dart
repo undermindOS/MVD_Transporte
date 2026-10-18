@@ -10,6 +10,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 
+import 'package:stm_app/models/bus_stop.dart';
 import 'package:stm_app/services/cache_service.dart';
 import 'package:stm_app/ui/stops_page.dart';
 
@@ -109,6 +110,77 @@ void main() {
       await tester.tap(find.text('Ver en Cómo Ir'));
       expect(opened, [574]);
     }, () => client);
+  });
+
+  testWidgets('Arrival times refresh every 30 s and on return to the app',
+      (tester) async {
+    var minutes = 7;
+    final etaRequests = <Uri>[];
+    final etaClient = MockClient((request) async {
+      if (request.url.path == '/transporteRest/siguientesParada/574') {
+        etaRequests.add(request.url);
+        return http.Response(
+            '[{"linea":"116","destino":"POCITOS","minutos":$minutes,'
+            '"real":true,"idEmpresa":50,"horaDesc":"8:00"}]',
+            200);
+      }
+      return http.Response('[]', 200);
+    });
+    // Hive writes to disk for real: start in the test zone (awaiting it
+    // inside runAsync hangs after a test that used Hive), let the IO finish
+    CacheService.saveStop(BusStop(id: 574, name: 'SAN JOSE y ANDES'));
+    await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 100)));
+    await tester.pump();
+
+    void lifecycle(List<AppLifecycleState> states) {
+      for (final state in states) {
+        tester.binding.handleAppLifecycleStateChanged(state);
+      }
+    }
+
+    await http.runWithClient(() async {
+      await tester.pumpWidget(app());
+      await tester.pump();
+      expect(find.text('7 min'), findsOneWidget);
+      final initial = etaRequests.length;
+
+      minutes = 6;
+      await tester.pump(
+          StopsPage.autoRefreshInterval - const Duration(seconds: 1));
+      expect(etaRequests.length, initial);
+      await tester.pump(const Duration(seconds: 1));
+      await tester.pump();
+      expect(etaRequests.length, initial + 1);
+      expect(find.text('6 min'), findsOneWidget);
+
+      // A system dialog (inactive) keeps the timer, no extra request
+      lifecycle([AppLifecycleState.inactive, AppLifecycleState.resumed]);
+      await tester.pump();
+      expect(etaRequests.length, initial + 1);
+
+      // Nothing is requested in the background
+      lifecycle([
+        AppLifecycleState.inactive,
+        AppLifecycleState.hidden,
+        AppLifecycleState.paused,
+      ]);
+      minutes = 3;
+      await tester.pump(const Duration(minutes: 5));
+      expect(etaRequests.length, initial + 1);
+
+      // Back in the foreground: refreshed at once, then every 30 s again
+      lifecycle([
+        AppLifecycleState.hidden,
+        AppLifecycleState.inactive,
+        AppLifecycleState.resumed,
+      ]);
+      await tester.pump();
+      expect(etaRequests.length, initial + 2);
+      expect(find.text('3 min'), findsOneWidget);
+      await tester.pump(StopsPage.autoRefreshInterval);
+      expect(etaRequests.length, initial + 3);
+    }, () => etaClient);
   });
 
   testWidgets('Denied location explains how to enable it', (tester) async {
