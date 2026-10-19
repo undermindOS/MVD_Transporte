@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 import 'package:flutter_native_splash/flutter_native_splash.dart';
 
 import 'services/background_worker.dart';
+import 'services/bus_wait_service.dart';
 import 'services/cache_service.dart';
 import 'services/notification_service.dart';
 import 'ui/home_page.dart';
@@ -14,6 +16,9 @@ void main() async {
   await CacheService.init();
   await NotificationService.init();
   await BackgroundWorker.init();
+  // "Estoy esperando": messages from the Android service isolate
+  FlutterForegroundTask.initCommunicationPort();
+  await BusWaitService.init();
 
   FlutterNativeSplash.remove();
   runApp(const MiTransporteMVDApp());

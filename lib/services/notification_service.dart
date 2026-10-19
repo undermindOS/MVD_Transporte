@@ -1,6 +1,7 @@
 import 'dart:ui';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:timezone/timezone.dart' as tz;
 
 class NotificationService {
   static final _plugin = FlutterLocalNotificationsPlugin();
@@ -125,6 +126,47 @@ class NotificationService {
     await _plugin.show(id, title, body, details);
     debugPrint('🗺️ Alerta ruta: $title');
   }
+
+  // "Estoy esperando" on iOS: one reminder at a time
+  static const _waitReminderId = 7001;
+
+  /// iOS cannot poll in the background, so "Estoy esperando" schedules a
+  /// reminder for the predicted time and moves it on every refresh.
+  static Future<void> scheduleWaitReminder({
+    required DateTime at,
+    required String line,
+    required String stopName,
+    required int alertMinutes,
+  }) async {
+    final details = NotificationDetails(
+      android: AndroidNotificationDetails(
+        _channelId,
+        _channelName,
+        channelDescription: _channelDesc,
+        importance: Importance.high,
+        priority: Priority.high,
+        icon: '@mipmap/ic_launcher',
+        color: const Color(0xFF0066CC),
+      ),
+      iOS: const DarwinNotificationDetails(
+        presentAlert: true,
+        presentSound: true,
+      ),
+    );
+    await _plugin.zonedSchedule(
+      _waitReminderId,
+      'Línea $line — ~$alertMinutes min',
+      'Debería llegar en unos $alertMinutes min a $stopName',
+      // No time zone database needed: an absolute instant in UTC
+      tz.TZDateTime.from(at, tz.UTC),
+      details,
+      uiLocalNotificationDateInterpretation:
+          UILocalNotificationDateInterpretation.absoluteTime,
+      androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+    );
+  }
+
+  static Future<void> cancelWaitReminder() => _plugin.cancel(_waitReminderId);
 
   static Future<void> cancelAll() => _plugin.cancelAll();
 

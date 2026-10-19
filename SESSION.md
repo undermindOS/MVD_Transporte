@@ -129,3 +129,33 @@
 - Закоммитить ветку; шаг 2 плана — слить PR #1 и ветки фич (по подтверждению).
 - После Custom Tabs: ссылка на политику в Info, опубликовать политику (GitHub Pages).
 - Решить лицензию репозитория (сейчас публичный без LICENSE).
+
+## 2026-10-18 — слияние, applicationId, автообновление ETA, «Estoy esperando» (ветка feat/live-eta-waiting)
+
+### What was done
+- `main` перемотан на `integration/features` (fast-forward, локально; origin/main не обновлён).
+- `applicationId`/namespace/Kotlin-пакет → `com.liberontech.stmapp` (как iOS bundle id); `home_widget`
+  ищет класс виджета по `packageName`, поэтому пакет перенесён вместе с ID. APK проверен aapt2.
+- Автообновление ETA раз в 30 с на переднем плане + сразу при возврате из фона (без спиннера).
+- «Estoy esperando»: тап по плашке рейса → порог 3/5/10 мин. Android — `flutter_foreground_task` 10.0.0,
+  тип `dataSync`, опрос раз в 30 с; iOS — напоминание `zonedSchedule` на прогнозное время.
+- AppDelegate: делегат `UNUserNotificationCenter`, иначе iOS не показывает уведомления при открытом приложении.
+
+### Current state
+- What works: analyze чисто, 77/77 тестов (мутации ключевых мест ловятся); debug APK собирается,
+  в манифесте служба с `dataSync`; iOS-симулятор (свой iPhone 17 Pro 3FAB5A9F…): шторка, колокольчик,
+  системный запрос уведомлений, напоминание доставлено в фоне, ожидание переживает уход в фон,
+  завершается по GPS при возврате.
+- What's broken/pending: Android-служба не проверена на устройстве (эмулятор не стартует).
+  iOS-напоминание — по прогнозу: при задержке автобуса приходит раньше. Плагин на iOS пишет в лог
+  «BGTask … not advertised in Info.plist» при уходе в фон (не падение).
+
+### Next steps
+- Проверка на Android-устройстве: служба, кнопка «Dejar de esperar», Doze, Android 14/15.
+- Play Console: декларация FGS `dataSync` + видео (текст в docs/store-listing.md).
+- Push `main` и ветки — по подтверждению.
+
+### Key decisions made
+- Пакет `flutter_foreground_task` (~180★; пакетов с 1000+★ нет) — выбор владельца.
+- Рейс идентифицируется линией + направлением + ожидаемым временем (у рейсов по расписанию нет id).
+- На Android уведомление только по автобусу с GPS (как периодические алерты).

@@ -1,4 +1,4 @@
-package com.example.stm_app
+package com.liberontech.stmapp
 
 import android.app.PendingIntent
 import android.appwidget.AppWidgetManager

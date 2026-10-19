@@ -1,12 +1,17 @@
+import 'dart:async';
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../models/bus_arrival.dart';
 import '../models/bus_stop.dart';
+import '../models/bus_wait.dart';
 import '../models/nearby_stop.dart';
 import '../models/route_alert.dart';
 import '../models/transport_news.dart';
 import '../services/background_worker.dart';
 import '../services/bus_status_service.dart';
+import '../services/bus_wait_service.dart';
 import '../services/cache_service.dart';
 import '../services/mvd_api_service.dart';
 import '../services/nearby_stops_service.dart';
@@ -21,13 +26,20 @@ class StopsPage extends StatefulWidget {
 
   const StopsPage({super.key, required this.onOpenStopInComoIr});
 
+  /// Arrival times go stale within a minute: refresh this often while the
+  /// app is in the foreground.
+  static const autoRefreshInterval = Duration(seconds: 30);
+
   @override
   State<StopsPage> createState() => _StopsPageState();
 }
 
 class _StopsPageState extends State<StopsPage>
-    with SingleTickerProviderStateMixin {
+    with SingleTickerProviderStateMixin, WidgetsBindingObserver {
   late final TabController _tabController;
+  // null while the app is in the background
+  Timer? _autoRefreshTimer;
+  bool _autoRefreshing = false;
 
   // --- Stops ---
   List<BusStop> _stops = [];
@@ -71,12 +83,79 @@ class _StopsPageState extends State<StopsPage>
       setState(() {});
     });
     _loadAll();
+    WidgetsBinding.instance.addObserver(this);
+    _startAutoRefresh();
+    BusWaitService.current.addListener(_onWaitChanged);
   }
 
   @override
   void dispose() {
+    BusWaitService.current.removeListener(_onWaitChanged);
+    WidgetsBinding.instance.removeObserver(this);
+    _autoRefreshTimer?.cancel();
     _tabController.dispose();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    switch (state) {
+      case AppLifecycleState.resumed:
+        // Back from the background (not from a system dialog, which only
+        // makes the app inactive): what is on screen may be minutes old
+        if (_autoRefreshTimer == null) {
+          BusWaitService.sync();
+          _autoRefresh();
+          _startAutoRefresh();
+        }
+      case AppLifecycleState.hidden:
+      case AppLifecycleState.paused:
+        _autoRefreshTimer?.cancel();
+        _autoRefreshTimer = null;
+      case AppLifecycleState.inactive:
+      case AppLifecycleState.detached:
+        break;
+    }
+  }
+
+  void _onWaitChanged() {
+    if (mounted) setState(() {});
+  }
+
+  void _startAutoRefresh() {
+    _autoRefreshTimer?.cancel();
+    _autoRefreshTimer =
+        Timer.periodic(StopsPage.autoRefreshInterval, (_) => _autoRefresh());
+  }
+
+  /// Refreshes stops and routes without spinners, so the chips do not
+  /// flicker. A stop that is also a route origin is requested once.
+  Future<void> _autoRefresh() async {
+    if (_autoRefreshing) return; // slow network: don't pile up requests
+    _autoRefreshing = true;
+    _loadGpsStatus();
+    final ids = {
+      ..._stops.map((s) => s.id),
+      ..._routes.map((r) => r.originStopId),
+    };
+    final results = <int, List<BusArrival>?>{};
+    await Future.wait(ids.map((id) async =>
+        results[id] = await MvdApiService.getNextArrivals(id)));
+    _autoRefreshing = false;
+    results.forEach(BusWaitService.onArrivals);
+    if (!mounted) return;
+    // Stops added meanwhile are loaded by _loadStops/_loadRoutes
+    setState(() {
+      for (final s in _stops) {
+        if (results.containsKey(s.id)) _stopArrivals[s.id] = results[s.id];
+      }
+      for (final r in _routes) {
+        if (!results.containsKey(r.originStopId)) continue;
+        _routeArrivals[r.id] = results[r.originStopId]
+            ?.where((a) => r.acceptsLine(a.line))
+            .toList();
+      }
+    });
   }
 
   void _loadAll() {
@@ -119,6 +198,7 @@ class _StopsPageState extends State<StopsPage>
   Future<void> _refreshStopArrivals(int stopId) async {
     setState(() => _stopLoading[stopId] = true);
     final arrivals = await MvdApiService.getNextArrivals(stopId);
+    BusWaitService.onArrivals(stopId, arrivals);
     if (mounted) {
       setState(() {
         _stopArrivals[stopId] = arrivals;
@@ -190,6 +270,7 @@ class _StopsPageState extends State<StopsPage>
   Future<void> _refreshRouteArrivals(RouteAlert route) async {
     setState(() => _routeLoading[route.id] = true);
     final all = await MvdApiService.getNextArrivals(route.originStopId);
+    BusWaitService.onArrivals(route.originStopId, all);
     final filtered = all?.where((a) => route.acceptsLine(a.line)).toList();
 
     if (mounted) {
@@ -340,6 +421,114 @@ class _StopsPageState extends State<StopsPage>
     if (mounted) setState(() {});
   }
 
+  // ------------------------------------------------------ Estoy esperando --
+
+  /// Tap on an arrival chip: follow that trip and notify when it is close.
+  Future<void> _showWaitSheet(int stopId, String stopName, BusArrival trip,
+      {required bool waiting}) async {
+    var alertMinutes = 5;
+    // Minutes before arrival to notify; -1 = stop waiting
+    final choice = await showModalBottomSheet<int>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setSheet) => SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  trip.destination.isEmpty
+                      ? 'Línea ${trip.line}'
+                      : '${trip.line} → ${trip.destination}',
+                  style: const TextStyle(
+                      fontSize: 17, fontWeight: FontWeight.w700),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  '${trip.isRealTime ? 'Llega en ${trip.etaMinutes} min' : 'Según horario ${trip.etaLabel}, sin GPS todavía'} · $stopName',
+                  style: const TextStyle(color: Colors.black54),
+                ),
+                const SizedBox(height: 16),
+                if (waiting)
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      onPressed: () => Navigator.pop(ctx, -1),
+                      icon: const Icon(Icons.notifications_off_outlined),
+                      label: const Text('Dejar de esperar'),
+                    ),
+                  )
+                else ...[
+                  const Text('Avisarme cuando falten'),
+                  const SizedBox(height: 8),
+                  SegmentedButton<int>(
+                    segments: [
+                      for (final m in const [3, 5, 10])
+                        ButtonSegment(value: m, label: Text('$m min')),
+                    ],
+                    selected: {alertMinutes},
+                    onSelectionChanged: (s) =>
+                        setSheet(() => alertMinutes = s.first),
+                  ),
+                  const SizedBox(height: 16),
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton.icon(
+                      onPressed: () => Navigator.pop(ctx, alertMinutes),
+                      icon: const Icon(Icons.notifications_active),
+                      label: const Text('Avisarme cuando llegue'),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    defaultTargetPlatform == TargetPlatform.android
+                        ? 'Verás un aviso fijo mientras la app sigue al '
+                            'ómnibus, también con la pantalla apagada. '
+                            'Avisa cuando el ómnibus tiene GPS.'
+                        : 'Te avisamos a la hora estimada. Si abrís la app '
+                            'mientras esperás, el aviso se ajusta al GPS.',
+                    style:
+                        const TextStyle(fontSize: 12, color: Colors.black45),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+    if (choice == null || !mounted) return;
+    if (choice < 0) {
+      await BusWaitService.stop();
+      return;
+    }
+
+    final wait = BusWait.forTrip(
+      stopId: stopId,
+      stopName: stopName,
+      trip: trip,
+      alertMinutes: choice,
+      now: DateTime.now(),
+    );
+    final started = await BusWaitService.start(wait, trip);
+    if (!mounted) return;
+    final messenger = ScaffoldMessenger.of(context);
+    switch (started) {
+      case WaitStart.started:
+        messenger.showSnackBar(SnackBar(
+            content:
+                Text('Te avisamos cuando el ${trip.line} esté a $choice min')));
+      case WaitStart.alreadyClose:
+        messenger.showSnackBar(SnackBar(
+            content: Text(
+                'El ${trip.line} ya está a ${trip.etaMinutes} min')));
+      case WaitStart.failed:
+        _showError('No se pudo activar el aviso');
+    }
+  }
+
   // ---------------------------------------------------------------- Build ---
 
   @override
@@ -486,7 +675,8 @@ class _StopsPageState extends State<StopsPage>
                 ),
               ]),
               const SizedBox(height: 8),
-              _buildArrivalRow(arrivals, isLoading, failed, primary),
+              _buildArrivalRow(
+                  arrivals, isLoading, failed, primary, stop.id, stop.name),
               Align(
                 alignment: Alignment.centerRight,
                 child: TextButton.icon(
@@ -599,7 +789,8 @@ class _StopsPageState extends State<StopsPage>
                   ),
                 ),
               const SizedBox(height: 4),
-              _buildArrivalRow(arrivals, isLoading, failed, primary),
+              _buildArrivalRow(arrivals, isLoading, failed, primary,
+                  route.originStopId, route.originName),
             ],
           ),
         ),
@@ -636,7 +827,7 @@ class _StopsPageState extends State<StopsPage>
   }
 
   Widget _buildArrivalRow(List<BusArrival>? arrivals, bool isLoading,
-      bool failed, Color primary) {
+      bool failed, Color primary, int stopId, String stopName) {
     if (isLoading) {
       return const SizedBox(
         height: 20,
@@ -658,57 +849,77 @@ class _StopsPageState extends State<StopsPage>
       return const Text('Sin colectivos próximos',
           style: TextStyle(color: Colors.black45, fontSize: 13));
     }
+    final wait = BusWaitService.current.value;
+    final waited = wait != null && wait.stopId == stopId
+        ? wait.findTrip(arrivals, DateTime.now())
+        : null;
     return Wrap(
       spacing: 8,
       runSpacing: 4,
       children: arrivals
           .take(6)
-          .map((a) => _buildArrivalChip(a, primary))
+          .map((a) => _buildArrivalChip(a, primary,
+              waited: identical(a, waited),
+              onTap: () => _showWaitSheet(stopId, stopName, a,
+                  waiting: identical(a, waited))))
           .toList(),
     );
   }
 
-  Widget _buildArrivalChip(BusArrival arrival, Color primary) {
+  Widget _buildArrivalChip(BusArrival arrival, Color primary,
+      {required bool waited, required VoidCallback onTap}) {
     final isImminent = arrival.isRealTime && arrival.etaMinutes <= 2;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      decoration: BoxDecoration(
-        color: isImminent ? primary : primary.withAlpha(30),
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(
-            arrival.line,
-            style: TextStyle(
-              fontWeight: FontWeight.bold,
-              fontSize: 13,
-              color: isImminent ? Colors.white : primary,
-            ),
+    return Material(
+      color: isImminent ? primary : primary.withAlpha(30),
+      shape: const StadiumBorder(),
+      child: InkWell(
+        customBorder: const StadiumBorder(),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                arrival.line,
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 13,
+                  color: isImminent ? Colors.white : primary,
+                ),
+              ),
+              const SizedBox(width: 4),
+              // "Estoy esperando" follows this trip
+              if (waited) ...[
+                Icon(Icons.notifications_active,
+                    size: 13,
+                    semanticLabel: 'Esperando',
+                    color: isImminent ? Colors.white : primary),
+                const SizedBox(width: 2),
+              ],
+              // Wheelchair-accessible bus (API `accesibilidad`)
+              if (arrival.accessible) ...[
+                Icon(Icons.accessible,
+                    size: 13,
+                    semanticLabel: 'Accesible',
+                    color: isImminent ? Colors.white : primary),
+                const SizedBox(width: 2),
+              ],
+              // Timetable estimate, not a GPS-tracked bus
+              if (!arrival.isRealTime) ...[
+                Icon(Icons.schedule, size: 12, color: primary.withAlpha(180)),
+                const SizedBox(width: 2),
+              ],
+              Text(
+                arrival.etaLabel,
+                style: TextStyle(
+                  fontSize: 12,
+                  color: isImminent ? Colors.white70 : primary.withAlpha(180),
+                ),
+              ),
+            ],
           ),
-          const SizedBox(width: 4),
-          // Wheelchair-accessible bus (API `accesibilidad`)
-          if (arrival.accessible) ...[
-            Icon(Icons.accessible,
-                size: 13,
-                semanticLabel: 'Accesible',
-                color: isImminent ? Colors.white : primary),
-            const SizedBox(width: 2),
-          ],
-          // Timetable estimate, not a GPS-tracked bus
-          if (!arrival.isRealTime) ...[
-            Icon(Icons.schedule, size: 12, color: primary.withAlpha(180)),
-            const SizedBox(width: 2),
-          ],
-          Text(
-            arrival.etaLabel,
-            style: TextStyle(
-              fontSize: 12,
-              color: isImminent ? Colors.white70 : primary.withAlpha(180),
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }

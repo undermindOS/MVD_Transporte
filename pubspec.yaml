@@ -63,6 +63,8 @@ dependencies:
 
   # Transport news: HTML parsed to text widgets (no JS engine involved)
   html: ^0.15.7
+  flutter_foreground_task: ^10.0.0
+  timezone: ^0.10.1
 
 dev_dependencies:
   flutter_test:

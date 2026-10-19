@@ -10,6 +10,10 @@ import 'package:geolocator/geolocator.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 
+import 'package:stm_app/models/bus_arrival.dart';
+import 'package:stm_app/models/bus_stop.dart';
+import 'package:stm_app/models/bus_wait.dart';
+import 'package:stm_app/services/bus_wait_service.dart';
 import 'package:stm_app/services/cache_service.dart';
 import 'package:stm_app/ui/stops_page.dart';
 
@@ -111,6 +115,148 @@ void main() {
     }, () => client);
   });
 
+  testWidgets('Arrival times refresh every 30 s and on return to the app',
+      (tester) async {
+    var minutes = 7;
+    final etaRequests = <Uri>[];
+    final etaClient = MockClient((request) async {
+      if (request.url.path == '/transporteRest/siguientesParada/574') {
+        etaRequests.add(request.url);
+        return http.Response(
+            '[{"linea":"116","destino":"POCITOS","minutos":$minutes,'
+            '"real":true,"idEmpresa":50,"horaDesc":"8:00"}]',
+            200);
+      }
+      return http.Response('[]', 200);
+    });
+    // Hive writes to disk for real: start in the test zone (awaiting it
+    // inside runAsync hangs after a test that used Hive), let the IO finish
+    CacheService.saveStop(BusStop(id: 574, name: 'SAN JOSE y ANDES'));
+    await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 100)));
+    await tester.pump();
+
+    void lifecycle(List<AppLifecycleState> states) {
+      for (final state in states) {
+        tester.binding.handleAppLifecycleStateChanged(state);
+      }
+    }
+
+    await http.runWithClient(() async {
+      await tester.pumpWidget(app());
+      await tester.pump();
+      expect(find.text('7 min'), findsOneWidget);
+      final initial = etaRequests.length;
+
+      minutes = 6;
+      await tester.pump(
+          StopsPage.autoRefreshInterval - const Duration(seconds: 1));
+      expect(etaRequests.length, initial);
+      await tester.pump(const Duration(seconds: 1));
+      await tester.pump();
+      expect(etaRequests.length, initial + 1);
+      expect(find.text('6 min'), findsOneWidget);
+
+      // A system dialog (inactive) keeps the timer, no extra request
+      lifecycle([AppLifecycleState.inactive, AppLifecycleState.resumed]);
+      await tester.pump();
+      expect(etaRequests.length, initial + 1);
+
+      // Nothing is requested in the background
+      lifecycle([
+        AppLifecycleState.inactive,
+        AppLifecycleState.hidden,
+        AppLifecycleState.paused,
+      ]);
+      minutes = 3;
+      await tester.pump(const Duration(minutes: 5));
+      expect(etaRequests.length, initial + 1);
+
+      // Back in the foreground: refreshed at once, then every 30 s again
+      lifecycle([
+        AppLifecycleState.hidden,
+        AppLifecycleState.inactive,
+        AppLifecycleState.resumed,
+      ]);
+      await tester.pump();
+      expect(etaRequests.length, initial + 2);
+      expect(find.text('3 min'), findsOneWidget);
+      await tester.pump(StopsPage.autoRefreshInterval);
+      expect(etaRequests.length, initial + 3);
+    }, () => etaClient);
+  });
+
+  testWidgets('Tapping a bus starts and stops "Estoy esperando"',
+      (tester) async {
+    final fake = _FakeWaitPlatform();
+    final previous = BusWaitService.platform;
+    BusWaitService.platform = fake;
+    addTearDown(() {
+      BusWaitService.platform = previous;
+      BusWaitService.current.value = null;
+    });
+    final etaClient = MockClient((request) async {
+      if (request.url.path == '/transporteRest/siguientesParada/574') {
+        return http.Response(
+            '[{"linea":"121","destino":"CENTRO","minutos":2,"real":true,'
+            '"idEmpresa":50,"horaDesc":"8:00"},'
+            '{"linea":"116","destino":"POCITOS","minutos":9,"real":true,'
+            '"idEmpresa":50,"horaDesc":"8:07"}]',
+            200);
+      }
+      return http.Response('[]', 200);
+    });
+    CacheService.saveStop(BusStop(id: 574, name: 'SAN JOSE y ANDES'));
+    await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 100)));
+    await tester.pump();
+
+    Finder bell(String line) => find.descendant(
+        of: find.widgetWithText(InkWell, line),
+        matching: find.byIcon(Icons.notifications_active));
+
+    await http.runWithClient(() async {
+      await tester.pumpWidget(app());
+      await tester.pump();
+
+      // 2 min away with the default 5 min threshold: nothing to wait for
+      await tester.tap(find.text('121'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Avisarme cuando llegue'));
+      await tester.pumpAndSettle();
+      expect(fake.started, isEmpty);
+      expect(find.text('El 121 ya está a 2 min'), findsOneWidget);
+      await tester.pump(const Duration(seconds: 5)); // snack bar goes away
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('116'));
+      await tester.pumpAndSettle();
+      expect(find.text('116 → POCITOS'), findsOneWidget);
+      expect(find.text('Llega en 9 min · SAN JOSE y ANDES'), findsOneWidget);
+      await tester.tap(find.text('3 min'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Avisarme cuando llegue'));
+      await tester.pumpAndSettle();
+
+      final wait = fake.started.single;
+      expect(
+          (wait.stopId, wait.stopName, wait.line, wait.destination,
+              wait.alertMinutes),
+          (574, 'SAN JOSE y ANDES', '116', 'POCITOS', 3));
+      expect(find.text('Te avisamos cuando el 116 esté a 3 min'),
+          findsOneWidget);
+      expect(bell('116'), findsOneWidget);
+      expect(bell('121'), findsNothing);
+
+      await tester.tap(find.text('116'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Dejar de esperar'));
+      await tester.pumpAndSettle();
+      expect(fake.stopped, isTrue);
+      expect(bell('116'), findsNothing);
+    }, () => etaClient);
+  });
+
   testWidgets('Denied location explains how to enable it', (tester) async {
     geolocator.answer = LocationPermission.deniedForever;
     await http.runWithClient(() async {
@@ -127,6 +273,30 @@ void main() {
           isEmpty);
     }, () => client);
   });
+}
+
+class _FakeWaitPlatform implements BusWaitPlatform {
+  final started = <BusWait>[];
+  bool stopped = false;
+
+  @override
+  Future<void> init({required ValueChanged<DateTime> onEnded}) async {}
+
+  @override
+  Future<BusWait?> restore() async => null;
+
+  @override
+  Future<bool> start(BusWait wait, BusArrival trip) async {
+    started.add(wait);
+    return true;
+  }
+
+  @override
+  Future<void> stop() async => stopped = true;
+
+  @override
+  Future<bool> onArrivals(BusWait wait, List<BusArrival>? arrivals) async =>
+      false;
 }
 
 class _FakeGeolocator extends GeolocatorPlatform {
