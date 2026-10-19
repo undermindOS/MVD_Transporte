@@ -9,6 +9,15 @@
   // Concurrent misses for one URL run the Worker once.
   "cache": { "enabled": true },
 
+  // The only caller of the official IM API, one instance for all locations
+  // (src/im_gateway.js). Its key comes from secrets, never from this file:
+  // `wrangler secret put IM_CLIENT_ID` and `IM_CLIENT_SECRET`; locally — .dev.vars.
+  "durable_objects": {
+    "bindings": [{ "name": "IM_GATEWAY", "class_name": "ImGateway" }]
+  },
+  // The Workers Free plan only has SQLite-backed Durable Objects
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["ImGateway"] }],
+
   "ratelimits": [
     {
       "name": "IP_LIMITER",

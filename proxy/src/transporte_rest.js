@@ -90,9 +90,10 @@ export function toStop(stopId, data) {
 
 /**
  * `[{"linea":"145","minutos":5,"real":true,"destino":"PLAZA ESPAÑA",
- *    "idEmpresa":50,"horaDesc":"7:39","coordinates":[lng,lat],
+ *    "idEmpresa":50,"idBus":247,"horaDesc":"7:39","coordinates":[lng,lat],
  *    "accesibilidad":true,"tipoAccesibilidad":2, ...}]`
- * Without GPS (`real:false`) `coordinates` and `idEmpresa` are null.
+ * Without GPS (`real:false`) `coordinates`, `idEmpresa` and `idBus` are null.
+ * `busId` is internal: index.js matches it with the official API and drops it.
  */
 export function toArrivals(data) {
   if (!Array.isArray(data)) {
@@ -114,6 +115,7 @@ export function toArrivals(data) {
       realTime: item.real === true,
       scheduledTime: text(item.horaDesc) || null,
       companyId: toInt(item.idEmpresa),
+      busId: toInt(item.idBus),
       location:
         typeof lat === 'number' && typeof lng === 'number' ? { lat, lng } : null,
       accessible: item.accesibilidad === true,

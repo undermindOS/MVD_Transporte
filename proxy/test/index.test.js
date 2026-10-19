@@ -2,7 +2,7 @@ import { afterEach, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
-import worker from '../src/index.js';
+import worker, { ImGateway } from '../src/index.js';
 
 const UPSTREAM = 'https://api.montevideo.gub.uy/transporteRest';
 
@@ -26,7 +26,28 @@ function mockUpstream(handler) {
   return calls;
 }
 
-function call(path, { method = 'GET', allowed = true, ip = '203.0.113.7' } = {}) {
+/** Durable Object namespace whose only object answers with [handler(url)]. */
+function gatewayNamespace(handler) {
+  const paths = [];
+  return {
+    paths,
+    idFromName: (name) => {
+      assert.equal(name, 'global');
+      return name;
+    },
+    get: () => ({
+      fetch: async (url) => {
+        paths.push(String(url).replace('https://im-gateway', ''));
+        return handler(String(url));
+      },
+    }),
+  };
+}
+
+function call(
+  path,
+  { method = 'GET', allowed = true, ip = '203.0.113.7', gateway } = {},
+) {
   const keys = [];
   const env = {
     IP_LIMITER: {
@@ -35,6 +56,7 @@ function call(path, { method = 'GET', allowed = true, ip = '203.0.113.7' } = {})
         return { success: allowed };
       },
     },
+    ...(gateway && { IM_GATEWAY: gateway }),
   };
   const request = new Request(`https://proxy.test${path}`, {
     method,
@@ -93,6 +115,8 @@ describe('GET /v1/stops/{id}/arrivals', () => {
       location: { lat: -34.897755, lng: -56.12432 },
       accessible: false,
       accessibilityType: 1,
+      // No ImGateway in this env: comfort is unknown, arrivals still work
+      vehicle: null,
     });
     // Timetable-only bus: no GPS position, no operator
     assert.equal(body.arrivals[2].realTime, false);
@@ -113,6 +137,152 @@ describe('GET /v1/stops/{id}/arrivals', () => {
     const { arrivals } = await response.json();
 
     assert.deepEqual(arrivals.map((a) => [a.line, a.etaMinutes]), [['G8', 4]]);
+  });
+});
+
+describe('GET /v1/stops/{id}/arrivals with comfort from the official API', () => {
+  // transporteRest and the official API answered at the same minute
+  const IM = 'https://api.montevideo.gub.uy/api/transportepublico';
+  function mockBoth() {
+    const calls = mockUpstream((url) => {
+      if (url.startsWith(UPSTREAM)) return new Response(fixture('arrivals_574.json'));
+      if (url.includes('openid-connect/token')) {
+        return Response.json({ access_token: 't', expires_in: 300 });
+      }
+      if (url === `${IM}/buses`) return new Response(fixture('im_buses.json'));
+      return assert.fail(`unexpected ${url}`);
+    });
+    return calls;
+  }
+
+  it('adds air conditioning and zero emission to GPS buses', async () => {
+    const calls = mockBoth();
+    const im = new ImGateway({}, { IM_CLIENT_ID: 'id', IM_CLIENT_SECRET: 's' });
+    const gateway = gatewayNamespace((url) => im.fetch(new Request(url)));
+
+    const { response } = await call('/v1/stops/574/arrivals', { gateway });
+    assert.equal(response.status, 200);
+    const { arrivals } = await response.json();
+
+    const byLine = Object.fromEntries(arrivals.map((a) => [a.line, a.vehicle]));
+    assert.deepEqual(byLine, {
+      117: { airConditioning: true, zeroEmission: false }, // bus 111, Euro V
+      121: { airConditioning: true, zeroEmission: false }, // bus 1118
+      116: { airConditioning: true, zeroEmission: true }, // bus 139, eléctrico
+      // Timetable only: no bus to look up
+      144: null,
+      538: null,
+      142: null,
+    });
+    // The internal id used for the match is not part of the contract
+    assert.ok(arrivals.every((a) => !('busId' in a)));
+    assert.deepEqual(
+      gateway.paths.map((p) => p.split('=')[1].split(',').sort()),
+      [['50:111', '50:1118', '50:139']],
+    );
+    assert.equal(calls.filter((c) => c === `${IM}/buses`).length, 1);
+  });
+
+  it('serves arrivals without comfort when the gateway is busy', async () => {
+    mockUpstream(() => new Response(fixture('arrivals_574.json')));
+    const gateway = gatewayNamespace(() =>
+      Response.json({ error: 'upstream_busy' }, { status: 503 }),
+    );
+
+    const { response } = await call('/v1/stops/574/arrivals', { gateway });
+    assert.equal(response.status, 200);
+    assert.equal(response.headers.get('Cache-Control'), 'public, max-age=15');
+    const { arrivals } = await response.json();
+    assert.ok(arrivals.every((a) => a.vehicle === null));
+  });
+
+  it('serves arrivals without comfort when the gateway throws', async () => {
+    mockUpstream(() => new Response(fixture('arrivals_574.json')));
+    const gateway = gatewayNamespace(() => {
+      throw new Error('Durable Object overloaded');
+    });
+
+    const { response } = await call('/v1/stops/574/arrivals', { gateway });
+    assert.equal(response.status, 200);
+  });
+
+  it('does not wait more than 2 s for comfort', async () => {
+    mockUpstream(() => new Response(fixture('arrivals_574.json')));
+    const gateway = gatewayNamespace(() => new Promise(() => {}));
+
+    const started = Date.now();
+    const { response } = await call('/v1/stops/574/arrivals', { gateway });
+    const waited = Date.now() - started;
+
+    assert.equal(response.status, 200);
+    assert.ok(waited >= 1900 && waited < 3000, `waited ${waited} ms`);
+  });
+
+  it('does not ask the gateway when no bus has GPS', async () => {
+    mockUpstream(() =>
+      Response.json([
+        { linea: '145', minutos: 12, real: false, idEmpresa: null, idBus: null },
+      ]),
+    );
+    const gateway = gatewayNamespace(() => assert.fail('gateway called'));
+
+    const { response } = await call('/v1/stops/3140/arrivals', { gateway });
+    assert.equal(response.status, 200);
+    assert.equal((await response.json()).arrivals[0].vehicle, null);
+    assert.deepEqual(gateway.paths, []);
+  });
+});
+
+describe('routes served by ImGateway', () => {
+  it('GET /v1/lines/{line}/buses passes the answer on, cached for 15 s', async () => {
+    const body = { fetchedAt: '2026-10-19T22:52:10.000Z', buses: [] };
+    const gateway = gatewayNamespace(() => Response.json(body));
+
+    const { response } = await call('/v1/lines/D10/buses', { gateway });
+    assert.equal(response.status, 200);
+    assert.equal(response.headers.get('Cache-Control'), 'public, max-age=15');
+    assert.deepEqual(await response.json(), body);
+    assert.deepEqual(gateway.paths, ['/lines/D10/buses']);
+  });
+
+  it('GET /v1/catalog/{stops|lines} are cached for a day', async () => {
+    const gateway = gatewayNamespace(() => Response.json({ stops: [] }));
+
+    for (const name of ['stops', 'lines']) {
+      const { response } = await call(`/v1/catalog/${name}`, { gateway });
+      assert.equal(response.headers.get('Cache-Control'), 'public, max-age=86400');
+    }
+    assert.deepEqual(gateway.paths, ['/catalog/stops', '/catalog/lines']);
+  });
+
+  it('passes gateway errors on, not cached', async () => {
+    const gateway = gatewayNamespace(() =>
+      Response.json(
+        { error: 'upstream_busy' },
+        { status: 503, headers: { 'Retry-After': '42' } },
+      ),
+    );
+
+    const { response } = await call('/v1/lines/117/buses', { gateway });
+    assert.equal(response.status, 503);
+    assert.equal(response.headers.get('Cache-Control'), 'no-store');
+    assert.equal(response.headers.get('Retry-After'), '42');
+    assert.deepEqual(await response.json(), { error: 'upstream_busy' });
+  });
+
+  it('answers 502 when the gateway throws', async () => {
+    const gateway = gatewayNamespace(() => {
+      throw new Error('Durable Object reset');
+    });
+
+    const { response } = await call('/v1/catalog/stops', { gateway });
+    assert.equal(response.status, 502);
+  });
+
+  it('answers 503 not_configured without the binding', async () => {
+    const { response } = await call('/v1/lines/117/buses');
+    assert.equal(response.status, 503);
+    assert.deepEqual(await response.json(), { error: 'not_configured' });
   });
 });
 
@@ -205,6 +375,10 @@ describe('requests that never reach transporteRest', () => {
     ['/v1/stops/3140/schedule/weekday/24:00', 400, 'bad_request'],
     ['/v1/stops/3140/schedule/weekday/8:60', 400, 'bad_request'],
     ['/v1/stops/3140/schedule/weekday/805', 404, 'not_found'],
+    ['/v1/lines/d10/buses', 404, 'not_found'],
+    ['/v1/lines/1234567/buses', 404, 'not_found'],
+    ['/v1/lines/117/buses?x=1', 400, 'bad_request'],
+    ['/v1/catalog/variants', 404, 'not_found'],
   ];
 
   for (const [path, status, code] of cases) {
