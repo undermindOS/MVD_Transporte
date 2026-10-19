@@ -1,0 +1,22 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "mvd-transporte-proxy",
+  "main": "src/index.js",
+  "compatibility_date": "2026-10-13",
+
+  // Workers Caching: Cloudflare checks its cache before running the Worker and
+  // keeps each response for its Cache-Control max-age (src/index.js).
+  // Concurrent misses for one URL run the Worker once.
+  "cache": { "enabled": true },
+
+  "ratelimits": [
+    {
+      "name": "IP_LIMITER",
+      // Any integer unique within the Cloudflare account
+      "namespace_id": "1001",
+      // Counted per Cloudflare location, on cache misses only. Mobile carriers
+      // put many users behind one IP (CGNAT), so keep this generous.
+      "simple": { "limit": 300, "period": 60 }
+    }
+  ]
+}

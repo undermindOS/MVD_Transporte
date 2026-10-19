@@ -55,6 +55,11 @@
   использовать герб.
 
 ### Добавлено
+- Прокси на Cloudflare Workers (`proxy/`, v0.1.0) — будущий единственный адрес бэкенда приложения.
+  Фиксированные маршруты `/v1/stops/{id}`, `/v1/stops/{id}/arrivals`,
+  `/v1/stops/{id}/schedule/{weekday|saturday|sunday}/{H:MM}` поверх `transporteRest` в собственном
+  формате ответа; кэш Workers Caching (ETA 15 с, остановка 24 ч, расписание 6 ч) и лимит 300 запросов
+  в минуту с IP на промахах кэша. Приложение на прокси ещё не переключено.
 - «Ver en Cómo Ir» на карточке остановки — официальный deep link `/comoir/parada?numero=N` в браузере.
 - Вкладка «Novedades» в «Mis paradas»: официальные новости транспорта IM (объезды, изменения
   линий, праздничные расписания) из открытого `api.montevideo.gub.uy/notificacion/mensajes` —
