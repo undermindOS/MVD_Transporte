@@ -159,3 +159,32 @@
 - Пакет `flutter_foreground_task` (~180★; пакетов с 1000+★ нет) — выбор владельца.
 - Рейс идентифицируется линией + направлением + ожидаемым временем (у рейсов по расписанию нет id).
 - На Android уведомление только по автобусу с GPS (как периодические алерты).
+
+## 2026-10-19 — прокси на Cloudflare Workers (шаг 1 перехода на официальный API)
+
+### What was done
+- Сверка документации API IM: в Swagger `publictransport` 9 эндпоинтов, все требуют OAuth2 (без токена 403);
+  приложение ни один не использует. В основном checkout (ветка `feat/live-eta-waiting`, не закоммичено)
+  дополнен docs/REVIEW.md §2.3: `/buses/linevariants/{lineVariantId}`, схема `upcomingbuses` в Swagger.
+- Ветка `feat/cf-proxy` от `main` (worktree `.claude/worktrees/cf-proxy/MVD_Transporte`): `proxy/` —
+  Worker с маршрутами `/v1/stops/{id}`, `/arrivals`, `/schedule/{weekday|saturday|sunday}/{H:MM}`
+  поверх `transporteRest` в собственном формате; Workers Caching (15 с / 24 ч / 6 ч), лимит 300/мин с IP.
+- 25 тестов `node:test` на живых ответах (мутационная проверка: ловят снятые проверки); `wrangler dev`
+  против живого `transporteRest`: маршруты, `stop_not_found`, 400/404, 429 после ~300 запросов.
+
+### Current state
+- What works: прокси локально, тесты зелёные.
+- What's broken/pending: не задеплоен (нужен `wrangler login` владельца); кэш локально не работает —
+  проверить `cf-cache-status: HIT` после деплоя. Приложение на прокси не переключено. Не закоммичено.
+
+### Next steps
+- Деплой → проверка кэша → шаг 2: `MvdApiService` на `/v1` (включая фоновые задачи), privacy policy,
+  Data safety. Затем регистрация на портале и смена источника в прокси на официальный API.
+
+### Key decisions made
+- Workers Caching, а не Cache API: Cache API на `*.workers.dev` не работает и не объединяет запросы.
+- Один entrypoint без «шлюза»: шлюз удвоил бы оплачиваемые запросы; лимит по IP считается на промахах
+  кэша — этого достаточно, чтобы защитить IMM.
+- Лимит по IP щедрый (300/мин): документация Cloudflare предупреждает о CGNAT на мобильных сетях.
+- Токен IM (на будущее): канонический `…/auth/realms/pci/protocol/openid-connect/token` (мануал + OIDC
+  discovery); короткий `/token` из Swagger тоже отвечает.
