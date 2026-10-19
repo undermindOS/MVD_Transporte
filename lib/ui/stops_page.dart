@@ -905,6 +905,21 @@ class _StopsPageState extends State<StopsPage>
                     color: isImminent ? Colors.white : primary),
                 const SizedBox(width: 2),
               ],
+              // Comfort of the GPS bus (official IM API, through the proxy)
+              if (arrival.airConditioning == true) ...[
+                Icon(Icons.ac_unit,
+                    size: 13,
+                    semanticLabel: 'Aire acondicionado',
+                    color: isImminent ? Colors.white : primary),
+                const SizedBox(width: 2),
+              ],
+              if (arrival.zeroEmission == true) ...[
+                Icon(Icons.electric_bolt,
+                    size: 13,
+                    semanticLabel: 'Cero emisiones',
+                    color: isImminent ? Colors.white : primary),
+                const SizedBox(width: 2),
+              ],
               // Timetable estimate, not a GPS-tracked bus
               if (!arrival.isRealTime) ...[
                 Icon(Icons.schedule, size: 12, color: primary.withAlpha(180)),

@@ -15,6 +15,7 @@ import 'package:stm_app/models/bus_stop.dart';
 import 'package:stm_app/models/bus_wait.dart';
 import 'package:stm_app/services/bus_wait_service.dart';
 import 'package:stm_app/services/cache_service.dart';
+import 'package:stm_app/services/mvd_api_service.dart';
 import 'package:stm_app/ui/stops_page.dart';
 
 const _lineas574 =
@@ -184,6 +185,48 @@ void main() {
       await tester.pump(StopsPage.autoRefreshInterval);
       expect(etaRequests.length, initial + 3);
     }, () => etaClient);
+  });
+
+  testWidgets('GPS buses from the proxy show air conditioning and zero emission',
+      (tester) async {
+    MvdApiService.proxyUrl = 'https://proxy.test';
+    addTearDown(() => MvdApiService.proxyUrl = '');
+    // Live proxy answer for stop 574: 121 ❄️⚡, 116 and 117 ❄️, 538 no data
+    final body = File('test/fixtures/proxy_arrivals.json').readAsBytesSync();
+    final proxyClient = MockClient((request) async =>
+        request.url.path == '/v1/stops/574/arrivals'
+            ? http.Response.bytes(body, 200)
+            : http.Response('{"error":"not_found"}', 404));
+    CacheService.saveStop(BusStop(id: 574, name: 'SAN JOSE y ANDES'));
+    await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 100)));
+    await tester.pump();
+
+    await http.runWithClient(() async {
+      await tester.pumpWidget(app());
+      await tester.pump();
+
+      expect(find.text('121'), findsOneWidget);
+      expect(find.byIcon(Icons.ac_unit), findsNWidgets(3));
+      expect(find.byIcon(Icons.electric_bolt), findsOneWidget);
+      // Screen readers say what the icons mean
+      expect(
+          tester
+              .widgetList<Icon>(find.byIcon(Icons.ac_unit))
+              .map((i) => i.semanticLabel),
+          everyElement('Aire acondicionado'));
+      expect(
+          tester.widget<Icon>(find.byIcon(Icons.electric_bolt)).semanticLabel,
+          'Cero emisiones');
+
+      // The zero-emission icon is on the 121 chip
+      final chip121 = find.ancestor(
+          of: find.text('121'), matching: find.byType(InkWell));
+      expect(
+          find.descendant(
+              of: chip121, matching: find.byIcon(Icons.electric_bolt)),
+          findsOneWidget);
+    }, () => proxyClient);
   });
 
   testWidgets('Tapping a bus starts and stops "Estoy esperando"',

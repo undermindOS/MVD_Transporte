@@ -14,13 +14,22 @@ class StopNotFoundException implements Exception {
   String toString() => 'StopNotFoundException($stopId)';
 }
 
-/// Client for the public endpoints used by the official Cómo Ir web app
-/// (https://m.montevideo.gub.uy/comoir/). They need no credentials.
+/// Arrivals, timetables and stop names.
 ///
-/// The documented API (api.montevideo.gub.uy/api/transportepublico) requires
-/// OAuth2 client credentials and must not ship a secret inside the app —
-/// see docs/REVIEW.md for the migration path.
+/// With `--dart-define=MVD_PROXY_URL=https://…` every call goes to the
+/// project's proxy (`proxy/`, routes `/v1`). The proxy holds the secret of the
+/// official IM API (OAuth2, 14 requests a minute for everybody) and adds
+/// comfort data — air conditioning, zero emission — to GPS arrivals.
+///
+/// Without it the app calls the public endpoints of the official Cómo Ir web
+/// app (https://m.montevideo.gub.uy/comoir/) directly: no credentials, no
+/// comfort data. Kept until the proxy is deployed — see docs/REVIEW.md.
 class MvdApiService {
+  /// From `--dart-define=MVD_PROXY_URL=…`; empty = transporteRest directly.
+  @visibleForTesting
+  static String proxyUrl = const String.fromEnvironment('MVD_PROXY_URL');
+  static bool get usesProxy => proxyUrl.isNotEmpty;
+
   static const _baseUrl = 'https://api.montevideo.gub.uy/transporteRest';
   static const _nextBusesPath = '/siguientesParada';
   static const _stopLinesPath = '/lineas';
@@ -38,7 +47,9 @@ class MvdApiService {
   /// "no buses" apart from "could not check".
   static Future<List<BusArrival>?> getNextArrivals(int stopId) async {
     try {
-      final uri = Uri.parse('$_baseUrl$_nextBusesPath/$stopId');
+      final uri = Uri.parse(usesProxy
+          ? '$proxyUrl/v1/stops/$stopId/arrivals'
+          : '$_baseUrl$_nextBusesPath/$stopId');
       final response =
           await http.get(uri, headers: _headers).timeout(_timeout);
 
@@ -47,7 +58,8 @@ class MvdApiService {
         return null;
       }
 
-      return parseArrivals(jsonDecode(utf8.decode(response.bodyBytes)));
+      final data = jsonDecode(utf8.decode(response.bodyBytes));
+      return usesProxy ? parseProxyArrivals(data) : parseArrivals(data);
     } catch (e) {
       debugPrint('❌ ETA API error: $e');
       return null;
@@ -67,7 +79,9 @@ class MvdApiService {
     }
 
     try {
-      final uri = Uri.parse('$_baseUrl$_nextBusesPath/$key');
+      final uri = Uri.parse(usesProxy
+          ? '$proxyUrl/v1/stops/$stopId/schedule/${day.proxyValue}/$time'
+          : '$_baseUrl$_nextBusesPath/$key');
       final response =
           await http.get(uri, headers: _headers).timeout(_timeout);
 
@@ -76,8 +90,9 @@ class MvdApiService {
         return null;
       }
 
+      final data = jsonDecode(utf8.decode(response.bodyBytes));
       final passes =
-          parseSchedule(jsonDecode(utf8.decode(response.bodyBytes)));
+          usesProxy ? parseProxySchedule(data) : parseSchedule(data);
       _scheduleCache[key] = (DateTime.now(), passes);
       return passes;
     } catch (e) {
@@ -92,7 +107,9 @@ class MvdApiService {
   static Future<BusStop?> resolveStop(int stopId) async {
     final http.Response response;
     try {
-      final uri = Uri.parse('$_baseUrl$_stopLinesPath/$stopId');
+      final uri = Uri.parse(usesProxy
+          ? '$proxyUrl/v1/stops/$stopId'
+          : '$_baseUrl$_stopLinesPath/$stopId');
       response = await http.get(uri, headers: _headers).timeout(_timeout);
     } catch (e) {
       debugPrint('❌ Lineas API error: $e');
@@ -101,14 +118,20 @@ class MvdApiService {
 
     final body = utf8.decode(response.bodyBytes);
     if (response.statusCode != 200) {
-      // The backend answers 500 "No existe la ubicación de parada con código 'N'."
-      if (body.contains('No existe')) throw StopNotFoundException(stopId);
+      // transporteRest answers 500 "No existe la ubicación de parada con
+      // código 'N'.", the proxy 404 {"error":"stop_not_found"}
+      if (body.contains('No existe') || body.contains('"stop_not_found"')) {
+        throw StopNotFoundException(stopId);
+      }
       debugPrint('❌ Lineas API ${response.statusCode}: $body');
       return null;
     }
 
     try {
-      return parseStop(stopId, jsonDecode(body));
+      final data = jsonDecode(body);
+      return usesProxy
+          ? parseProxyStop(stopId, data)
+          : parseStop(stopId, data);
     } catch (e) {
       debugPrint('⚠️ Parse stop error: $e');
       return null;
@@ -213,6 +236,93 @@ class MvdApiService {
       lines: lines,
     );
   }
+
+  /// Parses the proxy's `GET /v1/stops/{id}/arrivals`:
+  /// `{"fetchedAt":"…","arrivals":[{"line":"117","destination":"PUNTA CARRETAS",
+  ///   "etaMinutes":4,"realTime":true,"scheduledTime":"19:56","companyId":50,
+  ///   "location":{"lat":-34.9,"lng":-56.2},"accessible":true,
+  ///   "accessibilityType":2,
+  ///   "vehicle":{"airConditioning":true,"zeroEmission":false}}]}`
+  /// `vehicle` is null for timetable estimates and unknown buses.
+  @visibleForTesting
+  static List<BusArrival> parseProxyArrivals(dynamic data) {
+    final arrivals = <BusArrival>[];
+    final list = data is Map ? data['arrivals'] : null;
+    if (list is! List) return arrivals;
+
+    for (final item in list) {
+      if (item is! Map) continue;
+      final line = item['line']?.toString() ?? '';
+      final minutes = item['etaMinutes'];
+      if (line.isEmpty || minutes is! num) continue;
+
+      final location = item['location'];
+      final vehicle = item['vehicle'];
+      arrivals.add(BusArrival(
+        line: line,
+        companyCode: _safeInt(item['companyId']),
+        etaMinutes: minutes.toInt(),
+        etaSeconds: minutes.toInt() * 60,
+        busLatitude: location is Map ? (location['lat'] as num?)?.toDouble() : null,
+        busLongitude:
+            location is Map ? (location['lng'] as num?)?.toDouble() : null,
+        destination: item['destination']?.toString() ?? '',
+        isRealTime: item['realTime'] == true,
+        scheduledTime: item['scheduledTime']?.toString(),
+        accessible: item['accessible'] == true,
+        accessibilityType: item['accessibilityType'] is num
+            ? (item['accessibilityType'] as num).toInt()
+            : null,
+        airConditioning: vehicle is Map ? _bool(vehicle['airConditioning']) : null,
+        zeroEmission: vehicle is Map ? _bool(vehicle['zeroEmission']) : null,
+      ));
+    }
+
+    arrivals.sort((a, b) => a.etaSeconds.compareTo(b.etaSeconds));
+    return arrivals;
+  }
+
+  /// Parses the proxy's `GET /v1/stops/{id}/schedule/{day}/{H:MM}`:
+  /// `{"passes":[{"line":"143","destination":"CIUDADELA","time":"8:09","hhmm":809}]}`
+  @visibleForTesting
+  static List<ScheduledPass> parseProxySchedule(dynamic data) {
+    final passes = <ScheduledPass>[];
+    final list = data is Map ? data['passes'] : null;
+    if (list is! List) return passes;
+
+    for (final item in list) {
+      if (item is! Map) continue;
+      final line = item['line']?.toString() ?? '';
+      final time = item['time']?.toString() ?? '';
+      if (line.isEmpty || time.isEmpty) continue;
+      passes.add(ScheduledPass(
+        line: line,
+        destination: item['destination']?.toString() ?? '',
+        time: time,
+        hhmm: _safeInt(item['hhmm']),
+      ));
+    }
+    return passes;
+  }
+
+  /// Parses the proxy's `GET /v1/stops/{id}`:
+  /// `{"id":574,"name":"SAN JOSE y ANDES","lines":["116","117"]}`
+  @visibleForTesting
+  static BusStop? parseProxyStop(int stopId, dynamic data) {
+    if (data is! Map) return null;
+    final lines = <String>[
+      for (final l in data['lines'] is List ? data['lines'] as List : const [])
+        if (l is String && l.isNotEmpty) l,
+    ];
+    final name = data['name']?.toString().trim() ?? '';
+    return BusStop(
+      id: stopId,
+      name: name.isNotEmpty ? name : 'Parada $stopId',
+      lines: lines,
+    );
+  }
+
+  static bool? _bool(dynamic value) => value is bool ? value : null;
 
   /// Safely parse an int from a dynamic value (may be int, String, or null).
   static int _safeInt(dynamic value) {

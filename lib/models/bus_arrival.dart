@@ -24,6 +24,13 @@ class BusArrival {
   /// 0 = unknown (timetable queries).
   final int? accessibilityType;
 
+  /// Comfort of the GPS-tracked bus, from the official IM API via the proxy.
+  /// null = unknown (timetable estimate, no data, or no proxy configured).
+  final bool? airConditioning;
+
+  /// Zero-emission (electric) bus; null = unknown.
+  final bool? zeroEmission;
+
   const BusArrival({
     required this.line,
     required this.companyCode,
@@ -36,6 +43,8 @@ class BusArrival {
     this.scheduledTime,
     this.accessible = false,
     this.accessibilityType,
+    this.airConditioning,
+    this.zeroEmission,
   });
 
   String get companyName {
