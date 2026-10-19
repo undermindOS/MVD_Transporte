@@ -86,11 +86,43 @@ GET geoserver.montevideo.gub.uy/geoserver/ows?service=wfs&version=2.0.0&request=
 
 `https://api.montevideo.gub.uy/api/transportepublico` (Swagger: `/swagger/spec/publictransport.json`) ✔︎
 
-- OAuth2 **client_credentials**, token: `https://mvdapi-auth.montevideo.gub.uy/token`; без токена → `403`.
-- `GET /buses` (позиции всего парка, фильтры `company`, `lines`, `busstopId`), `/buses/geo?center&radius`
-- `GET /buses/busstops`, `/buses/busstops/{id}/lines`, `/buses/busstops/{id}/upcomingbuses?lines=` (обязателен `lines`)
-- `GET /buses/linevariants`, `/buses/gtfs/static/latest/google_transit.zip` (+ `version.txt`) — **GTFS**
-- `ETAItem` содержит `eta` (с), `distance` (м), `access`, `thermalConfort`, `emissions`.
+- OAuth2 **client_credentials**, token: `https://mvdapi-auth.montevideo.gub.uy/auth/realms/pci/protocol/openid-connect/token`
+  (мануал `docs/manualdeconexion.pdf`; короткий `/token` из Swagger тоже отвечает); без токена → `403`.
+  Токен живёт 300 с, refresh token нет.
+- Ключ владельца: приложение «MVD Transporte» на портале, план **Basico**. Секрет — только в секретах
+  Worker (`proxy/`), не в приложении и не в git.
+
+**Проверено живыми запросами 2026-10-19** ✔︎
+
+- **Лимит — 14 запросов в минуту на весь ключ**, окно фиксированное от :00: 15-й запрос →
+  `429 Usage limit exceeded`, `Retry-After` — секунды до следующей минуты. Запросы за токеном не
+  считаются. Ни портал, ни мануал лимит не называют. Поэтому приложение не может ходить в API само:
+  ключ общий на всех пользователей — нужен прокси с общим снимком (`proxy/src/im_gateway.js`).
+
+| Эндпоинт | Результат |
+|---|---|
+| `GET /buses` | ✅ весь парк с GPS: ~980 автобусов, 36 КБ gzip / 380 КБ, ~4 с. `company`, `busId`, `line`, `lineVariantId`, `location`, `timestamp` (с отставанием ~10 с), `speed`, `access`, `thermalConfort`, `emissions` |
+| `GET /buses?lines=` / `?busstopId=` / `?company=`, `format=geojson` | ✅ тот же формат с фильтром |
+| `GET /buses/busstops` | ✅ 4 972 остановки: `busstopId`, `street1`, `street2`, `location` (у 4 нет `street2`) |
+| `GET /buses/linevariants`, `/{lineVariantId}` | ✅ 2 148 вариантов: `line`, `origin`, `destination`, `subline`, `special` |
+| `GET /buses/gtfs/static/latest/version.txt`, `google_transit.zip` | ✅ версия `20261019`, архив 16,9 МБ (`HEAD` → 403, только `GET`) |
+| `GET /buses/busstops/{id}/upcomingbuses?lines=` | ❌ всегда `[]` — и когда `transporteRest` в ту же минуту показывает автобус с GPS в 4 мин; повтор `lines=` → 500. В Swagger схема ответа — `BusLineVariantItem`, хотя по смыслу `ETAItem` |
+| `GET /buses/busstops/{id}/lines` | ❌ `400 Bad Request` для любой остановки |
+| `GET /buses/geo?center&radius` | ❌ `500` при любом формате `center`; в Swagger помечен `deprecated` |
+
+- **ETA официальный API сейчас не даёт** — время прибытия по-прежнему из `transporteRest` (§2.2).
+- **Склейка с `transporteRest`**: `idEmpresa` (10 COETC, 20 COME, 50 CUTCSA, 70 UCOT) + `idBus` =
+  `company` + `busId`; `variante` = `lineVariantId`. 18 из 18 автобусов с GPS нашлись в снимке парка.
+  Так к ETA добавляются кондиционер и «cero emisiones».
+- **Комфорт — свойство машины**: у 842 автобусов, попавших в два снимка с разницей 15 мин, ни
+  `thermalConfort`, ни `emissions`, ни `access` не изменились. В снимке 19:52: кондиционер у 409 из 979,
+  «Cero emisiones» — 151, «PISO BAJO» — 441, «PLATAFORMA ELEVADORA» — 87. «Sin datos» ≠ «нет»:
+  приложение показывает только подтверждённое «да».
+- **GTFS**: `trips.shape_id` = `lineVariantId`, `stops.stop_code` = номер остановки STM (с URL Cómo Ir),
+  `shapes.txt` — геометрия маршрутов, `stop_times.txt` — 88 МБ в распакованном виде (в Worker не
+  обработать — только заранее, отдельным скриптом). Фид действует месяц и перевыпускается
+  (`feed_end_date` 20261119).
+- Другие сервисы портала (мануал): «Playas» (флаги на пляжах), «Eco» (тестовый).
 
 ### 2.4 Открытые наборы данных (catalogodatos.gub.uy, Licencia de Datos Abiertos – Uruguay)
 
@@ -258,6 +290,11 @@ SnackBar, «Ver en Cómo Ir» → `/comoir/parada?numero=1234`, возврат �
 1. **Официальный API через свой прокси.** Зарегистрироваться на `api.montevideo.gub.uy`,
    держать `client_secret` на небольшом бэкенде (Cloudflare Worker и т.п.) с кэшем токена
    и ответов. Это легальный канал с явными условиями и защита от поломок, как с `stmonlineRest`.
+   🟡 Сделано в ветке `feat/official-api`, не задеплоено: `proxy/` (Durable Object `ImGateway` —
+   токен, бюджет 12 из 14 запросов в минуту, общий снимок парка раз в ≥15 с). ETA по-прежнему из
+   `transporteRest` (`upcomingbuses` пуст, §2.3), к ним добавлены ❄️ кондиционер и ⚡ «cero
+   emisiones». `/v1/lines/{line}/buses` и каталоги остановок и линий — основа для п. 2 и 9.
+   Приложение ходит в прокси, если собрано с `--dart-define=MVD_PROXY_URL=…`.
 2. **Поиск остановок без номера.** WFS `imm:v_uptu_paradas` (`srsName=EPSG:4326`) или
    `/buses/busstops` → «остановки рядом» по геолокации и поиск по улице.
    ✅ «Остановки рядом» сделаны через WFS («Paradas cercanas», §2.2); поиск по улице — нет.

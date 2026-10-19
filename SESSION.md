@@ -188,3 +188,44 @@
 - Лимит по IP щедрый (300/мин): документация Cloudflare предупреждает о CGNAT на мобильных сетях.
 - Токен IM (на будущее): канонический `…/auth/realms/pci/protocol/openid-connect/token` (мануал + OIDC
   discovery); короткий `/token` из Swagger тоже отвечает.
+
+## 2026-10-19 (вечер) — официальный API IM через прокси (ветка feat/official-api)
+
+### What was done
+- Ключ портала владельца (приложение «MVD Transporte», план Basico) проверен на всех 9 эндпоинтах.
+  Работают `/buses` (весь парк), `/busstops`, `/linevariants`, GTFS; сломаны `upcomingbuses` (всегда
+  `[]`), `/busstops/{id}/lines` (400), `/buses/geo` (500). **Лимит — 14 запросов в минуту на ключ**
+  (окно от :00). Факты — docs/REVIEW.md §2.3 и память проекта `mvd-api-endpoints`.
+- Ветка `feat/official-api` от `feat/live-eta-waiting` + слияние `feat/cf-proxy` (конфликты только в
+  CHANGELOG/SESSION — оставлены обе стороны). Worktree `.claude/worktrees/official-api/MVD_Transporte`.
+- Прокси v0.2.0: Durable Object `ImGateway` (токен, бюджет 12/мин в хранилище, общий снимок парка
+  ≤ раз в 15 с, stale-while-revalidate, комфорт машин в хранилище), `vehicle` в arrivals,
+  `/v1/lines/{line}/buses`, `/v1/catalog/{stops,lines}`. 59 тестов `node:test`, мутации ловятся.
+- Приложение: `MVD_PROXY_URL` (dart-define) → все запросы `MvdApiService` через `/v1`; ❄️/⚡ на плашке.
+  88 тестов, analyze чисто, 5 мутаций ловятся.
+- Документация: REVIEW §2.3 и §6, proxy/README, README, CHANGELOG, privacy-policy, store-listing.
+
+### Current state
+- What works: `wrangler dev` с живым ключом — 40 запросов за 25 с → 3 запроса `/buses`; комфорт у
+  128/128 автобусов с GPS; после 12–40 с простоя ответ < 1 с с комфортом. iOS-симулятор (свой
+  `MVD official-api` F0AA39A7…) с `MVD_PROXY_URL=http://127.0.0.1:8787`: остановка 4018 добавлена
+  через прокси, плашки CE1 ♿❄️⚡, 21 ❄️⚡, D11/187 ♿❄️; «Horarios» через `/v1`.
+- What's broken/pending: прокси не задеплоен (нужны `wrangler login` и `wrangler secret put` владельца).
+  Android и фоновые задачи через прокси на устройстве не проверены. Не закоммичено (кроме merge-коммита).
+  Первый запрос после деплоя приходит без комфорта (хранилище пустое).
+
+### Next steps
+- Владелец: деплой прокси, затем адрес Worker в сборках (`--dart-define=MVD_PROXY_URL=…`).
+- Перевыпустить секрет на портале после деплоя («Regenerar» → `wrangler secret put IM_CLIENT_SECRET`) —
+  он попал в скриншот в чате.
+- Письмо в pci@imm.gub.uy (docs/carta-imm.md): сломанные `upcomingbuses`, `/lines`, `/geo`, лимит.
+- Дальше на тех же данных: поиск остановки по улицам (`/v1/catalog/stops`), карта линии
+  (`/v1/lines/{line}/buses`), GTFS офлайн.
+
+### Key decisions made
+- ETA остаются из `transporteRest` — официальный `upcomingbuses` пуст.
+- Один Durable Object на весь прокси: 14/мин на ключ нельзя делить между локациями Cloudflare.
+- Durable Object засыпает через 10 с простоя (не 70–140 с — то для объектов с таймерами/сокетами),
+  поэтому бюджет и комфорт в его хранилище; найдено по трассам `wrangler dev` (новый токен каждые ~25 с).
+- Показывается только подтверждённое «да»: «Sin datos» ≠ «нет кондиционера».
+- `MVD_PROXY_URL` с прямым режимом по умолчанию — чтобы сборки не ломались до деплоя прокси.

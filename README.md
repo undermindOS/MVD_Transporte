@@ -10,8 +10,13 @@ SFSafariViewController), а не во встроенном WebView.
 
 ## Данные
 
-Время прибытия и названия остановок — открытые сервисы Intendencia de Montevideo,
+Время прибытия, расписания и названия остановок — открытые сервисы Intendencia de Montevideo,
 которые использует веб-версия Cómo Ir (`api.montevideo.gub.uy/transporteRest`).
+Кондиционер и «cero emisiones» у прибывающих автобусов — официальный API IM
+(`api.montevideo.gub.uy/api/transportepublico`, OAuth2, 14 запросов в минуту на ключ). Его ключ
+живёт только в прокси на Cloudflare Workers ([proxy/](proxy/README.md)); если приложение собрано с
+адресом прокси, все эти запросы идут через него (маршруты `/v1`), иначе — напрямую в `transporteRest`
+и без данных о комфорте.
 Поиск остановок рядом («Paradas cercanas») — открытый WFS GeoServer IM
 (`geoserver.montevideo.gub.uy/geoserver/ows`, слой `imm:v_uptu_paradas`, без авторизации).
 Кнопка «Ver en Cómo Ir» открывает остановку по deep link `m.montevideo.gub.uy/comoir/parada?numero={id}`.
@@ -25,9 +30,18 @@ flutter test
 flutter run
 ```
 
+Через прокси (адрес Worker после деплоя или `http://127.0.0.1:8787` при `npm run dev` в `proxy/`):
+
+```bash
+flutter run --dart-define=MVD_PROXY_URL=https://mvd-transporte-proxy.<subdomain>.workers.dev
+```
+
+Сборки для сторов — с тем же `--dart-define`.
+
 ## Структура
 
-- `lib/services/mvd_api_service.dart` — клиент API (ETA, остановки)
+- `lib/services/mvd_api_service.dart` — клиент API (ETA, остановки, расписания; прокси или напрямую)
+- `proxy/` — Cloudflare Worker: маршруты `/v1`, Durable Object `ImGateway` с ключом официального API
 - `lib/services/nearby_stops_service.dart` — остановки рядом (геолокация + WFS)
 - `lib/services/background_worker.dart` — фоновая проверка алертов (WorkManager, ≥15 мин)
 - `lib/models/bus_wait.dart`, `lib/services/bus_wait_service.dart`, `lib/services/bus_wait_task.dart` —

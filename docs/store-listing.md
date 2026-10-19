@@ -27,6 +27,8 @@ los días y te avisa cuando se está acercando.
 • En vivo o por horario: los ómnibus con ubicación GPS se marcan distinto de
   los horarios teóricos, para que sepas qué tan confiable es cada tiempo.
 • Accesibilidad: los ómnibus accesibles se marcan con ♿.
+• Comodidad: los ómnibus con aire acondicionado y los de cero emisiones
+  (eléctricos) se marcan en cada arribo.
 • Horarios: consultá el horario teórico de una parada para días hábiles,
   sábados o domingos.
 • Novedades: desvíos y cambios de líneas publicados por la Intendencia.
@@ -46,6 +48,8 @@ transporte.
 • Tiempos de arribo, horarios, paradas y novedades: servicios en línea de la
   Intendencia de Montevideo, los mismos que usa Cómo Ir —
   https://m.montevideo.gub.uy/comoir/
+• Datos de los ómnibus (aire acondicionado, cero emisiones): API de
+  transporte público de Montevideo API — https://api.montevideo.gub.uy
 • Mi STM y recarga de tarjeta: sitio oficial — https://stm.gub.uy
 • Información del transporte: https://montevideo.gub.uy
 
@@ -78,6 +82,7 @@ Revisar contra la implementación final antes de enviar.
 |---|---|---|
 | ¿Recopila o comparte datos? | Ubicación aproximada, para «Paradas cercanas» | Esa función envía un área alrededor del usuario al servicio público de la Intendencia (WFS) para obtener paradas; no se envía al desarrollador |
 | Paradas y rutas guardadas | No recopilado | Quedan en el dispositivo (Hive) |
+| Consultas al servidor intermediario (número de parada, IP) | No recopilado: procesamiento efímero | El proxy en Cloudflare (`proxy/`) reenvía la consulta y no guarda la IP ni el número; la IP solo se cuenta en memoria para limitar abusos. Confirmar que la definición de Google de «processed ephemerally» aplica |
 | Credenciales de Mi STM | No recopilado | Se ingresan en el sitio oficial, en el navegador del sistema |
 | Biometría | No recopilado | La valida el sistema operativo; la app recibe solo sí/no |
 | Cifrado en tránsito | Sí | Todas las solicitudes son HTTPS |

@@ -2,7 +2,8 @@
 
 > Borrador. Revisarlo con un asesor legal y actualizar la fecha antes de
 > publicarlo. Las tiendas piden una URL pública (por ejemplo GitHub Pages) y
-> Google Play también un enlace dentro de la app.
+> Google Play también un enlace dentro de la app. Revisar con el asesor el
+> uso de Cloudflare (servidores fuera de Uruguay) según la Ley N° 18.331.
 
 **Última actualización:** [fecha]
 
@@ -14,8 +15,9 @@ ningún organismo de gobierno.
 
 - No tenés que crear una cuenta.
 - No usamos publicidad, analíticas ni rastreo.
-- Lo que guardás en la app queda en tu teléfono; no tenemos servidores que
-  reciban tus datos.
+- Lo que guardás en la app queda en tu teléfono. Nuestro servidor
+  intermediario solo reenvía consultas de horarios y no guarda datos
+  personales.
 
 ## Qué datos usa la app
 
@@ -23,13 +25,21 @@ ningún organismo de gobierno.
 que guardás, y la configuración del bloqueo biométrico, se almacenan solo en
 tu dispositivo. Se borran al eliminar los datos de la app o desinstalarla.
 
-**Consultas a la Intendencia de Montevideo.** Para mostrar tiempos de
-arribo, horarios, nombres de paradas, novedades y el estado de los datos
-GPS, la app consulta los servicios públicos de la Intendencia
-(`api.montevideo.gub.uy`, `pci.montevideo.gub.uy`), enviando como mucho el
-número de parada. Esas
-solicitudes llegan directamente a la Intendencia, que las trata según sus
-propias políticas; incluyen datos técnicos como tu dirección IP.
+**Tiempos de arribo, horarios y paradas.** La app los pide a un servidor
+intermediario de MVD Transporte, alojado en Cloudflare, que a su vez consulta
+los servicios públicos de la Intendencia (`api.montevideo.gub.uy`) y agrega
+datos públicos del ómnibus, como si tiene aire acondicionado o es de cero
+emisiones. Ese servidor recibe el número de parada y datos técnicos de la
+conexión, como tu dirección IP. Usa la IP solo para limitar la cantidad de
+consultas por minuto y evitar abusos; no la guarda ni la asocia con otros
+datos, y a la Intendencia no le llega tu IP sino la del servidor. Cloudflare
+actúa como proveedor de alojamiento.
+
+**Novedades y estado de los datos GPS.** La app consulta directamente los
+servicios públicos de la Intendencia (`api.montevideo.gub.uy`,
+`pci.montevideo.gub.uy`). Esas solicitudes llegan a la Intendencia, que las
+trata según sus propias políticas; incluyen datos técnicos como tu dirección
+IP.
 
 **Ubicación.** Solo si usás «Paradas cercanas»: la app obtiene tu ubicación
 en ese momento y envía un área aproximada al servicio público de mapas de la
