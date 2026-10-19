@@ -24,13 +24,20 @@ class RouteAlertAdapter extends TypeAdapter<RouteAlert> {
       preferredLines: (fields[4] as List).cast<String>(),
       enabled: fields[5] as bool,
       alertMinutes: fields[6] as int,
+      alertDays: fields[7] == null
+          ? [1, 2, 3, 4, 5, 6, 7]
+          : (fields[7] as List).cast<int>(),
+      alertFromMinute: fields[8] == null ? 0 : fields[8] as int,
+      alertToMinute: fields[9] == null ? 1440 : fields[9] as int,
+      preferredDestinations:
+          fields[10] == null ? [] : (fields[10] as List).cast<String>(),
     );
   }
 
   @override
   void write(BinaryWriter writer, RouteAlert obj) {
     writer
-      ..writeByte(7)
+      ..writeByte(11)
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
@@ -44,7 +51,15 @@ class RouteAlertAdapter extends TypeAdapter<RouteAlert> {
       ..writeByte(5)
       ..write(obj.enabled)
       ..writeByte(6)
-      ..write(obj.alertMinutes);
+      ..write(obj.alertMinutes)
+      ..writeByte(7)
+      ..write(obj.alertDays)
+      ..writeByte(8)
+      ..write(obj.alertFromMinute)
+      ..writeByte(9)
+      ..write(obj.alertToMinute)
+      ..writeByte(10)
+      ..write(obj.preferredDestinations);
   }
 
   @override

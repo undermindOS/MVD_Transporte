@@ -5,6 +5,8 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:http/http.dart' as http;
@@ -44,6 +46,12 @@ void main() {
       home: StopsPage(onOpenStopInComoIr: opened.add));
 
   setUpAll(() async {
+    // Enabling an alert asks for the notification permission
+    AndroidFlutterLocalNotificationsPlugin.registerWith();
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(
+            const MethodChannel('dexterous.com/flutter/local_notifications'),
+            (_) async => true);
     hiveDir = await Directory.systemTemp.createTemp('mvd_stops_test');
     await CacheService.init(path: hiveDir.path);
     wfsBody =
@@ -272,6 +280,141 @@ void main() {
       expect(requests.where((u) => u.host == 'geoserver.montevideo.gub.uy'),
           isEmpty);
     }, () => client);
+  });
+
+  testWidgets('Alert threshold and schedule are set from the stop card',
+      (tester) async {
+    // A small phone: the sheet and the chips must fit
+    tester.view.physicalSize = const Size(360, 690) * 3;
+    tester.view.devicePixelRatio = 3;
+    addTearDown(tester.view.reset);
+    CacheService.saveStop(BusStop(
+        id: 574, name: 'SAN JOSE y ANDES', notificationsEnabled: true));
+    await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 100)));
+    await tester.pump();
+
+    await http.runWithClient(() async {
+      await tester.pumpWidget(app());
+      await tester.pump();
+
+      await tester.tap(find.text('Aviso 5 min antes · Siempre'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('10 min'));
+      await tester.tap(find.text('Sá'));
+      await tester.tap(find.text('Do'));
+      await tester.tap(find.text('Todo el día'));
+      await tester.pumpAndSettle();
+
+      // 7:00–9:00 is offered; the start is changed to 7:30
+      expect(find.text('Hasta 9:00'), findsOneWidget);
+      await tester.tap(find.text('Desde 7:00'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byIcon(Icons.keyboard_outlined));
+      await tester.pumpAndSettle();
+      final fields = find.descendant(
+          of: find.byType(Dialog), matching: find.byType(TextField));
+      await tester.enterText(fields.at(1), '30');
+      await tester.tap(find.text('OK'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Guardar'));
+      await tester.pumpAndSettle();
+      await tester.runAsync(
+          () => Future<void>.delayed(const Duration(milliseconds: 100)));
+      await tester.pumpAndSettle();
+
+      final saved = CacheService.getStop(574)!;
+      expect(saved.etaAlertMinutes, 10);
+      expect(saved.alertDays, [1, 2, 3, 4, 5]);
+      expect((saved.alertFromMinute, saved.alertToMinute),
+          (7 * 60 + 30, 9 * 60));
+      expect(find.text('Aviso 10 min antes · Lun a Vie 7:30–9:00'),
+          findsOneWidget);
+    }, () => client);
+  });
+
+  testWidgets('Agregar ruta picks the lines and direction of the stop',
+      (tester) async {
+    // A small phone: the sheet and the chips must fit
+    tester.view.physicalSize = const Size(360, 690) * 3;
+    tester.view.devicePixelRatio = 3;
+    addTearDown(tester.view.reset);
+    final routeClient = MockClient((request) async {
+      requests.add(request.url);
+      if (request.url.path == '/transporteRest/lineas/574') {
+        return http.Response(_lineas574, 200);
+      }
+      if (request.url.path == '/transporteRest/siguientesParada/574') {
+        return http.Response(
+            '[{"linea":"121","destino":"CENTRO","minutos":2,"real":true,'
+            '"idEmpresa":50,"horaDesc":"8:00"},'
+            '{"linea":"116","destino":"POCITOS","minutos":9,"real":true,'
+            '"idEmpresa":50,"horaDesc":"8:07"},'
+            '{"linea":"116","destino":"CIUDAD VIEJA","minutos":14,'
+            '"real":true,"idEmpresa":50,"horaDesc":"8:12"}]',
+            200);
+      }
+      return http.Response('[]', 200);
+    });
+    Finder inDialog(String text) => find.descendant(
+        of: find.byType(AlertDialog), matching: find.text(text));
+    Finder chip(String text) => find.descendant(
+        of: find.byType(AlertDialog),
+        matching: find.widgetWithText(FilterChip, text));
+
+    await http.runWithClient(() async {
+      await tester.pumpWidget(app());
+      await tester.pump();
+      await tester.tap(find.text('Rutas'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byIcon(Icons.add));
+      await tester.pumpAndSettle();
+
+      await tester.enterText(
+          find.widgetWithText(TextField, 'Parada de origen *'), '574');
+      await tester.enterText(
+          find.widgetWithText(TextField, 'Destino *'), 'Trabajo');
+      await tester.tap(find.byTooltip('Ver líneas'));
+      await tester.pumpAndSettle();
+
+      // The stop's lines (transporteRest/lineas), not typed by hand
+      expect(inDialog('SAN JOSE y ANDES'), findsOneWidget);
+      for (final line in ['116', '117', '121']) {
+        expect(chip(line), findsOneWidget);
+      }
+      // Directions of the upcoming buses, narrowed to the picked lines
+      expect(chip('CENTRO'), findsOneWidget);
+      await tester.tap(chip('116'));
+      await tester.pumpAndSettle();
+      expect(chip('CENTRO'), findsNothing);
+      await tester.tap(chip('121'));
+      await tester.tap(chip('POCITOS'));
+      await tester.pumpAndSettle();
+
+      requests.clear();
+      await tester.tap(find.text('Guardar'));
+      await tester.pumpAndSettle();
+      await tester.runAsync(
+          () => Future<void>.delayed(const Duration(milliseconds: 100)));
+      await tester.pumpAndSettle();
+
+      final route = CacheService.getAllRoutes().single;
+      expect(
+          (route.originStopId, route.originName, route.destinationName),
+          (574, 'SAN JOSE y ANDES', 'Trabajo'));
+      expect(route.preferredLines, ['116', '121']);
+      expect(route.preferredDestinations, ['POCITOS']);
+      // The dialog already resolved the stop
+      expect(requests.map((u) => u.path),
+          isNot(contains('/transporteRest/lineas/574')));
+      expect(find.text('Líneas: 116, 121 · Hacia: POCITOS'), findsOneWidget);
+      expect(find.text('Aviso 5 min antes · Siempre'), findsOneWidget);
+    }, () => routeClient);
+
+    CacheService.deleteRoute(CacheService.getAllRoutes().single.id);
+    await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 100)));
   });
 }
 
