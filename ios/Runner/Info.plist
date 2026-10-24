@@ -7,7 +7,7 @@
 		<key>CFBundleDevelopmentRegion</key>
 		<string>$(DEVELOPMENT_LANGUAGE)</string>
 		<key>CFBundleDisplayName</key>
-		<string>MVD Transporte</string>
+		<string>Timbre MVD</string>
 		<key>CFBundleExecutable</key>
 		<string>$(EXECUTABLE_NAME)</string>
 		<key>CFBundleIdentifier</key>
@@ -49,11 +49,11 @@
 			</dict>
 		</dict>
 		<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
-		<string>MVD Transporte necesita acceso a tu ubicación para mostrarte rutas de transporte cercanas.</string>
+		<string>Timbre MVD necesita acceso a tu ubicación para mostrarte rutas de transporte cercanas.</string>
 		<key>NSLocationWhenInUseUsageDescription</key>
-		<string>MVD Transporte necesita acceso a tu ubicación para mostrarte rutas de transporte cercanas en la función Cómo Ir.</string>
+		<string>Timbre MVD necesita acceso a tu ubicación para mostrarte rutas de transporte cercanas en la función Cómo Ir.</string>
 		<key>NSFaceIDUsageDescription</key>
-		<string>MVD Transporte usa Face ID para proteger tu información de transporte.</string>
+		<string>Timbre MVD usa Face ID para proteger tu información de transporte.</string>
 		<key>UIApplicationSceneManifest</key>
 		<dict>
 			<key>UIApplicationSupportsMultipleScenes</key>

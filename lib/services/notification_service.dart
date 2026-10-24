@@ -1,15 +1,16 @@
-import 'dart:ui';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/timezone.dart' as tz;
+
+import '../ui/theme/timbre_tokens.dart';
 
 class NotificationService {
   static final _plugin = FlutterLocalNotificationsPlugin();
 
   static const _channelId = 'bus_alerts';
-  static const _channelName = 'Alertas de colectivo';
+  static const _channelName = 'Alertas de ómnibus';
   static const _channelDesc =
-      'Notificaciones cuando tu colectivo está por llegar';
+      'Avisos cuando tu ómnibus está por llegar';
 
   static Future<void> init() async {
     const androidSettings =
@@ -69,8 +70,8 @@ class NotificationService {
   }) async {
     final title = 'Línea $line — $etaMinutes min';
     final body = etaMinutes <= 1
-        ? 'Tu colectivo está llegando a $stopName'
-        : 'Tu colectivo llega en $etaMinutes min a $stopName';
+        ? 'Tu ómnibus está llegando a $stopName'
+        : 'Tu ómnibus llega en $etaMinutes min a $stopName';
 
     final details = NotificationDetails(
       android: AndroidNotificationDetails(
@@ -80,7 +81,7 @@ class NotificationService {
         importance: Importance.high,
         priority: Priority.high,
         icon: '@mipmap/ic_launcher',
-        color: const Color(0xFF0066CC),
+        color: TimbreColors.azul,
       ),
       iOS: const DarwinNotificationDetails(
         presentAlert: true,
@@ -102,7 +103,7 @@ class NotificationService {
   }) async {
     final title = 'Línea $line → $destinationName';
     final body = etaMinutes <= 1
-        ? 'Tu colectivo está llegando a $originName'
+        ? 'Tu ómnibus está llegando a $originName'
         : 'Sale en $etaMinutes min desde $originName';
 
     final details = NotificationDetails(
@@ -113,7 +114,7 @@ class NotificationService {
         importance: Importance.high,
         priority: Priority.high,
         icon: '@mipmap/ic_launcher',
-        color: const Color(0xFF0066CC),
+        color: TimbreColors.azul,
         styleInformation: BigTextStyleInformation(body),
       ),
       iOS: const DarwinNotificationDetails(
@@ -146,7 +147,7 @@ class NotificationService {
         importance: Importance.high,
         priority: Priority.high,
         icon: '@mipmap/ic_launcher',
-        color: const Color(0xFF0066CC),
+        color: TimbreColors.azul,
       ),
       iOS: const DarwinNotificationDetails(
         presentAlert: true,

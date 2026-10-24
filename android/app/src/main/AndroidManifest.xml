@@ -17,7 +17,7 @@
          Google Play restricts it to alarm/calendar apps -->
 
     <application
-        android:label="MVD Transporte"
+        android:label="Timbre MVD"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher"
         android:usesCleartextTraffic="false">
