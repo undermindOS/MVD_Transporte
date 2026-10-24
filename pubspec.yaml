@@ -98,6 +98,38 @@ flutter:
   # the material Icons class.
   uses-material-design: true
 
+  # Font licenses, shown in the app's license page (SIL OFL 1.1)
+  assets:
+    - assets/fonts/OFL-FiraSans.txt
+    - assets/fonts/OFL-FiraSansExtraCondensed.txt
+    - assets/fonts/OFL-Doto.txt
+
+  # Timbre MVD typefaces, bundled (no runtime download): Latin subsets of
+  # Fira Sans, Fira Sans Extra Condensed and a static Black instance of Doto
+  fonts:
+    - family: FiraSans
+      fonts:
+        - asset: assets/fonts/FiraSans-Regular.ttf
+          weight: 400
+        - asset: assets/fonts/FiraSans-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/FiraSans-SemiBold.ttf
+          weight: 600
+        - asset: assets/fonts/FiraSans-Bold.ttf
+          weight: 700
+    - family: FiraSansExtraCondensed
+      fonts:
+        - asset: assets/fonts/FiraSansExtraCondensed-SemiBold.ttf
+          weight: 600
+        - asset: assets/fonts/FiraSansExtraCondensed-Bold.ttf
+          weight: 700
+        - asset: assets/fonts/FiraSansExtraCondensed-ExtraBold.ttf
+          weight: 800
+    - family: Doto
+      fonts:
+        - asset: assets/fonts/Doto-Black.ttf
+          weight: 900
+
   # To add assets to your application, add an assets section, like this:
   # assets:
   #   - images/a_dot_burr.jpeg
