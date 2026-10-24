@@ -17,6 +17,9 @@ import 'package:stm_app/main.dart';
 import 'package:stm_app/models/bus_stop.dart';
 import 'package:stm_app/services/cache_service.dart';
 import 'package:stm_app/services/official_sites.dart';
+import 'package:stm_app/ui/theme/timbre_tokens.dart';
+
+import 'support/layout.dart';
 
 void main() {
   late Directory hiveDir;
@@ -57,8 +60,23 @@ void main() {
     expect(find.byIcon(Icons.info_outline), findsOneWidget);
   });
 
+  testWidgets('Paradas / Rutas / Novedades sit on a white bar',
+      (WidgetTester tester) async {
+    // Their blue labels vanished on the blue app bar of the theme
+    await tester.pumpWidget(const MiTransporteMVDApp());
+    await tester.pump();
+
+    final bar =
+        find.ancestor(of: find.byType(TabBar), matching: find.byType(AppBar));
+    final material = tester.widget<Material>(
+        find.descendant(of: bar, matching: find.byType(Material)).first);
+    expect(material.color, TimbreColors.blanco);
+  });
+
   testWidgets('Servicios lists the official sites',
       (WidgetTester tester) async {
+    // Portrait phone: the 800 × 600 test window hides the last tile
+    usePhoneScreen(tester);
     await tester.pumpWidget(const MiTransporteMVDApp());
     await tester.pump();
 

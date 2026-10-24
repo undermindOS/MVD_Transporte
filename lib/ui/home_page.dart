@@ -10,8 +10,9 @@ import '../services/official_sites.dart';
 import 'info_page.dart';
 import 'services_page.dart';
 import 'stops_page.dart';
-import 'theme/timbre_text.dart';
+import 'theme/timbre_tokens.dart';
 import 'widgets/cartel.dart';
+import 'widgets/page_title_bar.dart';
 
 // ---------------------------------------------------------------------------
 // Tab model — single source of truth for navigation structure
@@ -22,10 +23,14 @@ class _TabDef {
   final IconData icon;
   final IconData selectedIcon;
 
+  /// Line under the page title in the blue header.
+  final String? subtitle;
+
   const _TabDef({
     required this.label,
     required this.icon,
     required this.selectedIcon,
+    this.subtitle,
   });
 }
 
@@ -79,6 +84,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       label: 'Servicios',
       icon: Icons.apps_outlined,
       selectedIcon: Icons.apps,
+      subtitle: 'Sitios oficiales, en tu navegador',
     ),
   ];
 
@@ -278,6 +284,13 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
 
   // --- Build ---
 
+  static ThemeData _subTabsTheme(ThemeData theme) => theme.copyWith(
+        appBarTheme: theme.appBarTheme.copyWith(
+          backgroundColor: TimbreColors.blanco,
+          foregroundColor: TimbreColors.tinta,
+        ),
+      );
+
   @override
   Widget build(BuildContext context) {
     if (_biometricLockEnabled && !_isAuthenticated) {
@@ -297,32 +310,25 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
             onPressed: _openInfoPage,
           ),
         ],
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(52),
-          child: Align(
-            alignment: Alignment.centerLeft,
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
-              child: Semantics(
-                header: true,
-                child: Text(
-                  _tabs[_currentIndex].label,
-                  style: TimbreText.pageTitle,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-            ),
-          ),
+        bottom: PageTitleBar(
+          title: _tabs[_currentIndex].label,
+          subtitle: _tabs[_currentIndex].subtitle,
+          textScaler: MediaQuery.textScalerOf(context),
         ),
       ),
       // Keeps each tab's state (loaded arrivals, selected sub-tab)
       body: IndexedStack(
         index: _currentIndex,
         children: [
-          StopsPage(
-            onOpenStopInComoIr: (stopId) =>
-                _openInBrowser(OfficialSite.comoIrStop(stopId)),
+          // StopsPage draws its own bar for Paradas / Rutas / Novedades
+          // with blue labels: on the blue app bar of the theme they
+          // vanished. A white bar here, stops_page.dart stays untouched.
+          Theme(
+            data: _subTabsTheme(Theme.of(context)),
+            child: StopsPage(
+              onOpenStopInComoIr: (stopId) =>
+                  _openInBrowser(OfficialSite.comoIrStop(stopId)),
+            ),
           ),
           ServicesPage(onOpen: (site) => _openInBrowser(site.uri)),
         ],

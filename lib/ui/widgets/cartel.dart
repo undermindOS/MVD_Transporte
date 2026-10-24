@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../spoken_text.dart';
 import '../theme/timbre_text.dart';
 import '../theme/timbre_tokens.dart';
 import 'timbre_bus.dart';
@@ -191,7 +192,7 @@ class CartelParada extends StatelessWidget {
 
   String get _semanticLabel {
     final parts = <String>[
-      'Próximo: $line a ${_capitalized(destination)}',
+      'Próximo: $line a ${spokenName(destination)}',
       _arriving ? 'llegando' : 'llega en ${_minutosLabel(etaMinutes)}',
       'con GPS',
       if (accessible) 'accesible',
@@ -212,6 +213,8 @@ class CartelParada extends StatelessWidget {
     return Semantics(
       button: onTap != null,
       label: _semanticLabel,
+      // ExcludeSemantics drops the InkWell's tap action too
+      onTap: onTap,
       child: ExcludeSemantics(
         child: Material(
           color: TimbreColors.tinta,
@@ -351,7 +354,7 @@ class CartelTira extends StatelessWidget {
   Widget build(BuildContext context) {
     final arriving = etaMinutes <= 0;
     return Semantics(
-      label: '$line a ${_capitalized(destination)}, '
+      label: '$line a ${spokenName(destination)}, '
           '${arriving ? 'llegando' : 'llega en ${_minutosLabel(etaMinutes)}'}'
           ', con GPS',
       child: ExcludeSemantics(
@@ -400,11 +403,3 @@ String _minutosLabel(int minutes) =>
 
 String _hhmm(DateTime t) =>
     '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
-
-/// "PUNTA CARRETAS" -> "Punta Carretas" for screen readers, which would
-/// otherwise spell some uppercase words letter by letter.
-String _capitalized(String text) => text
-    .toLowerCase()
-    .split(' ')
-    .map((w) => w.isEmpty ? w : w[0].toUpperCase() + w.substring(1))
-    .join(' ');

@@ -1,0 +1,311 @@
+// Servicios, Novedades, Horarios and Info on the Timbre design system:
+// what each screen promises the user, independent of pixels. Real fonts
+// and a phone-sized screen, so overflow checks mean something.
+
+import 'package:flutter/material.dart';
+import 'package:flutter_test/flutter_test.dart';
+
+import 'package:stm_app/models/bus_stop.dart';
+import 'package:stm_app/models/scheduled_pass.dart';
+import 'package:stm_app/models/transport_news.dart';
+import 'package:stm_app/services/official_sites.dart';
+import 'package:stm_app/ui/info_page.dart';
+import 'package:stm_app/ui/news_list.dart';
+import 'package:stm_app/ui/schedule_page.dart';
+import 'package:stm_app/ui/services_page.dart';
+import 'package:stm_app/ui/theme/timbre_theme.dart';
+import 'package:stm_app/ui/theme/timbre_tokens.dart';
+import 'package:stm_app/ui/widgets/cartel.dart';
+import 'package:stm_app/ui/widgets/line_badge.dart';
+import 'package:stm_app/ui/widgets/page_title_bar.dart';
+import 'package:stm_app/ui/widgets/segmented.dart';
+
+import 'support/layout.dart';
+
+/// [textScale] 2.0 is the largest Android font size ("Largest", Android 14+).
+Widget _app(Widget home, {double textScale = 1}) => MaterialApp(
+      theme: buildTimbreTheme(),
+      builder: (context, child) => MediaQuery(
+        data: MediaQuery.of(context)
+            .copyWith(textScaler: TextScaler.linear(textScale)),
+        child: child!,
+      ),
+      home: home,
+    );
+
+final _news = [
+  TransportNews(
+      id: 180,
+      title: 'Líneas patrimoniales recorren la Ciudad Vieja',
+      summary: 'Este sábado y domingo, de 10 a 18 horas',
+      body: '',
+      date: DateTime(2026, 10, 2)),
+  TransportNews(
+      id: 179,
+      title: 'Desvíos por Expo Prado',
+      summary: '',
+      body: '',
+      date: DateTime(2026, 9, 11)),
+];
+
+const _passes = [
+  ScheduledPass(
+      line: '145', destination: 'PLAZA ESPAÑA', time: '23:31', hhmm: 2331),
+  ScheduledPass(
+      line: '143', destination: 'CIUDADELA', time: '23:54', hhmm: 2354),
+  ScheduledPass(
+      line: '494', destination: 'PASO DE LA ARENA', time: '0:17', hhmm: 17),
+];
+
+Widget _services(List<OfficialSite> opened) =>
+    Scaffold(body: ServicesPage(onOpen: opened.add));
+
+Widget _newsList({int? readBefore = 179, bool failed = false}) => Scaffold(
+      body: NewsList(
+        news: _news,
+        readBefore: readBefore,
+        isLoading: false,
+        failed: failed,
+        onRefresh: () async {},
+      ),
+    );
+
+Widget _schedule() => SchedulePage(
+      stop: BusStop(id: 3140, name: 'AV RAMON ANADOR y TIBURCIO GOMEZ'),
+      now: DateTime(2026, 10, 17, 23, 33),
+      fetch: (id, day, h, m) async => _passes,
+    );
+
+Widget _info({Uri? privacy}) => InfoPage(
+      biometricLockEnabled: false,
+      onToggleBiometricLock: (v) async => v,
+      privacyPolicyUrl: privacy,
+    );
+
+void main() {
+  setUpAll(loadBundledFonts);
+
+  group('Servicios', () {
+    testWidgets('card services and Cómo Ir in two sections', (tester) async {
+      usePhoneScreen(tester);
+      final opened = <OfficialSite>[];
+      await tester.pumpWidget(_app(_services(opened)));
+
+      final card = tester.getTopLeft(find.text('Tu tarjeta STM')).dy;
+      final travel = tester.getTopLeft(find.text('Para moverte')).dy;
+      for (final t in ['Mi STM', 'Recarga', 'Avisos']) {
+        expect(tester.getTopLeft(find.text(t)).dy, inExclusiveRange(card, travel));
+      }
+      expect(tester.getTopLeft(find.text('Cómo Ir')).dy, greaterThan(travel));
+      expect(find.textContaining('Timbre MVD no es una app oficial'),
+          findsOneWidget);
+
+      await tester.tap(find.text('Cómo Ir'));
+      expect(opened, [OfficialSite.comoIr]);
+    });
+
+    testWidgets('screen readers hear the destination and can open it',
+        (tester) async {
+      usePhoneScreen(tester);
+      final handle = tester.ensureSemantics();
+      final opened = <OfficialSite>[];
+      await tester.pumpWidget(_app(_services(opened)));
+
+      final miStm =
+          RegExp(r'^Mi STM\. .*Abre el sitio oficial en el navegador$');
+      expect(tester.getSemantics(find.bySemanticsLabel(miStm)),
+          isSemantics(isButton: true, hasTapAction: true));
+      tester.semantics.tap(find.semantics.byLabel(miStm));
+      expect(opened, [OfficialSite.miStm]);
+      handle.dispose();
+    });
+
+    testWidgets('tiles stop growing on tablets', (tester) async {
+      tester.view.physicalSize = const Size(2048, 1536);
+      tester.view.devicePixelRatio = 2;
+      addTearDown(tester.view.reset);
+      await tester.pumpWidget(_app(_services([])));
+
+      final tile = tester.getSize(find.byType(AspectRatio).first);
+      expect(tile.width, lessThanOrEqualTo(168));
+    });
+  });
+
+  group('Novedades', () {
+    testWidgets('only unread news get NUEVA and a filled date',
+        (tester) async {
+      usePhoneScreen(tester);
+      await tester.pumpWidget(_app(_newsList()));
+
+      expect(find.text('NUEVA'), findsOneWidget);
+      expect(find.text('02'), findsOneWidget);
+      expect(find.text('OCT'), findsOneWidget);
+      expect(find.text('SET'), findsOneWidget); // Uruguay: setiembre
+      BoxDecoration tileOf(String day) => tester
+          .widget<Container>(find
+              .ancestor(of: find.text(day), matching: find.byType(Container))
+              .first)
+          .decoration! as BoxDecoration;
+      expect(tileOf('02').color, TimbreColors.azul);
+      expect(tileOf('11').color, TimbreColors.blanco);
+    });
+
+    testWidgets('never opened: everything is new', (tester) async {
+      usePhoneScreen(tester);
+      await tester.pumpWidget(_app(_newsList(readBefore: null)));
+      expect(find.text('NUEVA'), findsNWidgets(2));
+    });
+
+    testWidgets('offline is a warning, not "Sin novedades"', (tester) async {
+      usePhoneScreen(tester);
+      await tester.pumpWidget(_app(_newsList(failed: true)));
+      expect(find.text('No se pudo actualizar. Deslizá para reintentar'),
+          findsOneWidget);
+      expect(find.text('Sin novedades'), findsNothing);
+    });
+  });
+
+  group('Horarios', () {
+    testWidgets('grouped by hour, midnight in between', (tester) async {
+      usePhoneScreen(tester);
+      await tester.pumpWidget(_app(_schedule()));
+      await tester.pumpAndSettle();
+
+      expect(find.text('AV RAMON ANADOR y TIBURCIO GOMEZ'), findsOneWidget);
+      expect(find.text(' · 3140'), findsOneWidget);
+      expect(find.text('Desde 23:30'), findsOneWidget);
+      final midnight = tester.getTopLeft(find.text('Después de medianoche')).dy;
+      expect(tester.getTopLeft(find.text('23 h')).dy, lessThan(midnight));
+      expect(tester.getTopLeft(find.text('0 h')).dy, greaterThan(midnight));
+    });
+
+    testWidgets('timetable badges are outlined, never live', (tester) async {
+      usePhoneScreen(tester);
+      await tester.pumpWidget(_app(_schedule()));
+      await tester.pumpAndSettle();
+
+      final badges = tester.widgetList<LineBadge>(find.byType(LineBadge));
+      expect(badges, hasLength(3));
+      expect(badges.every((b) => !b.live), isTrue);
+    });
+
+    testWidgets('rows read as one sentence', (tester) async {
+      usePhoneScreen(tester);
+      final handle = tester.ensureSemantics();
+      await tester.pumpWidget(_app(_schedule()));
+      await tester.pumpAndSettle();
+
+      expect(find.bySemanticsLabel('23:31, línea 145 a Plaza España'),
+          findsOneWidget);
+      expect(
+          find.bySemanticsLabel(
+              'Horarios de la parada 3140, Av Ramon Anador y Tiburcio Gomez'),
+          findsOneWidget);
+      handle.dispose();
+    });
+  });
+
+  group('TimbreSegmented', () {
+    testWidgets('selected segment is announced; the others can be picked',
+        (tester) async {
+      usePhoneScreen(tester);
+      final handle = tester.ensureSemantics();
+      final picks = <int>[];
+      await tester.pumpWidget(_app(Scaffold(
+        body: TimbreSegmented<int>(
+          values: const [3, 5, 10],
+          selected: 3,
+          labelOf: (v) => '$v min',
+          onChanged: picks.add,
+        ),
+      )));
+
+      expect(
+          tester.getSemantics(find.text('3 min')),
+          isSemantics(
+              label: '3 min',
+              isButton: true,
+              isSelected: true,
+              isInMutuallyExclusiveGroup: true,
+              hasTapAction: false));
+      expect(
+          tester.getSemantics(find.text('10 min')),
+          isSemantics(
+              label: '10 min',
+              isButton: true,
+              isSelected: false,
+              isInMutuallyExclusiveGroup: true,
+              hasTapAction: true));
+
+      await tester.tap(find.text('3 min'));
+      await tester.tap(find.text('10 min'));
+      tester.semantics.tap(find.semantics.byLabel('5 min'));
+      expect(picks, [10, 5]);
+      handle.dispose();
+    });
+  });
+
+  group('Info', () {
+    testWidgets('unofficial notice and links', (tester) async {
+      usePhoneScreen(tester);
+      await tester.pumpWidget(_app(_info()));
+
+      expect(find.textContaining('Aplicación no oficial.', findRichText: true),
+          findsOneWidget);
+      expect(find.text('Código fuente'), findsOneWidget);
+      expect(find.text('Contacto'), findsOneWidget);
+      // No public privacy policy yet: no dead link
+      expect(find.text('Política de privacidad'), findsNothing);
+    });
+
+    testWidgets('privacy policy row once it is published', (tester) async {
+      usePhoneScreen(tester);
+      await tester.pumpWidget(
+          _app(_info(privacy: Uri.parse('https://example.com/privacidad'))));
+      expect(find.text('Política de privacidad'), findsOneWidget);
+    });
+  });
+
+  // Older riders use big fonts. Nothing may overflow (an overflow fails
+  // the test) and the header must not cut the page title.
+  group('Largest system font', () {
+    for (final (name, screen) in [
+      ('Servicios', _services([])),
+      ('Novedades', _newsList()),
+      ('Horarios', _schedule()),
+      ('Info', _info(privacy: Uri.parse('https://example.com/privacidad'))),
+    ]) {
+      testWidgets(name, (tester) async {
+        usePhoneScreen(tester);
+        await tester.pumpWidget(_app(screen, textScale: 2));
+        await tester.pumpAndSettle();
+      });
+    }
+
+    testWidgets('header plate and page title', (tester) async {
+      usePhoneScreen(tester);
+      await tester.pumpWidget(_app(
+        Builder(
+          builder: (context) => Scaffold(
+            appBar: AppBar(
+              title: const CartelCompacto(),
+              centerTitle: false,
+              bottom: PageTitleBar(
+                title: 'Servicios',
+                subtitle: 'Sitios oficiales, en tu navegador',
+                textScaler: MediaQuery.textScalerOf(context),
+              ),
+            ),
+          ),
+        ),
+        textScale: 2,
+      ));
+
+      final bar = tester.getRect(find.byType(AppBar));
+      expect(tester.getRect(find.text('Servicios')).bottom,
+          lessThanOrEqualTo(bar.bottom));
+      expect(tester.getRect(find.text('Sitios oficiales, en tu navegador')).bottom,
+          lessThanOrEqualTo(bar.bottom));
+    });
+  });
+}
