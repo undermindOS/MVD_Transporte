@@ -195,6 +195,7 @@ class _SchedulePageState extends State<SchedulePage> {
       return const Center(
         child: SingleChildScrollView(
           child: TimbreEmptyState('Sin pasadas para este horario',
+              sign: 'SIN PASADAS',
               detail: 'Probá con otro día o con una hora más temprano.'),
         ),
       );

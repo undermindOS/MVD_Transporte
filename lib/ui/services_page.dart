@@ -113,6 +113,9 @@ class ServicesPage extends StatelessWidget {
   static const _maxTile = 168.0;
 }
 
+/// The soft light around a lit LED icon.
+const _glow = Shadow(color: Color(0x99FFB21E), blurRadius: 14);
+
 class _SiteTile extends StatelessWidget {
   const _SiteTile({required this.site, required this.onTap});
 
@@ -131,28 +134,35 @@ class _SiteTile extends StatelessWidget {
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(TimbreRadii.card),
+        // Tapping lights the board up
+        splashColor: TimbreColors.ambar.withValues(alpha: 0.22),
+        highlightColor: TimbreColors.ambar.withValues(alpha: 0.10),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             AspectRatio(
               aspectRatio: 1,
-              // Ink, so the tap ripple shows on the blue
+              // A small LED board, the material of the header plate. Ink,
+              // so the tap ripple shows on it
               child: Ink(
                 decoration: BoxDecoration(
-                  color: TimbreColors.azul,
+                  color: TimbreColors.tinta,
                   borderRadius: BorderRadius.circular(TimbreRadii.card),
                 ),
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(TimbreRadii.card),
                   child: Stack(
                     children: [
-                      // A small board: the unlit LEDs of the header
-                      const Positioned.fill(child: LedMatrix(opacity: 0.55)),
+                      const Positioned.fill(
+                        child:
+                            LedMatrix(color: TimbreColors.ambar, opacity: 0.11),
+                      ),
                       Center(
                         child: Icon(
                           site.icon,
                           size: 44,
-                          color: TimbreColors.blanco,
+                          color: TimbreColors.ambar,
+                          shadows: const [_glow],
                         ),
                       ),
                       const Positioned(
@@ -161,7 +171,7 @@ class _SiteTile extends StatelessWidget {
                         child: Icon(
                           Icons.north_east,
                           size: 16,
-                          color: TimbreColors.sobreAzul,
+                          color: TimbreColors.ambarTenue,
                         ),
                       ),
                     ],

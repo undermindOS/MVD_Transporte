@@ -4,6 +4,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../services/official_sites.dart';
 import 'theme/timbre_text.dart';
 import 'theme/timbre_tokens.dart';
+import 'widgets/led_matrix.dart';
 import 'widgets/timbre_app_bar.dart';
 import 'widgets/timbre_bus.dart';
 
@@ -33,6 +34,8 @@ class _InfoPageState extends State<InfoPage> {
   // Local copy: the parent's rebuild does not reach a pushed route
   late bool _biometricLockEnabled = widget.biometricLockEnabled;
 
+  static const _notAffiliated = 'No está afiliada con la Intendencia de '
+      'Montevideo, el STM ni ninguna empresa de transporte.';
   static const _sourceCode = 'github.com/undermindOS/MVD_Transporte';
   static const _contact = 'zhongnanhaii@yahoo.com';
 
@@ -106,25 +109,44 @@ class _InfoPageState extends State<InfoPage> {
                   ),
                 ]),
                 const SizedBox(height: 14),
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                  decoration: BoxDecoration(
-                    color: TimbreColors.niebla,
-                    borderRadius: BorderRadius.circular(TimbreRadii.control),
-                  ),
-                  child: const Text.rich(
-                    TextSpan(children: [
-                      TextSpan(
-                          text: 'Aplicación no oficial. ',
-                          style: TextStyle(fontWeight: FontWeight.w700)),
-                      TextSpan(
-                          text: 'No está afiliada con la Intendencia de '
-                              'Montevideo, el STM ni ninguna empresa de '
-                              'transporte.'),
-                    ]),
-                    style: TextStyle(
-                        fontSize: 14, height: 1.45, color: TimbreColors.tinta),
+                // The notice that matters most, on the LED board
+                Semantics(
+                  container: true,
+                  label: 'Aplicación no oficial. $_notAffiliated',
+                  excludeSemantics: true,
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      color: TimbreColors.tinta,
+                      borderRadius: BorderRadius.circular(TimbreRadii.control),
+                    ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(TimbreRadii.control),
+                      child: Stack(children: [
+                        const Positioned.fill(
+                          child: LedMatrix(
+                              color: TimbreColors.ambar, opacity: 0.11),
+                        ),
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text('NO OFICIAL',
+                                  style: TimbreText.cartel(22)
+                                      .copyWith(letterSpacing: 1.5)),
+                              const SizedBox(height: 10),
+                              const Text(
+                                _notAffiliated,
+                                style: TextStyle(
+                                    fontSize: 14,
+                                    height: 1.45,
+                                    color: TimbreColors.sobreAzulSuave),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ]),
+                    ),
                   ),
                 ),
               ],

@@ -33,6 +33,9 @@ class NewsList extends StatelessWidget {
       color: TimbreColors.blanco,
       child: RefreshIndicator(
         onRefresh: onRefresh,
+        // A lit dot on the plate while it reloads
+        color: TimbreColors.ambar,
+        backgroundColor: TimbreColors.tinta,
         child: ListView(
           padding: const EdgeInsets.only(bottom: 24),
           children: [
@@ -46,6 +49,7 @@ class NewsList extends StatelessWidget {
             if (!isLoading && !failed && news.isEmpty)
               const TimbreEmptyState(
                 'Sin novedades',
+                sign: 'SIN NOVEDADES',
                 detail: 'Los desvíos y cambios de recorrido aparecen acá.',
               ),
             for (final n in news)
@@ -191,6 +195,15 @@ class _DateTile extends StatelessWidget {
     'NOV',
     'DIC',
   ];
+  static const _day = TextStyle(
+    fontFamily: TimbreFonts.firaCondensed,
+    fontWeight: FontWeight.w800,
+    fontSize: 26,
+    height: 1,
+    color: TimbreColors.tinta,
+  );
+  static final _ledDay = TimbreText.cartel(24);
+
   static const _monthNames = [
     'enero',
     'febrero',
@@ -208,7 +221,6 @@ class _DateTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final fg = filled ? TimbreColors.blanco : TimbreColors.tinta;
     return Semantics(
       label: '${date.day} de ${_monthNames[date.month - 1]}',
       excludeSemantics: true,
@@ -216,15 +228,18 @@ class _DateTile extends StatelessWidget {
         width: 52,
         height: 56,
         decoration: BoxDecoration(
-          color: filled ? TimbreColors.azul : TimbreColors.blanco,
+          color: filled ? TimbreColors.tinta : TimbreColors.blanco,
           borderRadius: BorderRadius.circular(10),
           border:
               filled ? null : Border.all(color: TimbreColors.linea, width: 1.5),
         ),
         clipBehavior: Clip.antiAlias,
         child: Stack(alignment: Alignment.center, children: [
-          // Unread: a small board, like the header
-          if (filled) const Positioned.fill(child: LedMatrix(opacity: 0.55)),
+          // Unread: a small LED board, the material of the header plate
+          if (filled)
+            const Positioned.fill(
+              child: LedMatrix(color: TimbreColors.ambar, opacity: 0.11),
+            ),
           // Fixed tile: with the largest system fonts the date scales down
           // inside it (the title next to it does grow)
           Padding(
@@ -236,13 +251,7 @@ class _DateTile extends StatelessWidget {
                 children: [
                   Text(
                     date.day.toString().padLeft(2, '0'),
-                    style: TextStyle(
-                      fontFamily: TimbreFonts.firaCondensed,
-                      fontWeight: FontWeight.w800,
-                      fontSize: 26,
-                      height: 1,
-                      color: fg,
-                    ),
+                    style: filled ? _ledDay : _day,
                   ),
                   const SizedBox(height: 2),
                   Text(
@@ -252,7 +261,9 @@ class _DateTile extends StatelessWidget {
                       height: 1,
                       fontWeight: FontWeight.w700,
                       letterSpacing: 0.96,
-                      color: filled ? fg : TimbreColors.grisTexto,
+                      color: filled
+                          ? TimbreColors.etiquetaCartel
+                          : TimbreColors.grisTexto,
                     ),
                   ),
                 ],

@@ -16,6 +16,7 @@ import 'package:stm_app/ui/services_page.dart';
 import 'package:stm_app/ui/theme/timbre_theme.dart';
 import 'package:stm_app/ui/theme/timbre_tokens.dart';
 import 'package:stm_app/ui/widgets/cartel.dart';
+import 'package:stm_app/ui/widgets/empty_state.dart';
 import 'package:stm_app/ui/widgets/led_matrix.dart';
 import 'package:stm_app/ui/widgets/line_badge.dart';
 import 'package:stm_app/ui/widgets/segmented.dart';
@@ -159,7 +160,7 @@ void main() {
               .ancestor(of: find.text(day), matching: find.byType(Container))
               .first)
           .decoration! as BoxDecoration;
-      expect(tileOf('02').color, TimbreColors.azul);
+      expect(tileOf('02').color, TimbreColors.tinta); // a small LED board
       expect(tileOf('11').color, TimbreColors.blanco);
     });
 
@@ -174,7 +175,7 @@ void main() {
       await tester.pumpWidget(_app(_newsList(failed: true)));
       expect(find.text('No se pudo actualizar. Deslizá para reintentar'),
           findsOneWidget);
-      expect(find.text('Sin novedades'), findsNothing);
+      expect(find.text('SIN NOVEDADES'), findsNothing);
     });
   });
 
@@ -263,7 +264,8 @@ void main() {
       usePhoneScreen(tester);
       await tester.pumpWidget(_app(_info()));
 
-      expect(find.textContaining('Aplicación no oficial.', findRichText: true),
+      expect(find.text('NO OFICIAL'), findsOneWidget);
+      expect(find.textContaining('No está afiliada con la Intendencia'),
           findsOneWidget);
       expect(find.text('Código fuente'), findsOneWidget);
       expect(find.text('Contacto'), findsOneWidget);
@@ -320,11 +322,12 @@ void main() {
       expect(find.byType(LedMatrix), findsOneWidget); // read ones stay plain
     });
 
-    testWidgets('empty lists show the bus and what to try', (tester) async {
+    testWidgets('empty lists: a sign with nothing to announce',
+        (tester) async {
       usePhoneScreen(tester);
-      // The blue bus on white; the header plate has its own amber one
-      final bus = find.byWidgetPredicate(
-          (w) => w is TimbreBus && w.palette == TimbreBusPalette.onLight);
+      final handle = tester.ensureSemantics();
+      final bus = find.descendant(
+          of: find.byType(TimbreEmptyState), matching: find.byType(TimbreBus));
       await tester.pumpWidget(_app(Scaffold(
         body: NewsList(
           news: const [],
@@ -334,14 +337,18 @@ void main() {
           onRefresh: () async {},
         ),
       )));
-      expect(find.text('Sin novedades'), findsOneWidget);
+      expect(find.text('SIN NOVEDADES'), findsOneWidget);
+      expect(find.bySemanticsLabel('Sin novedades'), findsOneWidget);
       expect(bus, findsOneWidget);
 
       await tester.pumpWidget(_app(_schedule(passes: const [])));
       await tester.pumpAndSettle();
-      expect(find.text('Sin pasadas para este horario'), findsOneWidget);
+      expect(find.text('SIN PASADAS'), findsOneWidget);
+      expect(find.bySemanticsLabel('Sin pasadas para este horario'),
+          findsOneWidget);
       expect(find.textContaining('Probá con otro día'), findsOneWidget);
       expect(bus, findsOneWidget);
+      handle.dispose();
     });
   });
 

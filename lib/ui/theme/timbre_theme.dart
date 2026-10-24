@@ -78,19 +78,20 @@ ThemeData buildTimbreTheme() {
       surfaceTintColor: Colors.transparent,
       elevation: 0,
       height: 72,
-      indicatorColor: TimbreColors.celeste,
+      // The selected tab is a small lit plate, like the one in the header
+      indicatorColor: TimbreColors.tinta,
       labelTextStyle: WidgetStateProperty.resolveWith((states) {
         final selected = states.contains(WidgetState.selected);
         return TextStyle(
           fontFamily: TimbreFonts.fira,
           fontSize: 12,
           fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-          color: selected ? TimbreColors.azul : TimbreColors.grisTexto,
+          color: selected ? TimbreColors.tinta : TimbreColors.grisTexto,
         );
       }),
       iconTheme: WidgetStateProperty.resolveWith((states) => IconThemeData(
             color: states.contains(WidgetState.selected)
-                ? TimbreColors.azul
+                ? TimbreColors.ambar
                 : TimbreColors.grisTexto,
           )),
     ),
@@ -164,11 +165,15 @@ ThemeData buildTimbreTheme() {
         )),
       ),
     ),
+    // On = an amber LED lit on the ink
     switchTheme: SwitchThemeData(
-      thumbColor: const WidgetStatePropertyAll(TimbreColors.blanco),
+      thumbColor: WidgetStateProperty.resolveWith((states) =>
+          states.contains(WidgetState.selected)
+              ? TimbreColors.ambar
+              : TimbreColors.blanco),
       trackColor: WidgetStateProperty.resolveWith((states) =>
           states.contains(WidgetState.selected)
-              ? TimbreColors.azul
+              ? TimbreColors.tinta
               : TimbreColors.anillo),
       trackOutlineColor: const WidgetStatePropertyAll(Colors.transparent),
     ),
@@ -224,8 +229,17 @@ ThemeData buildTimbreTheme() {
         fontSize: 15,
         color: TimbreColors.blanco,
       ),
-      actionTextColor: TimbreColors.sobreAzul,
+      actionTextColor: TimbreColors.ambar,
       behavior: SnackBarBehavior.floating,
+    ),
+    // The main action and the counters wear the plate: ink and amber
+    floatingActionButtonTheme: const FloatingActionButtonThemeData(
+      backgroundColor: TimbreColors.tinta,
+      foregroundColor: TimbreColors.ambar,
+    ),
+    badgeTheme: const BadgeThemeData(
+      backgroundColor: TimbreColors.tinta,
+      textColor: TimbreColors.ambar,
     ),
     progressIndicatorTheme: const ProgressIndicatorThemeData(
       color: TimbreColors.azul,

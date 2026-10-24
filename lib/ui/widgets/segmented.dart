@@ -4,7 +4,7 @@ import '../theme/timbre_text.dart';
 import '../theme/timbre_tokens.dart';
 
 /// Segmented control of the design: a mist track with the selected segment
-/// filled in blue. Day types in Horarios, 3 / 5 / 10 min in "Estoy
+/// lit in amber on ink. Day types in Horarios, 3 / 5 / 10 min in "Estoy
 /// esperando".
 class TimbreSegmented<T> extends StatelessWidget {
   const TimbreSegmented({
@@ -62,8 +62,9 @@ class TimbreSegmented<T> extends StatelessWidget {
       label: label,
       onTap: onTap,
       excludeSemantics: true,
+      // The chosen option lights up like the header plate
       child: Material(
-        color: isSelected ? TimbreColors.azul : Colors.transparent,
+        color: isSelected ? TimbreColors.tinta : Colors.transparent,
         borderRadius: BorderRadius.circular(11),
         child: InkWell(
           borderRadius: BorderRadius.circular(11),
@@ -86,7 +87,7 @@ class TimbreSegmented<T> extends StatelessWidget {
                       fontWeight:
                           isSelected ? FontWeight.w700 : FontWeight.w600,
                       color:
-                          isSelected ? TimbreColors.blanco : TimbreColors.tinta,
+                          isSelected ? TimbreColors.ambar : TimbreColors.tinta,
                     ),
                   ),
                 ),

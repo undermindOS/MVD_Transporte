@@ -8,11 +8,10 @@ import '../services/cache_service.dart';
 import '../services/notification_service.dart';
 import '../services/official_sites.dart';
 import 'info_page.dart';
+import 'lock_screen.dart';
 import 'services_page.dart';
 import 'stops_page.dart';
 import 'theme/timbre_tokens.dart';
-import 'widgets/cartel.dart';
-import 'widgets/led_matrix.dart';
 import 'widgets/timbre_app_bar.dart';
 
 // ---------------------------------------------------------------------------
@@ -343,62 +342,6 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     );
   }
 
-  Widget _buildLockScreen() {
-    final primary = Theme.of(context).primaryColor;
-    return Scaffold(
-      body: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [primary, primary.withAlpha((0.7 * 255).toInt())],
-          ),
-        ),
-        child: Stack(children: [
-          // The board of the header, behind the plate
-          const Positioned.fill(
-            child: LedMatrix(opacity: 0.7, fadeFrom: Alignment.topCenter),
-          ),
-          SafeArea(
-            child: Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Icon(Icons.lock_outline,
-                      size: 100, color: Colors.white),
-                  const SizedBox(height: 32),
-                  const CartelCompacto(fontSize: 26),
-                  const SizedBox(height: 16),
-                  const Text(
-                    'Aplicación bloqueada',
-                    style: TextStyle(fontSize: 18, color: Colors.white70),
-                  ),
-                  const SizedBox(height: 48),
-                  ElevatedButton.icon(
-                    onPressed: _authenticate,
-                    icon: const Icon(Icons.fingerprint, size: 28),
-                    label: const Text(
-                      'Desbloquear',
-                      style: TextStyle(fontSize: 18),
-                    ),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.white,
-                      foregroundColor: primary,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 32,
-                        vertical: 16,
-                      ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(30),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ]),
-      ),
-    );
-  }
+  /// The LED board with the lock; the button opens the system prompt.
+  Widget _buildLockScreen() => LockScreen(onUnlock: _authenticate);
 }

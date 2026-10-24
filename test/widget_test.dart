@@ -17,6 +17,7 @@ import 'package:stm_app/main.dart';
 import 'package:stm_app/models/bus_stop.dart';
 import 'package:stm_app/services/cache_service.dart';
 import 'package:stm_app/services/official_sites.dart';
+import 'package:stm_app/ui/lock_screen.dart';
 import 'package:stm_app/ui/theme/timbre_tokens.dart';
 
 import 'support/layout.dart';
@@ -186,7 +187,7 @@ void main() {
     cycle();
     await tester.pump();
     expect(auth.calls, 1);
-    expect(find.text('Aplicación bloqueada'), findsNothing);
+    expect(find.byType(LockScreen), findsNothing);
 
     cycle();
     await tester.pump();
