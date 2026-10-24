@@ -10,6 +10,8 @@ import '../services/official_sites.dart';
 import 'info_page.dart';
 import 'services_page.dart';
 import 'stops_page.dart';
+import 'theme/timbre_text.dart';
+import 'widgets/cartel.dart';
 
 // ---------------------------------------------------------------------------
 // Tab model — single source of truth for navigation structure
@@ -164,7 +166,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       }
 
       final ok = await _localAuth.authenticate(
-        localizedReason: 'Autentícate para acceder a MVD Transporte',
+        localizedReason: 'Autenticate para acceder a Timbre MVD',
         options: const AuthenticationOptions(
           stickyAuth: true,
           biometricOnly: false,
@@ -284,17 +286,10 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(
-          _tabs[_currentIndex].label,
-          style: const TextStyle(
-            fontWeight: FontWeight.w600,
-            fontSize: 20,
-          ),
-        ),
-        centerTitle: true,
-        backgroundColor: Theme.of(context).primaryColor,
-        foregroundColor: Colors.white,
-        elevation: 0,
+        // Brand plate on the left, page title below: the blue header of
+        // the "Mis paradas" board
+        title: const CartelCompacto(),
+        centerTitle: false,
         actions: [
           IconButton(
             icon: const Icon(Icons.info_outline),
@@ -302,6 +297,24 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
             onPressed: _openInfoPage,
           ),
         ],
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(52),
+          child: Align(
+            alignment: Alignment.centerLeft,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
+              child: Semantics(
+                header: true,
+                child: Text(
+                  _tabs[_currentIndex].label,
+                  style: TimbreText.pageTitle,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ),
+          ),
+        ),
       ),
       // Keeps each tab's state (loaded arrivals, selected sub-tab)
       body: IndexedStack(
@@ -347,14 +360,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
               children: [
                 const Icon(Icons.lock_outline, size: 100, color: Colors.white),
                 const SizedBox(height: 32),
-                const Text(
-                  'MVD Transporte',
-                  style: TextStyle(
-                    fontSize: 28,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                  ),
-                ),
+                const CartelCompacto(fontSize: 26),
                 const SizedBox(height: 16),
                 const Text(
                   'Aplicación bloqueada',
