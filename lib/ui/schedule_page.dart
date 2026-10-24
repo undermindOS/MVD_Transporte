@@ -5,8 +5,10 @@ import '../services/mvd_api_service.dart';
 import 'spoken_text.dart';
 import 'theme/timbre_text.dart';
 import 'theme/timbre_tokens.dart';
+import 'widgets/empty_state.dart';
 import 'widgets/line_badge.dart';
 import 'widgets/segmented.dart';
+import 'widgets/timbre_app_bar.dart';
 
 /// Theoretical timetable of a saved stop by day type and start time —
 /// the "Elegir horario" of Cómo Ir. Timetable data never uses the LED
@@ -96,43 +98,18 @@ class _SchedulePageState extends State<SchedulePage> {
   Widget build(BuildContext context) {
     final stop = widget.stop;
 
-    // Two-line title: the bar grows with the system font size
-    final scaler = MediaQuery.textScalerOf(context);
-    final titleHeight = (scaler.scale(19) + scaler.scale(17)) * 1.2 + 4;
-
     return Scaffold(
       backgroundColor: TimbreColors.blanco,
-      appBar: AppBar(
-        centerTitle: true,
-        toolbarHeight: titleHeight + 20 > 68 ? titleHeight + 20 : 68,
-        title: Semantics(
-          header: true,
-          label: 'Horarios de la parada ${stop.id}, ${spokenName(stop.name)}',
-          excludeSemantics: true,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text('Horarios',
-                  style: TextStyle(
-                      fontFamily: TimbreFonts.fira,
-                      fontWeight: FontWeight.w700,
-                      fontSize: 19,
-                      height: 1.2,
-                      color: TimbreColors.blanco)),
-              const SizedBox(height: 4),
-              // A long name is cut, the stop number never is
-              Row(mainAxisSize: MainAxisSize.min, children: [
-                Flexible(
-                  child: Text(stop.name,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: _stopLine),
-                ),
-                Text(' · ${stop.id}', style: _stopLine),
-              ]),
-            ],
-          ),
-        ),
+      // The identity bar of the tabs; a long stop name is cut, the stop
+      // number never is
+      appBar: buildTimbreAppBar(
+        context,
+        title: 'Horarios',
+        subtitle: stop.name,
+        subtitleTrailing: ' · ${stop.id}',
+        subtitleStyle: _stopLine,
+        semanticLabel:
+            'Horarios de la parada ${stop.id}, ${spokenName(stop.name)}',
       ),
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -216,8 +193,10 @@ class _SchedulePageState extends State<SchedulePage> {
     final passes = _passes ?? const [];
     if (passes.isEmpty) {
       return const Center(
-        child: Text('Sin pasadas para este horario',
-            style: TextStyle(color: TimbreColors.grisTexto, fontSize: 15)),
+        child: SingleChildScrollView(
+          child: TimbreEmptyState('Sin pasadas para este horario',
+              detail: 'Probá con otro día o con una hora más temprano.'),
+        ),
       );
     }
 

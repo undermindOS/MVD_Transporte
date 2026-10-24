@@ -16,9 +16,11 @@ import 'package:stm_app/ui/services_page.dart';
 import 'package:stm_app/ui/theme/timbre_theme.dart';
 import 'package:stm_app/ui/theme/timbre_tokens.dart';
 import 'package:stm_app/ui/widgets/cartel.dart';
+import 'package:stm_app/ui/widgets/led_matrix.dart';
 import 'package:stm_app/ui/widgets/line_badge.dart';
-import 'package:stm_app/ui/widgets/page_title_bar.dart';
 import 'package:stm_app/ui/widgets/segmented.dart';
+import 'package:stm_app/ui/widgets/timbre_app_bar.dart';
+import 'package:stm_app/ui/widgets/timbre_bus.dart';
 
 import 'support/layout.dart';
 
@@ -70,10 +72,21 @@ Widget _newsList({int? readBefore = 179, bool failed = false}) => Scaffold(
       ),
     );
 
-Widget _schedule() => SchedulePage(
+Widget _schedule({List<ScheduledPass> passes = _passes}) => SchedulePage(
       stop: BusStop(id: 3140, name: 'AV RAMON ANADOR y TIBURCIO GOMEZ'),
       now: DateTime(2026, 10, 17, 23, 33),
-      fetch: (id, day, h, m) async => _passes,
+      fetch: (id, day, h, m) async => passes,
+    );
+
+/// [page] pushed over a first screen, as the app opens Info and Horarios.
+Widget _pushed(Widget page) => Builder(
+      builder: (context) => Scaffold(
+        body: TextButton(
+          onPressed: () => Navigator.of(context)
+              .push(MaterialPageRoute<void>(builder: (_) => page)),
+          child: const Text('abrir'),
+        ),
+      ),
     );
 
 Widget _info({Uri? privacy}) => InfoPage(
@@ -266,6 +279,72 @@ void main() {
     });
   });
 
+  // The brand outside the lists: the identity bar on every screen, the
+  // blue surfaces as boards, the bus when a list is empty
+  group('Timbre identity', () {
+    for (final (name, page, title) in [
+      ('Info', _info(), 'Info'),
+      ('Horarios', _schedule(), 'Horarios'),
+    ]) {
+      testWidgets('$name: identity bar with the plate and the back arrow',
+          (tester) async {
+        usePhoneScreen(tester);
+        await tester.pumpWidget(_app(_pushed(page)));
+        await tester.tap(find.text('abrir'));
+        await tester.pumpAndSettle();
+
+        final bar = find.byType(AppBar);
+        for (final part in [
+          find.byType(CartelCompacto),
+          find.byType(BackButton),
+          find.byType(LedMatrix),
+          find.text(title),
+        ]) {
+          expect(find.descendant(of: bar, matching: part), findsOneWidget);
+        }
+      });
+    }
+
+    testWidgets('Servicios tiles and unread dates are small boards',
+        (tester) async {
+      usePhoneScreen(tester);
+      await tester.pumpWidget(_app(_services([])));
+      expect(find.byType(LedMatrix), findsNWidgets(4));
+
+      await tester.pumpWidget(_app(_newsList()));
+      final unread = find
+          .ancestor(of: find.text('02'), matching: find.byType(Container))
+          .first;
+      expect(find.descendant(of: unread, matching: find.byType(LedMatrix)),
+          findsOneWidget);
+      expect(find.byType(LedMatrix), findsOneWidget); // read ones stay plain
+    });
+
+    testWidgets('empty lists show the bus and what to try', (tester) async {
+      usePhoneScreen(tester);
+      // The blue bus on white; the header plate has its own amber one
+      final bus = find.byWidgetPredicate(
+          (w) => w is TimbreBus && w.palette == TimbreBusPalette.onLight);
+      await tester.pumpWidget(_app(Scaffold(
+        body: NewsList(
+          news: const [],
+          readBefore: null,
+          isLoading: false,
+          failed: false,
+          onRefresh: () async {},
+        ),
+      )));
+      expect(find.text('Sin novedades'), findsOneWidget);
+      expect(bus, findsOneWidget);
+
+      await tester.pumpWidget(_app(_schedule(passes: const [])));
+      await tester.pumpAndSettle();
+      expect(find.text('Sin pasadas para este horario'), findsOneWidget);
+      expect(find.textContaining('Probá con otro día'), findsOneWidget);
+      expect(bus, findsOneWidget);
+    });
+  });
+
   // Older riders use big fonts. Nothing may overflow (an overflow fails
   // the test) and the header must not cut the page title.
   group('Largest system font', () {
@@ -287,14 +366,10 @@ void main() {
       await tester.pumpWidget(_app(
         Builder(
           builder: (context) => Scaffold(
-            appBar: AppBar(
-              title: const CartelCompacto(),
-              centerTitle: false,
-              bottom: PageTitleBar(
-                title: 'Servicios',
-                subtitle: 'Sitios oficiales, en tu navegador',
-                textScaler: MediaQuery.textScalerOf(context),
-              ),
+            appBar: buildTimbreAppBar(
+              context,
+              title: 'Servicios',
+              subtitle: 'Sitios oficiales, en tu navegador',
             ),
           ),
         ),

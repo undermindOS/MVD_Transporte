@@ -4,6 +4,8 @@ import '../models/transport_news.dart';
 import 'safe_html.dart';
 import 'theme/timbre_text.dart';
 import 'theme/timbre_tokens.dart';
+import 'widgets/empty_state.dart';
+import 'widgets/led_matrix.dart';
 
 /// Official transport news (detours, line changes), newest first.
 class NewsList extends StatelessWidget {
@@ -42,13 +44,9 @@ class NewsList extends StatelessWidget {
             // Offline must not look like "no news"
             if (failed) const _FailedBanner(),
             if (!isLoading && !failed && news.isEmpty)
-              const Padding(
-                padding: EdgeInsets.all(32),
-                child: Text(
-                  'Sin novedades',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(color: TimbreColors.grisTexto, fontSize: 15),
-                ),
+              const TimbreEmptyState(
+                'Sin novedades',
+                detail: 'Los desvíos y cambios de recorrido aparecen acá.',
               ),
             for (final n in news)
               _NewsRow(
@@ -223,38 +221,45 @@ class _DateTile extends StatelessWidget {
           border:
               filled ? null : Border.all(color: TimbreColors.linea, width: 1.5),
         ),
-        // Fixed tile: with the largest system fonts the date scales down
-        // inside it (the title next to it does grow)
-        padding: const EdgeInsets.all(4),
-        child: FittedBox(
-          fit: BoxFit.scaleDown,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                date.day.toString().padLeft(2, '0'),
-                style: TextStyle(
-                  fontFamily: TimbreFonts.firaCondensed,
-                  fontWeight: FontWeight.w800,
-                  fontSize: 26,
-                  height: 1,
-                  color: fg,
-                ),
+        clipBehavior: Clip.antiAlias,
+        child: Stack(alignment: Alignment.center, children: [
+          // Unread: a small board, like the header
+          if (filled) const Positioned.fill(child: LedMatrix(opacity: 0.55)),
+          // Fixed tile: with the largest system fonts the date scales down
+          // inside it (the title next to it does grow)
+          Padding(
+            padding: const EdgeInsets.all(4),
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    date.day.toString().padLeft(2, '0'),
+                    style: TextStyle(
+                      fontFamily: TimbreFonts.firaCondensed,
+                      fontWeight: FontWeight.w800,
+                      fontSize: 26,
+                      height: 1,
+                      color: fg,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    _months[date.month - 1],
+                    style: TextStyle(
+                      fontSize: 12,
+                      height: 1,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 0.96,
+                      color: filled ? fg : TimbreColors.grisTexto,
+                    ),
+                  ),
+                ],
               ),
-              const SizedBox(height: 2),
-              Text(
-                _months[date.month - 1],
-                style: TextStyle(
-                  fontSize: 12,
-                  height: 1,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: 0.96,
-                  color: filled ? fg : TimbreColors.grisTexto,
-                ),
-              ),
-            ],
+            ),
           ),
-        ),
+        ]),
       ),
     );
   }

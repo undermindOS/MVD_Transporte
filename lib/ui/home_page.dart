@@ -12,7 +12,8 @@ import 'services_page.dart';
 import 'stops_page.dart';
 import 'theme/timbre_tokens.dart';
 import 'widgets/cartel.dart';
-import 'widgets/page_title_bar.dart';
+import 'widgets/led_matrix.dart';
+import 'widgets/timbre_app_bar.dart';
 
 // ---------------------------------------------------------------------------
 // Tab model — single source of truth for navigation structure
@@ -298,11 +299,10 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     }
 
     return Scaffold(
-      appBar: AppBar(
-        // Brand plate on the left, page title below: the blue header of
-        // the "Mis paradas" board
-        title: const CartelCompacto(),
-        centerTitle: false,
+      appBar: buildTimbreAppBar(
+        context,
+        title: _tabs[_currentIndex].label,
+        subtitle: _tabs[_currentIndex].subtitle,
         actions: [
           IconButton(
             icon: const Icon(Icons.info_outline),
@@ -310,11 +310,6 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
             onPressed: _openInfoPage,
           ),
         ],
-        bottom: PageTitleBar(
-          title: _tabs[_currentIndex].label,
-          subtitle: _tabs[_currentIndex].subtitle,
-          textScaler: MediaQuery.textScalerOf(context),
-        ),
       ),
       // Keeps each tab's state (loaded arrivals, selected sub-tab)
       body: IndexedStack(
@@ -359,43 +354,50 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
             colors: [primary, primary.withAlpha((0.7 * 255).toInt())],
           ),
         ),
-        child: SafeArea(
-          child: Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Icon(Icons.lock_outline, size: 100, color: Colors.white),
-                const SizedBox(height: 32),
-                const CartelCompacto(fontSize: 26),
-                const SizedBox(height: 16),
-                const Text(
-                  'Aplicación bloqueada',
-                  style: TextStyle(fontSize: 18, color: Colors.white70),
-                ),
-                const SizedBox(height: 48),
-                ElevatedButton.icon(
-                  onPressed: _authenticate,
-                  icon: const Icon(Icons.fingerprint, size: 28),
-                  label: const Text(
-                    'Desbloquear',
-                    style: TextStyle(fontSize: 18),
+        child: Stack(children: [
+          // The board of the header, behind the plate
+          const Positioned.fill(
+            child: LedMatrix(opacity: 0.7, fadeFrom: Alignment.topCenter),
+          ),
+          SafeArea(
+            child: Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(Icons.lock_outline,
+                      size: 100, color: Colors.white),
+                  const SizedBox(height: 32),
+                  const CartelCompacto(fontSize: 26),
+                  const SizedBox(height: 16),
+                  const Text(
+                    'Aplicación bloqueada',
+                    style: TextStyle(fontSize: 18, color: Colors.white70),
                   ),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.white,
-                    foregroundColor: primary,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 32,
-                      vertical: 16,
+                  const SizedBox(height: 48),
+                  ElevatedButton.icon(
+                    onPressed: _authenticate,
+                    icon: const Icon(Icons.fingerprint, size: 28),
+                    label: const Text(
+                      'Desbloquear',
+                      style: TextStyle(fontSize: 18),
                     ),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(30),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.white,
+                      foregroundColor: primary,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 32,
+                        vertical: 16,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(30),
+                      ),
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
-        ),
+        ]),
       ),
     );
   }

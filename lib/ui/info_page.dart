@@ -4,6 +4,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../services/official_sites.dart';
 import 'theme/timbre_text.dart';
 import 'theme/timbre_tokens.dart';
+import 'widgets/timbre_app_bar.dart';
 import 'widgets/timbre_bus.dart';
 
 class InfoPage extends StatefulWidget {
@@ -62,10 +63,8 @@ class _InfoPageState extends State<InfoPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        centerTitle: true,
-        title: const Text('Info'),
-      ),
+      // The identity bar of the tabs, with the back arrow
+      appBar: buildTimbreAppBar(context, title: 'Info'),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(12, 14, 12, 28),
         children: [

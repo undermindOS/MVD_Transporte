@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../services/official_sites.dart';
 import 'theme/timbre_text.dart';
 import 'theme/timbre_tokens.dart';
+import 'widgets/led_matrix.dart';
 
 typedef _Site = ({
   OfficialSite site,
@@ -57,7 +58,8 @@ class ServicesPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ColoredBox(
+    // A Material, not a colored box: the tiles' tap ripple paints on it
+    return Material(
       color: TimbreColors.blanco,
       child: ListView(
         padding: const EdgeInsets.fromLTRB(16, 22, 16, 24),
@@ -134,30 +136,36 @@ class _SiteTile extends StatelessWidget {
           children: [
             AspectRatio(
               aspectRatio: 1,
-              child: DecoratedBox(
+              // Ink, so the tap ripple shows on the blue
+              child: Ink(
                 decoration: BoxDecoration(
                   color: TimbreColors.azul,
                   borderRadius: BorderRadius.circular(TimbreRadii.card),
                 ),
-                child: Stack(
-                  children: [
-                    Center(
-                      child: Icon(
-                        site.icon,
-                        size: 44,
-                        color: TimbreColors.blanco,
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(TimbreRadii.card),
+                  child: Stack(
+                    children: [
+                      // A small board: the unlit LEDs of the header
+                      const Positioned.fill(child: LedMatrix(opacity: 0.55)),
+                      Center(
+                        child: Icon(
+                          site.icon,
+                          size: 44,
+                          color: TimbreColors.blanco,
+                        ),
                       ),
-                    ),
-                    const Positioned(
-                      top: 9,
-                      right: 9,
-                      child: Icon(
-                        Icons.north_east,
-                        size: 16,
-                        color: TimbreColors.sobreAzul,
+                      const Positioned(
+                        top: 9,
+                        right: 9,
+                        child: Icon(
+                          Icons.north_east,
+                          size: 16,
+                          color: TimbreColors.sobreAzul,
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             ),
