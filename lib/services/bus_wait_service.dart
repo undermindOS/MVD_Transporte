@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/bus_arrival.dart';
 import '../models/bus_wait.dart';
+import '../ui/theme/timbre_tokens.dart';
 import 'bus_wait_task.dart';
 import 'notification_service.dart';
 
@@ -137,6 +138,12 @@ class AndroidBusWait implements BusWaitPlatform {
       notificationTitle: wait.title,
       notificationText:
           wait.statusText(WaitCheck(WaitOutcome.waiting, trip: trip)),
+      // White bus silhouette, not the launcher icon (a colored icon turns
+      // into a white blob in the status bar)
+      notificationIcon: const NotificationIcon(
+        metaDataName: 'com.liberontech.stmapp.NOTIFICATION_ICON',
+        backgroundColor: TimbreColors.azul,
+      ),
       notificationButtons: const [
         NotificationButton(
             id: BusWaitTaskHandler.stopButtonId, text: 'Dejar de esperar'),

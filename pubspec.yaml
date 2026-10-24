@@ -81,7 +81,7 @@ dev_dependencies:
   flutter_lints: ^6.0.0
 
   # Tool to generate app icons for Android and iOS
-  flutter_launcher_icons: ^0.13.1
+  flutter_launcher_icons: ^0.14.4
 
   # Hive code generation
   build_runner: ^2.4.0
@@ -161,11 +161,21 @@ flutter:
   # For details regarding fonts from package dependencies,
   # see https://flutter.dev/to/font-from-package
 
-# App Icon Configuration
+# App Icon Configuration (sources and design notes: assets/README.md)
 flutter_launcher_icons:
   android: true
   ios: true
   image_path: "assets/app_icon.png"
-  adaptive_icon_background: "#0066CC"  # Blue
+  # Android < 8: rounded tile as on the brand board
+  image_path_android: "assets/app_icon_android.png"
+  adaptive_icon_background: "#0038A8"  # Azul MVD
   adaptive_icon_foreground: "assets/app_icon_foreground.png"
+  # The bus is already inside the 66 dp safe zone of the PNG
+  adaptive_icon_foreground_inset: 0
+  # Android 13+ themed icons
+  adaptive_icon_monochrome: "assets/app_icon_monochrome.png"
   remove_alpha_ios: true
+  # iOS 18 dark and tinted icons: the bus on transparent
+  image_path_ios_dark_transparent: "assets/app_icon_ios_dark.png"
+  image_path_ios_tinted_grayscale: "assets/app_icon_ios_dark.png"
+  desaturate_tinted_to_grayscale_ios: true

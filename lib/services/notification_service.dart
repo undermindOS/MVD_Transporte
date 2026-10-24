@@ -14,7 +14,7 @@ class NotificationService {
 
   static Future<void> init() async {
     const androidSettings =
-        AndroidInitializationSettings('@mipmap/ic_launcher');
+        AndroidInitializationSettings('@drawable/ic_stat_timbre');
     const iosSettings = DarwinInitializationSettings(
       requestAlertPermission: false,
       requestBadgePermission: false,
@@ -80,7 +80,7 @@ class NotificationService {
         channelDescription: _channelDesc,
         importance: Importance.high,
         priority: Priority.high,
-        icon: '@mipmap/ic_launcher',
+        icon: '@drawable/ic_stat_timbre',
         color: TimbreColors.azul,
       ),
       iOS: const DarwinNotificationDetails(
@@ -113,7 +113,7 @@ class NotificationService {
         channelDescription: _channelDesc,
         importance: Importance.high,
         priority: Priority.high,
-        icon: '@mipmap/ic_launcher',
+        icon: '@drawable/ic_stat_timbre',
         color: TimbreColors.azul,
         styleInformation: BigTextStyleInformation(body),
       ),
@@ -146,7 +146,7 @@ class NotificationService {
         channelDescription: _channelDesc,
         importance: Importance.high,
         priority: Priority.high,
-        icon: '@mipmap/ic_launcher',
+        icon: '@drawable/ic_stat_timbre',
         color: TimbreColors.azul,
       ),
       iOS: const DarwinNotificationDetails(

@@ -1,14 +1,17 @@
+# Native splash: only the bus on the brand blue, no text (the Android 12+
+# system splash cannot show text anyway). Regenerate with:
+#   dart run flutter_native_splash:create
 flutter_native_splash:
-  color: "#0066CC"
-  image: assets/app_icon_foreground.png
-  color_dark: "#004499"
-  image_dark: assets/app_icon_foreground.png
+  color: "#0038A8"
+  image: assets/splash_icon.png
+  color_dark: "#00266F"
+  image_dark: assets/splash_icon.png
   android_12:
-    color: "#0066CC"
-    icon_background_color: "#0066CC"
-    image: assets/app_icon_foreground.png
-    color_dark: "#004499"
-    icon_background_color_dark: "#004499"
-    image_dark: assets/app_icon_foreground.png
+    color: "#0038A8"
+    image: assets/splash_icon_android12.png
+    icon_background_color: "#0038A8"
+    color_dark: "#00266F"
+    image_dark: assets/splash_icon_android12.png
+    icon_background_color_dark: "#00266F"
   ios: true
   web: false
