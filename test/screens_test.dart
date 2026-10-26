@@ -3,6 +3,7 @@
 // and a phone-sized screen, so overflow checks mean something.
 
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:stm_app/models/bus_stop.dart';
@@ -389,6 +390,26 @@ void main() {
           lessThanOrEqualTo(bar.bottom));
       expect(tester.getRect(find.text('Sitios oficiales, en tu navegador')).bottom,
           lessThanOrEqualTo(bar.bottom));
+    });
+
+    testWidgets('the longest page title shrinks to fit, never cut',
+        (tester) async {
+      usePhoneScreen(tester);
+      await tester.pumpWidget(_app(
+        Builder(
+          builder: (context) => Scaffold(
+            appBar: buildTimbreAppBar(context, title: 'Mis paradas'),
+          ),
+        ),
+        textScale: 2,
+      ));
+
+      final title =
+          tester.renderObject<RenderParagraph>(find.text('MIS PARADAS'));
+      expect(title.didExceedMaxLines, isFalse);
+      // Inside the screen, after the side margin
+      expect(tester.getRect(find.byType(FittedBox).first).right,
+          lessThanOrEqualTo(390 - 16));
     });
   });
 }

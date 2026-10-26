@@ -70,11 +70,17 @@ class PageTitleBar extends StatelessWidget implements PreferredSizeWidget {
           header: true,
           label: title,
           excludeSemantics: true,
-          child: Text(
-            title.toUpperCase(),
-            style: TimbreText.pageTitle,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
+          // A sign keeps every letter: with the largest fonts it shrinks
+          // to the width instead of ending in "…"
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Text(
+              title.toUpperCase(),
+              style: TimbreText.pageTitle,
+              maxLines: 1,
+              softWrap: false,
+            ),
           ),
         ),
         if (subtitle != null) ...[
