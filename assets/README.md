@@ -1,27 +1,28 @@
-# MVD Transporte - App Icon
+# MVD Transporte - Ícono de la app
 
-## Design
+## Diseño
 
-White front-view bus on the app's brand blue (#0066CC). Nothing else.
+Ómnibus blanco en vista frontal sobre el azul de marca de la app (#0066CC). Nada más.
 
-**Do not use official symbols** — no Escudo de Montevideo, no national flag
-or Sol de Mayo, no STM / Intendencia branding. This is an unofficial app:
-Google Play's Misleading Claims policy and Apple's guidelines treat
-government-looking icons as false affiliation. (The previous icon combined a
-bus with the Montevideo coat of arms and was replaced for this reason.)
+**No uses símbolos oficiales** — nada de Escudo de Montevideo, ni bandera nacional
+ni Sol de Mayo, ni marcas del STM / Intendencia. Esta es una app no oficial:
+la política de Google Play sobre afirmaciones engañosas (Misleading Claims) y las
+pautas de Apple consideran los íconos con apariencia de gobierno como falsa
+afiliación. (El ícono anterior combinaba un ómnibus con el escudo de Montevideo
+y se reemplazó por este motivo.)
 
-## Files
+## Archivos
 
-| File | Use |
+| Archivo | Uso |
 |---|---|
-| `app_icon.png` | Full icon, blue background: iOS and legacy Android launcher |
-| `app_icon_foreground.png` | Transparent bus inside the 66% safe zone: Android adaptive foreground and splash screens |
+| `app_icon.png` | Ícono completo, fondo azul: iOS y launcher legacy de Android |
+| `app_icon_foreground.png` | Ómnibus con fondo transparente dentro de la zona segura del 66%: primer plano del ícono adaptativo de Android y pantallas de inicio (splash) |
 
-Both are 1024×1024. The adaptive background color (#0066CC) is set in
-`pubspec.yaml` (`flutter_launcher_icons`); splash colors are in
+Ambos son de 1024×1024. El color de fondo adaptativo (#0066CC) está definido en
+`pubspec.yaml` (`flutter_launcher_icons`); los colores del splash están en
 `flutter_native_splash.yaml`.
 
-## Regenerate platform icons
+## Regenerar los íconos de cada plataforma
 
 ```bash
 dart run flutter_launcher_icons

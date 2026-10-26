@@ -1,113 +1,113 @@
 # Changelog
 
-Все заметные изменения проекта. Формат — [Keep a Changelog](https://keepachangelog.com/ru/1.1.0/),
-версии — [SemVer](https://semver.org/lang/ru/).
+Todos los cambios relevantes del proyecto. Formato: [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/);
+versiones: [SemVer](https://semver.org/lang/es/).
 
 ## [Unreleased]
 
-### Изменено
-- Android `applicationId` и пакет — `com.liberontech.stmapp` вместо шаблонного `com.example.stm_app`
-  (Google Play не принимает `com.example`), как bundle id на iOS. Это другое приложение для системы:
-  установленная ранее debug-сборка не обновится, а встанет рядом.
-- Mi STM, Recarga, Cómo Ir и Avisos открываются в системном браузере — Chrome Custom Tabs на Android,
-  SFSafariViewController на iOS — вместо встроенного WebView. Google Play (Spam policy) запрещает
-  «webview of a website without permission», а вход через ID Uruguay должен идти во внешнем браузере
-  (RFC 8252), а не в WebView с внедрённым JS. Нижняя навигация — две нативные вкладки:
-  «Mis paradas» (главная) и «Servicios» с плитками официальных сайтов.
-- Кнопки Android-виджета — «Mi STM» и «Recarga», открывают сайт в браузере.
-- Биометрический замок защищает сохранённые остановки и маршруты (подпись в Info исправлена);
-  возврат из браузера не блокирует приложение повторно.
+### Cambiado
+- `applicationId` y paquete de Android: `com.liberontech.stmapp` en lugar del `com.example.stm_app` de la plantilla
+  (Google Play no acepta `com.example`), igual que el bundle id de iOS. Para el sistema es otra app:
+  una build debug instalada antes no se actualiza, sino que queda instalada al lado.
+- Mi STM, Recarga, Cómo Ir y Avisos se abren en el navegador del sistema (Chrome Custom Tabs en Android,
+  SFSafariViewController en iOS) en lugar de un WebView integrado. Google Play (Spam policy) prohíbe
+  «webview of a website without permission», y el inicio de sesión con ID Uruguay tiene que hacerse en un
+  navegador externo (RFC 8252), no en un WebView con JS inyectado. La navegación inferior tiene dos pestañas
+  nativas: «Mis paradas» (principal) y «Servicios», con tarjetas de los sitios oficiales.
+- Botones del widget de Android: «Mi STM» y «Recarga»; abren el sitio en el navegador.
+- El bloqueo biométrico protege las paradas y rutas guardadas (se corrigió el texto en Info);
+  volver del navegador no bloquea la app otra vez.
 
-### Исправлено
-- ETA снова работают: старый `m.montevideo.gub.uy/stmonlineRest/nextETA` отвечал
-  `400 Argumentos invalidos`, теперь используется `api.montevideo.gub.uy/transporteRest/siguientesParada/{id}` —
-  тот же сервис, что у официального веб-приложения Cómo Ir.
-- Название остановки: `transporteRest/variantes` отвечал 500, теперь `transporteRest/lineas/{id}`
-  отдаёт реальное название («AV RAMON ANADOR y TIBURCIO GOMEZ») вместо «Parada 1234».
-- Несуществующую остановку больше нельзя добавить; повторное добавление не затирает настройки алертов.
-- Фоновая проверка регистрируется при включении любого алерта (раньше — только при старте приложения
-  и только для остановок, маршруты не учитывались) и отменяется, когда алертов не осталось.
-- Уведомления «llegando» приходят только по автобусам с GPS (`real: true`), а не по расписанию.
-- Ошибка виджета больше не блокирует уведомления маршрутов в фоне.
-- Удаление свайпом (`Dismissible`) убирает карточку синхронно — раньше была ошибка
+### Corregido
+- Los tiempos de arribo (ETA) vuelven a funcionar: el viejo `m.montevideo.gub.uy/stmonlineRest/nextETA` respondía
+  `400 Argumentos invalidos`; ahora se usa `api.montevideo.gub.uy/transporteRest/siguientesParada/{id}`,
+  el mismo servicio que usa la app web oficial Cómo Ir.
+- Nombre de la parada: `transporteRest/variantes` respondía 500; ahora `transporteRest/lineas/{id}`
+  devuelve el nombre real («AV RAMON ANADOR y TIBURCIO GOMEZ») en lugar de «Parada 1234».
+- Ya no se puede agregar una parada inexistente; agregar de nuevo una parada no borra la configuración de sus alertas.
+- La verificación en segundo plano se registra al activar cualquier alerta (antes, solo al iniciar la app
+  y solo para paradas, sin contar las rutas) y se cancela cuando no quedan alertas.
+- Las notificaciones «llegando» se envían solo para ómnibus con GPS (`real: true`), no por horario.
+- Un error del widget ya no bloquea las notificaciones de rutas en segundo plano.
+- Borrar deslizando (`Dismissible`) quita la tarjeta de forma sincrónica; antes aparecía el error
   «A dismissed Dismissible widget is still part of the tree».
-- Биометрический замок не открывается при `LockedOut`/`PermanentlyLockedOut` (было fail-open);
-  нет цикла повторной блокировки после ввода PIN.
-- Переключатель биометрии на странице Info отображает реальное состояние.
-- Кнопки виджета «Inicio»/«Recarga» открывают нужную вкладку (extra `tab` никто не читал).
-- Геолокация в Cómo Ir на Android: WebView по умолчанию отклонял Geolocation API; разрешение
-  запрашивается в момент, когда о нём просит Cómo Ir, и только для доменов IM.
-- Скрейперы баланса и Cómo Ir выполняются только на официальных хостах; убраны селекторы
-  `[class*="to"]`, `[class*="from"]`, `[data-id]`, ловившие `toolbar`/`button` и любой элемент.
-- Баланс в виджете — только сумма, а не текст контейнера.
-- Предпочитаемые линии сравниваются без учёта регистра («64d» = «64D»).
-- Виджет показывает время прибытия (`~08:14`), а не устаревающее «N min».
-- Ошибка сети отображается как «No se pudo actualizar», а не «Sin colectivos próximos».
-- Тесты: были сломаны (нет Hive и WebView-платформы в тестовой среде) — переписаны, 20 тестов.
-- iOS не собирался: `workmanager_apple` требует iOS 14, Xcode 27 — минимум iOS 15. Deployment target
-  поднят до 15.0, Podfile выравнивает target всех подов.
-- Вечное «Cargando...» в WebView: при гибели процесса WebContent (iOS при нехватке памяти)
-  `onPageFinished` не приходит. Теперь один автоматический перезапуск, затем экран
-  «No se pudo cargar la página» с кнопкой «Reintentar»; так же обрабатываются ошибки основного фрейма.
+- El bloqueo biométrico no se abre con `LockedOut`/`PermanentlyLockedOut` (era fail-open);
+  ya no hay un ciclo de rebloqueo después de ingresar el PIN.
+- El interruptor de biometría en la página Info muestra el estado real.
+- Los botones del widget «Inicio»/«Recarga» abren la pestaña correcta (nadie leía el extra `tab`).
+- Geolocalización en Cómo Ir en Android: el WebView rechazaba por defecto la Geolocation API; el permiso
+  se pide en el momento en que Cómo Ir lo solicita, y solo para dominios de la IM.
+- Los scrapers de saldo y de Cómo Ir se ejecutan solo en los hosts oficiales; se quitaron los selectores
+  `[class*="to"]`, `[class*="from"]`, `[data-id]`, que capturaban `toolbar`/`button` y cualquier elemento.
+- El saldo en el widget muestra solo el monto, no el texto del contenedor.
+- Las líneas preferidas se comparan sin distinguir mayúsculas de minúsculas («64d» = «64D»).
+- El widget muestra la hora de llegada (`~08:14`), no un «N min» que queda desactualizado.
+- Un error de red se muestra como «No se pudo actualizar», no como «Sin colectivos próximos».
+- Tests: estaban rotos (sin Hive ni plataforma de WebView en el entorno de tests); se reescribieron, 20 tests.
+- iOS no compilaba: `workmanager_apple` requiere iOS 14 y Xcode 27, como mínimo iOS 15. El deployment target
+  subió a 15.0 y el Podfile alinea el target de todos los pods.
+- «Cargando...» eterno en el WebView: cuando muere el proceso WebContent (iOS, por falta de memoria),
+  `onPageFinished` nunca llega. Ahora hay un reinicio automático y después la pantalla
+  «No se pudo cargar la página» con el botón «Reintentar»; los errores del frame principal se manejan igual.
 
-### Изменено
-- Новая иконка: белый автобус на синем. Старая сочетала автобус с гербом Монтевидео —
-  для неофициального приложения это риск по политикам сторов (ложная аффилиация).
-  Адаптивная иконка Android и сплэш используют прозрачный передний план
-  `assets/app_icon_foreground.png`; из `assets/README.md` и `LOGO_SETUP.md` убраны советы
-  использовать герб.
+### Cambiado
+- Ícono nuevo: ómnibus blanco sobre azul. El anterior combinaba un ómnibus con el escudo de Montevideo,
+  algo riesgoso para una app no oficial según las políticas de las tiendas (falsa afiliación).
+  El ícono adaptativo de Android y la pantalla de inicio (splash) usan el primer plano transparente
+  `assets/app_icon_foreground.png`; de `assets/README.md` y `LOGO_SETUP.md` se quitaron los consejos
+  de usar el escudo.
 
-### Добавлено
-- «Estoy esperando»: тап по рейсу → «Avisarme cuando llegue» за 3/5/10 мин. Рейс отслеживается по
-  линии, направлению и ожидаемому времени (у рейсов по расписанию нет id), поэтому второй автобус
-  той же линии не путается с первым. На колокольчике плашки видно, какой рейс отслеживается.
-  - Android: служба переднего плана (`flutter_foreground_task`, тип `dataSync`) опрашивает остановку
-    раз в 30 с и с выключенным экраном, показывает фиксированное уведомление с кнопкой
-    «Dejar de esperar», уведомляет только по автобусу с GPS. Завершается сама после уведомления,
-    после прохода рейса или через 60 мин; не перезапускается и не стартует при загрузке.
-  - iOS: фонового опроса нет (нужен свой push-сервер), поэтому ставится напоминание на прогнозное
-    время, и оно переставляется при каждом обновлении, пока приложение открыто.
-  - Новые разрешения Android: `FOREGROUND_SERVICE`, `FOREGROUND_SERVICE_DATA_SYNC`; в Play Console
-    нужна декларация типа службы с видео (`docs/store-listing.md`).
-- Время прибытия в «Mis paradas» обновляется само: раз в 30 с, пока приложение на экране, и сразу
-  при возврате из фона (раньше — только pull-to-refresh, и через 10 минут на экране оставалось старое
-  «3 min»). Без индикатора загрузки, чтобы плашки не мигали; остановка, общая для карточки и маршрута,
-  запрашивается один раз; в фоне запросов нет.
-- «Ver en Cómo Ir» на карточке остановки — официальный deep link `/comoir/parada?numero=N` в браузере.
-- Вкладка «Novedades» в «Mis paradas»: официальные новости транспорта IM (объезды, изменения
-  линий, праздничные расписания) из открытого `api.montevideo.gub.uy/notificacion/mensajes` —
-  того же, что читает Cómo Ir. Новые сверху, счётчик непрочитанных, последний прочитанный
-  `idMensaje` запоминается. HTML показывается как текст (разбор в DOM без WebView и JS,
-  `<script>`/`<iframe>`/картинки отбрасываются), «Ver más» открывает ссылку в системном браузере.
-  Запрос не чаще раза в 10 мин (pull-to-refresh — 30 с), ответы кэшируются в Hive.
-  API отдаёт по 10 сообщений с `id > fromIdMessage` не по порядку, поэтому листание по
-  максимальному id (как в Cómo Ir) теряет сообщения; приложение ищет «верхнее окно» по `count`.
-- Значок ♿ на чипе рейса с `accesibilidad: true`.
-- Экран «Horarios» (значок часов на карточке остановки): теоретическое расписание по типу дня
-  (Hábiles/Sábados/Domingos) и времени — `transporteRest/siguientesParada/{parada}/{tipoDia}/{H:MM}`,
-  ~50 рейсов с переходом через полночь; ответы кэшируются на 6 ч.
-- Предупреждение «Datos GPS parciales» в «Mis paradas», если у оператора меньше 70 % автобусов
-  передают GPS (`pci.montevideo.gub.uy/buses/control`, порог как в Cómo Ir); не чаще раза в минуту.
-- Страница Info перечисляет новые данные в «Fuente de datos».
-- Зависимости: `url_launcher` (ссылки новостей), `html` (разбор HTML новостей, уже была транзитивной).
-- «Paradas cercanas» в диалоге «Agregar parada»: остановки в радиусе 400 м по геолокации, ближайшие
-  первыми, с номером, расстоянием и линиями — номер вводить не нужно. Источник — открытый WFS
-  `geoserver.montevideo.gub.uy` (слой `imm:v_uptu_paradas`, без авторизации); разрешение на
-  геолокацию запрашивается в момент нажатия. Выбранная остановка сохраняется как раньше,
-  через `transporteRest/lineas`.
-- `docs/store-listing.md` — текст для Google Play / App Store с источниками и дисклеймером,
-  черновик Data safety; `docs/privacy-policy.md` — политика конфиденциальности (Ley 18.331);
-  `docs/carta-imm.md` — черновик письма в pci@imm.gub.uy (не отправлено).
-- Иконка «по расписанию» у рейсов без GPS, их время показывается часами («8:07»).
-- Указание источника данных на странице Info; исправлена ссылка на GitHub.
-- `docs/REVIEW.md` — ревью, карта API Intendencia de Montevideo, правовые рамки, предложения.
+### Agregado
+- «Estoy esperando»: tocar un ómnibus → «Avisarme cuando llegue» con 3/5/10 min de anticipación. El viaje se
+  identifica por línea, destino y hora prevista (los viajes por horario no tienen id), así que un segundo ómnibus
+  de la misma línea no se confunde con el primero. La campanita del chip muestra qué viaje se está siguiendo.
+  - Android: un servicio en primer plano (`flutter_foreground_task`, tipo `dataSync`) consulta la parada
+    cada 30 s, también con la pantalla apagada, muestra una notificación fija con el botón
+    «Dejar de esperar» y avisa solo por un ómnibus con GPS. Termina solo después del aviso,
+    cuando el viaje ya pasó o a los 60 min; no se reinicia ni arranca al encender el teléfono.
+  - iOS: no hay consulta en segundo plano (haría falta un servidor de push propio), así que se programa un
+    recordatorio para la hora prevista, que se reprograma en cada actualización mientras la app está abierta.
+  - Permisos nuevos de Android: `FOREGROUND_SERVICE`, `FOREGROUND_SERVICE_DATA_SYNC`; en Play Console
+    hay que declarar el tipo de servicio con un video (`docs/store-listing.md`).
+- Los tiempos de arribo en «Mis paradas» se actualizan solos: cada 30 s mientras la app está en pantalla, y
+  enseguida al volver del segundo plano (antes, solo con pull-to-refresh, y a los 10 minutos en pantalla seguía
+  un «3 min» viejo). Sin indicador de carga, para que los chips no parpadeen; una parada compartida por una
+  tarjeta y una ruta se consulta una sola vez; en segundo plano no hay consultas.
+- «Ver en Cómo Ir» en la tarjeta de la parada: el deep link oficial `/comoir/parada?numero=N` en el navegador.
+- Pestaña «Novedades» en «Mis paradas»: novedades oficiales del transporte de la IM (desvíos, cambios de
+  líneas, horarios de feriados) desde el servicio abierto `api.montevideo.gub.uy/notificacion/mensajes`,
+  el mismo que lee Cómo Ir. Las nuevas arriba, contador de no leídas; se recuerda el último
+  `idMensaje` leído. El HTML se muestra como texto (se parsea a DOM sin WebView ni JS; se descartan
+  `<script>`/`<iframe>`/imágenes) y «Ver más» abre el enlace en el navegador del sistema.
+  Se consulta como máximo una vez cada 10 min (con pull-to-refresh, cada 30 s); las respuestas se guardan en caché en Hive.
+  La API devuelve de a 10 mensajes con `id > fromIdMessage` sin orden, así que paginar por el
+  id máximo (como hace Cómo Ir) pierde mensajes; la app busca la «ventana superior» según `count`.
+- Ícono ♿ en el chip de los viajes con `accesibilidad: true`.
+- Pantalla «Horarios» (ícono de reloj en la tarjeta de la parada): horario teórico según tipo de día
+  (Hábiles/Sábados/Domingos) y hora — `transporteRest/siguientesParada/{parada}/{tipoDia}/{H:MM}`,
+  ~50 viajes, pasando la medianoche; las respuestas se guardan en caché por 6 h.
+- Aviso «Datos GPS parciales» en «Mis paradas» si una empresa tiene menos del 70 % de sus ómnibus
+  transmitiendo GPS (`pci.montevideo.gub.uy/buses/control`, mismo umbral que Cómo Ir); como máximo una vez por minuto.
+- La página Info enumera los datos nuevos en «Fuente de datos».
+- Dependencias: `url_launcher` (enlaces de las novedades), `html` (parseo del HTML de las novedades; ya era transitiva).
+- «Paradas cercanas» en el diálogo «Agregar parada»: paradas en un radio de 400 m según la ubicación, las más
+  cercanas primero, con número, distancia y líneas; no hace falta ingresar el número. Fuente: el WFS abierto
+  de `geoserver.montevideo.gub.uy` (capa `imm:v_uptu_paradas`, sin autenticación); el permiso de
+  ubicación se pide al tocar el botón. La parada elegida se guarda como antes,
+  mediante `transporteRest/lineas`.
+- `docs/store-listing.md`: texto para Google Play / App Store con fuentes y aviso legal,
+  borrador de Data safety; `docs/privacy-policy.md`: política de privacidad (Ley 18.331);
+  `docs/carta-imm.md`: borrador de carta a pci@imm.gub.uy (no enviada).
+- Ícono de «por horario» en los viajes sin GPS; su hora se muestra como hora de reloj («8:07»).
+- Mención de la fuente de datos en la página Info; se corrigió el enlace a GitHub.
+- `docs/REVIEW.md`: revisión, mapa de la API de la Intendencia de Montevideo, marco legal, propuestas.
 
-### Удалено
-- Баланс карты в Android-виджете и `BalanceScraper`: из системного браузера баланс не прочитать,
-  открытого API баланса нет (в `api.montevideo.gub.uy` только `transporte` и `playas`).
-- `ComoIrScraper` и баннер «Ruta detectada en Cómo Ir» (не срабатывал: Cómo Ir — Ionic SPA).
-- Зависимости `webview_flutter`, `webview_flutter_android`, `permission_handler`; сброс кэша WebView
-  после 2 ч неактивности.
-- Разрешение `SCHEDULE_EXACT_ALARM` (не использовалось; Google Play ограничивает его).
-- Cleartext HTTP (`usesCleartextTraffic="false"`): все эндпоинты на HTTPS.
-- Запрос геолокации при каждом запуске и запрос уведомлений без активных алертов.
+### Eliminado
+- Saldo de la tarjeta en el widget de Android y `BalanceScraper`: desde el navegador del sistema no se puede leer
+  el saldo, y no hay una API abierta de saldo (en `api.montevideo.gub.uy` solo están `transporte` y `playas`).
+- `ComoIrScraper` y el banner «Ruta detectada en Cómo Ir» (no funcionaba: Cómo Ir es una SPA de Ionic).
+- Dependencias `webview_flutter`, `webview_flutter_android`, `permission_handler`; el borrado de la caché del WebView
+  después de 2 h de inactividad.
+- Permiso `SCHEDULE_EXACT_ALARM` (no se usaba; Google Play lo restringe).
+- Tráfico HTTP sin cifrar (`usesCleartextTraffic="false"`): todos los endpoints son HTTPS.
+- El pedido de ubicación en cada inicio y el pedido de permiso de notificaciones sin alertas activas.
