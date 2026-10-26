@@ -177,7 +177,8 @@ class _NewsRow extends StatelessWidget {
   }
 }
 
-/// Day and month in a tile: filled blue while unread, outlined after.
+/// Day and month in a tile: a small lit LED display while unread, an
+/// empty frame after.
 class _DateTile extends StatelessWidget {
   const _DateTile({required this.date, required this.filled});
 

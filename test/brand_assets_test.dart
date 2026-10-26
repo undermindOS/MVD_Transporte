@@ -62,9 +62,35 @@ void main() {
     expect(manifest, contains('@drawable/ic_stat_timbre'));
     expect(_read('lib/services/bus_wait_service.dart'),
         contains('com.liberontech.stmapp.NOTIFICATION_ICON'));
+    // The accent is the LED amber, as in the app
+    expect(service, contains('color: TimbreColors.ambar'));
+  });
+
+  test('the home widget is a small night board', () {
+    final layout = _read('$res/layout/mvd_transporte_widget.xml');
+    expect(layout, contains('@drawable/widget_background'));
+    expect(layout, contains('@drawable/widget_plate'));
+    expect(layout, isNot(contains('#FFFFFFFF')));
+    expect(_read('$res/drawable/widget_background.xml'),
+        contains('@color/tinta'));
+    // The widget picker shows the real layout (Android 12+)
+    expect(_read('$res/xml/mvd_transporte_widget_info.xml'),
+        contains('android:previewLayout="@layout/mvd_transporte_widget"'));
+    // Every view the provider fills exists in the layout
+    final provider = _read('android/app/src/main/kotlin/com/liberontech/'
+        'stmapp/MVDTransporteWidgetProvider.kt');
+    for (final id in RegExp(r'R\.id\.(\w+)')
+        .allMatches(provider)
+        .map((m) => m.group(1)!)
+        .toSet()) {
+      expect(layout, contains('@+id/$id'), reason: id);
+    }
   });
 
   test('iOS has light, dark and tinted 1024 px icons', () {
+    // Light status bar text over the dark launch screen
+    expect(_read('ios/Runner/Info.plist'),
+        contains('<string>UIStatusBarStyleLightContent</string>'));
     const set = 'ios/Runner/Assets.xcassets/AppIcon.appiconset';
     for (final name in [
       'Icon-App-1024x1024@1x.png',

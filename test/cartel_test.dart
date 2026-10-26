@@ -163,7 +163,6 @@ void main() {
             TimbreBus(height: h),
             TimbreBus(height: h, palette: TimbreBusPalette.led),
             TimbreAppIcon(size: h),
-            TimbreAppIcon(size: h, night: true),
           ],
         )));
         expect(tester.takeException(), isNull);
@@ -172,10 +171,9 @@ void main() {
       }
     });
 
-    testWidgets('night icon is the launcher icon: lit bus, LED board behind',
+    testWidgets('the app icon is the launcher icon: lit bus, LED board behind',
         (tester) async {
-      await tester
-          .pumpWidget(_wrap(const TimbreAppIcon(size: 64, night: true)));
+      await tester.pumpWidget(_wrap(const TimbreAppIcon(size: 64)));
       expect(find.byType(LedMatrix), findsOneWidget);
       // The bus and its bloom: amber, the sign and windshield cut out so
       // the board shows through

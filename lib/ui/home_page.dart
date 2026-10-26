@@ -22,7 +22,7 @@ class _TabDef {
   final String label;
   final PixelGlyph icon;
 
-  /// Line under the page title in the blue header.
+  /// Line under the page title in the header.
   final String? subtitle;
 
   const _TabDef({

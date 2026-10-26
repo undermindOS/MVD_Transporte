@@ -6,6 +6,7 @@ import android.appwidget.AppWidgetProvider
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.view.View
 import android.widget.RemoteViews
 import es.antonborri.home_widget.HomeWidgetPlugin
 
@@ -63,13 +64,25 @@ class MVDTransporteWidgetProvider : AppWidgetProvider() {
                 routeEtaMin == 0 -> "ahora"
                 else -> "$routeEtaMin min"
             }
-            views.setTextViewText(
-                R.id.widget_route_text,
-                "$routeLine → $routeDest: $etaLabel"
+            val spokenEta = when {
+                routeEtaAt != null -> "alrededor de las $routeEtaAt"
+                routeEtaMin == 0 -> "ahora"
+                else -> "en unos $routeEtaMin minutos"
+            }
+            views.setTextViewText(R.id.widget_route_line, routeLine)
+            views.setTextViewText(R.id.widget_route_dest, routeDest)
+            views.setTextViewText(R.id.widget_route_eta, etaLabel)
+            // TalkBack reads the row as one sentence, not "116", "POCITOS"
+            views.setContentDescription(
+                R.id.widget_route_section,
+                "Línea $routeLine a $routeDest, $spokenEta, estimado"
             )
+            views.setViewVisibility(R.id.widget_route_section, View.VISIBLE)
+            views.setViewVisibility(R.id.widget_route_empty, View.GONE)
         } else {
             // No enabled route alert, or none of its lines is coming
-            views.setTextViewText(R.id.widget_route_text, "Sin próximos ómnibus en tus rutas")
+            views.setViewVisibility(R.id.widget_route_section, View.GONE)
+            views.setViewVisibility(R.id.widget_route_empty, View.VISIBLE)
         }
 
         appWidgetManager.updateAppWidget(widgetId, views)

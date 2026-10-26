@@ -20,23 +20,10 @@ class TimbreBusPalette {
     required this.light,
   });
 
-  /// White bus on the blue header or app icon.
-  static const onBlue = TimbreBusPalette(
-    body: TimbreColors.blanco,
-    ink: TimbreColors.tinta,
-    light: TimbreColors.ambar,
-  );
-
-  /// Amber bus inside the LED plate: one light color, like a real sign.
+  /// The amber bus of the plate, the icon and the empty boards: one light
+  /// color, like a real sign.
   static const led = TimbreBusPalette(
     body: TimbreColors.ambar,
-    ink: TimbreColors.tinta,
-    light: TimbreColors.ambar,
-  );
-
-  /// Blue bus on white or light backgrounds.
-  static const onLight = TimbreBusPalette(
-    body: TimbreColors.azul,
     ink: TimbreColors.tinta,
     light: TimbreColors.ambar,
   );
@@ -89,7 +76,7 @@ class TimbreBus extends StatelessWidget {
   const TimbreBus({
     super.key,
     required this.height,
-    this.palette = TimbreBusPalette.onBlue,
+    this.palette = TimbreBusPalette.led,
     this.semanticLabel,
   });
 
@@ -114,42 +101,28 @@ class TimbreBus extends StatelessWidget {
   }
 }
 
-/// App icon. [night] is the one on the home screen: the bus lit in amber
-/// on the ink board. Otherwise the first version, white bus on blue.
+/// The app icon as on the home screen: the bus lit in amber on the ink
+/// board. The same layers as the launcher icon (assets/README.md): ink,
+/// unlit LEDs, the bloom of the lit bus, then the bus with its sign and
+/// windshield cut out, so the board shows through.
 class TimbreAppIcon extends StatelessWidget {
   const TimbreAppIcon({
     super.key,
     required this.size,
     this.semanticLabel,
-    this.night = false,
   });
 
   final double size;
   final String? semanticLabel;
 
-  /// The home screen icon: the bus lit in amber on the ink board.
-  final bool night;
-
   @override
   Widget build(BuildContext context) {
-    final icon = night
-        ? _night()
-        : CustomPaint(
-            size: Size.square(size),
-            painter: TimbreBusPainter(
-              palette: TimbreBusPalette.onBlue,
-              detail: TimbreBusDetail.forIconSize(size),
-              tile: true,
-            ),
-          );
+    final icon = _board();
     if (semanticLabel == null) return ExcludeSemantics(child: icon);
     return Semantics(label: semanticLabel, image: true, child: icon);
   }
 
-  /// The same layers as the launcher icon (assets/README.md): ink, unlit
-  /// LEDs, the bloom of the lit bus, then the bus with its sign and
-  /// windshield cut out, so the board shows through.
-  Widget _night() {
+  Widget _board() {
     final bus = CustomPaint(
       size: Size.square(size),
       painter: TimbreBusPainter(
@@ -182,14 +155,14 @@ class TimbreAppIcon extends StatelessWidget {
 }
 
 /// Paints the bus in its 1024-unit design space. With [tile] the canvas is
-/// the full 1024 × 1024 icon (blue rounded square, glass glare); without it,
+/// the full 1024 × 1024 icon (a [tileColor] rounded square); without it,
 /// the canvas is the 724 × 700 lockup box starting at (150, 160).
 class TimbreBusPainter extends CustomPainter {
   const TimbreBusPainter({
     required this.palette,
     required this.detail,
     this.tile = false,
-    this.tileColor = TimbreColors.azul,
+    this.tileColor = TimbreColors.tinta,
     this.cutout = false,
   });
 
@@ -306,17 +279,6 @@ class TimbreBusPainter extends CustomPainter {
     // Windshield
     canvas.drawRRect(
         RRect.fromLTRBR(290, 336, 734, 666, const Radius.circular(30)), ink);
-    if (tile && !cutout && detail == TimbreBusDetail.full) {
-      final glare = Paint()
-        ..color = const Color(0x29FFFFFF)
-        ..style = PaintingStyle.stroke
-        ..strokeCap = StrokeCap.round;
-      canvas.drawLine(const Offset(334, 620), const Offset(446, 420),
-          glare..strokeWidth = 26);
-      canvas.drawLine(const Offset(390, 636), const Offset(480, 476),
-          glare..strokeWidth = 12);
-    }
-
     // Corner lights, angled
     if (detail == TimbreBusDetail.full || detail == TimbreBusDetail.medium) {
       final lights = Path()

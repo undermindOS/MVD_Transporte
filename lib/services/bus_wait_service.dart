@@ -139,10 +139,11 @@ class AndroidBusWait implements BusWaitPlatform {
       notificationText:
           wait.statusText(WaitCheck(WaitOutcome.waiting, trip: trip)),
       // White bus silhouette, not the launcher icon (a colored icon turns
-      // into a white blob in the status bar)
+      // into a white blob in the status bar). Amber accent, as in the app:
+      // Android darkens it on a light shade to keep the text readable
       notificationIcon: const NotificationIcon(
         metaDataName: 'com.liberontech.stmapp.NOTIFICATION_ICON',
-        backgroundColor: TimbreColors.azul,
+        backgroundColor: TimbreColors.ambar,
       ),
       notificationButtons: const [
         NotificationButton(

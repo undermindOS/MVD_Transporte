@@ -84,7 +84,7 @@ class _InfoPageState extends State<InfoPage> {
                       borderRadius: BorderRadius.circular(15),
                       border: Border.all(color: TimbreColors.lineaNoche),
                     ),
-                    child: const TimbreAppIcon(size: 64, night: true),
+                    child: const TimbreAppIcon(size: 64),
                   ),
                   const SizedBox(width: 14),
                   // The wordmark is a logo: with the largest fonts it

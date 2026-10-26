@@ -10,8 +10,9 @@ import 'timbre_bus.dart';
 // destination sign of a bus. Rules (board "El cartel en la interfaz"):
 //  * only for what the bus says live (GPS arrivals) and the brand plate;
 //  * one cartel per screen;
-//  * Doto from 19 px up, amber only on tinta or azul, never on white;
-//  * a timetable estimate never gets a cartel: it stays a white card.
+//  * Doto from 19 px up, amber only on the night board, never on white;
+//  * a timetable estimate never gets a cartel: it stays plain text with a
+//    clock.
 
 /// Brand plate for headers: amber bus + "TIMBRE MVD".
 class CartelCompacto extends StatelessWidget {

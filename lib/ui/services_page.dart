@@ -87,7 +87,7 @@ class ServicesPage extends StatelessWidget {
 
   /// Three tiles per row, like the board; a short last row keeps the size.
   /// On tablets the tiles stop growing at [_maxTile] instead of turning
-  /// into blue walls.
+  /// into big empty boards.
   Widget _grid(List<_Site> sites) {
     return LayoutBuilder(
       builder: (context, constraints) {
