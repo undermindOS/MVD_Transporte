@@ -16,6 +16,8 @@ import 'package:stm_app/models/bus_wait.dart';
 import 'package:stm_app/services/bus_wait_service.dart';
 import 'package:stm_app/services/cache_service.dart';
 import 'package:stm_app/ui/stops_page.dart';
+import 'package:stm_app/ui/theme/timbre_text.dart';
+import 'package:stm_app/ui/theme/timbre_theme.dart';
 import 'package:stm_app/ui/widgets/cartel.dart';
 import 'package:stm_app/ui/widgets/pixel_icon.dart';
 
@@ -43,6 +45,7 @@ void main() {
   });
 
   Widget app() => MaterialApp(
+      theme: buildTimbreTheme(),
       home: StopsPage(onOpenStopInComoIr: opened.add));
 
   // Live minutes in lit digits
@@ -90,6 +93,11 @@ void main() {
       expect(find.text('ANDES y AV 18 DE JULIO'), findsOneWidget);
       expect(find.textContaining('#5109 · 48 m · 124, 124 SD, 125'),
           findsOneWidget);
+      // In the app font, not the platform one
+      final details = tester.widget<RichText>(find.descendant(
+          of: find.textContaining('#5109 · 48 m'),
+          matching: find.byType(RichText)));
+      expect(details.text.style?.fontFamily, TimbreFonts.fira);
       expect(find.text('SAN JOSE y ANDES'), findsOneWidget);
 
       await tester.tap(find.text('SAN JOSE y ANDES'));

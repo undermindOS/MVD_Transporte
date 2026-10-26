@@ -1159,13 +1159,14 @@ class _AddStopDialogState extends State<_AddStopDialog> {
         title: Text(stop.name,
             style: const TextStyle(
                 fontWeight: FontWeight.w600, color: TimbreColors.papel)),
-        subtitleTextStyle: const TextStyle(
-            fontSize: 12.5, color: TimbreColors.etiquetaCartel),
+        // Merged into the tile's style, so it keeps the app font
         subtitle: Text(
           '#${stop.id} · ${stop.distanceMeters.round()} m'
           '${stop.lines.isEmpty ? '' : ' · ${stop.lines.join(', ')}'}',
           maxLines: 2,
           overflow: TextOverflow.ellipsis,
+          style: const TextStyle(
+              fontSize: 12.5, color: TimbreColors.etiquetaCartel),
         ),
         onTap: () => Navigator.pop(context, stop.id),
       );
