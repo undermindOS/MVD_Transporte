@@ -85,11 +85,15 @@ class _LedMatrixPainter extends CustomPainter {
     final from = fadeFrom;
     if (from != null) {
       final rect = Offset.zero & size;
-      paint.shader = ui.Gradient.linear(
-        from.withinRect(rect),
-        (-from).withinRect(rect),
-        [color, color.withValues(alpha: 0)],
-      );
+      // Under a shader the paint's own alpha still multiplies the
+      // gradient's: kept opaque, or faded dots get 10 % of 10 % and vanish
+      paint
+        ..color = const Color(0xFF000000)
+        ..shader = ui.Gradient.linear(
+          from.withinRect(rect),
+          (-from).withinRect(rect),
+          [color, color.withValues(alpha: 0)],
+        );
     }
     canvas.drawPoints(ui.PointMode.points, points, paint);
   }

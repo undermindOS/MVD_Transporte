@@ -1,7 +1,10 @@
 // The LED "cartel" widgets and the bus glyph: live minutes, "LLEGANDO",
 // amenities only when the API says so, and readable semantics.
 
+import 'dart:ui' as ui;
+
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:stm_app/ui/theme/timbre_theme.dart';
@@ -187,6 +190,49 @@ void main() {
         expect(bus.palette, TimbreBusPalette.led);
       }
     });
+  });
+
+  testWidgets('LED dots fade from the given side instead of vanishing',
+      (tester) async {
+    final key = GlobalKey();
+    await tester.pumpWidget(Directionality(
+      textDirection: TextDirection.ltr,
+      child: Center(
+        child: RepaintBoundary(
+          key: key,
+          child: const SizedBox(
+            width: 120,
+            height: 24,
+            child: ColoredBox(
+              color: TimbreColors.tinta,
+              child: LedMatrix(fadeFrom: AlignmentDirectional.centerEnd),
+            ),
+          ),
+        ),
+      ),
+    ));
+    final boundary =
+        key.currentContext!.findRenderObject()! as RenderRepaintBoundary;
+    final data = await tester.runAsync(() async {
+      final image = await boundary.toImage();
+      return image.toByteData(format: ui.ImageByteFormat.rawRgba);
+    });
+    final bytes = data!.buffer.asUint8List();
+    // Brightest red channel in the right and the left quarter: the ink
+    // is 10, a dot at the default 10 % amber about 34
+    int brightest(int from, int to) {
+      var max = 0;
+      for (var y = 0; y < 24; y++) {
+        for (var x = from; x < to; x++) {
+          final r = bytes[(y * 120 + x) * 4];
+          if (r > max) max = r;
+        }
+      }
+      return max;
+    }
+
+    expect(brightest(90, 120), greaterThan(25)); // dots at the end
+    expect(brightest(0, 30), lessThan(20)); // faded at the start
   });
 
   test('theme: the night board, amber lit, Fira to read', () {
