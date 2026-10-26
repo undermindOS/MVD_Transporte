@@ -19,6 +19,8 @@ SFSafariViewController), а не во встроенном WebView.
 и без данных о комфорте.
 Поиск остановок рядом («Paradas cercanas») — открытый WFS GeoServer IM
 (`geoserver.montevideo.gub.uy/geoserver/ows`, слой `imm:v_uptu_paradas`, без авторизации).
+Поиск остановки по названиям улиц («Buscar por calles») — каталог остановок официального API
+(`/v1/catalog/stops` прокси, хранится на устройстве сутки); есть только в сборке с прокси.
 Кнопка «Ver en Cómo Ir» открывает остановку по deep link `m.montevideo.gub.uy/comoir/parada?numero={id}`.
 Карта API, условия использования и правовые ограничения — в [docs/REVIEW.md](docs/REVIEW.md).
 
@@ -40,7 +42,8 @@ flutter run --dart-define=MVD_PROXY_URL=https://mvd-transporte-proxy.<subdomain>
 
 ## Структура
 
-- `lib/services/mvd_api_service.dart` — клиент API (ETA, остановки, расписания; прокси или напрямую)
+- `lib/services/mvd_api_service.dart` — клиент API (ETA, остановки, расписания; прокси или напрямую;
+  каталог остановок и поиск по улицам — только через прокси)
 - `proxy/` — Cloudflare Worker: маршруты `/v1`, Durable Object `ImGateway` с ключом официального API
 - `lib/services/nearby_stops_service.dart` — остановки рядом (геолокация + WFS)
 - `lib/services/background_worker.dart` — фоновая проверка алертов (WorkManager, ≥15 мин)

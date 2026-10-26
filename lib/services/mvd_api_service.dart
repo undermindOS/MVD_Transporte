@@ -3,7 +3,9 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import '../models/bus_arrival.dart';
 import '../models/bus_stop.dart';
+import '../models/catalog_stop.dart';
 import '../models/scheduled_pass.dart';
+import 'cache_service.dart';
 
 /// The stop code does not exist in the STM network.
 class StopNotFoundException implements Exception {
@@ -41,6 +43,12 @@ class MvdApiService {
   static const _scheduleTtl = Duration(hours: 6);
   static final Map<String, (DateTime, List<ScheduledPass>)> _scheduleCache =
       {};
+
+  // The stop catalog (~520 KB from the proxy) is kept on the device for a
+  // day, and decoded once per app session
+  static const _catalogTtl = Duration(days: 1);
+  static const _catalogTimeout = Duration(seconds: 30);
+  static List<CatalogStop>? _catalog;
 
   /// Returns upcoming buses for a stop, soonest first.
   /// Returns null on network/server error so callers can tell
@@ -136,6 +144,156 @@ class MvdApiService {
       debugPrint('⚠️ Parse stop error: $e');
       return null;
     }
+  }
+
+  /// Every stop with its street names, for the search by streets — only
+  /// through the proxy (`/v1/catalog/stops`), null without it.
+  /// Downloaded at most once a day; when the proxy cannot be reached an
+  /// older copy is used. Returns null when there is neither.
+  static Future<List<CatalogStop>?> getStopCatalog() async {
+    if (!usesProxy) return null;
+
+    final cached = _cachedCatalog();
+    final lastMs = CacheService.get<int>(CacheService.keyStopCatalogFetchedAt);
+    if (cached != null &&
+        lastMs != null &&
+        DateTime.now()
+                .difference(DateTime.fromMillisecondsSinceEpoch(lastMs)) <
+            _catalogTtl) {
+      return cached;
+    }
+
+    final List<CatalogStop> fresh;
+    try {
+      final response = await http
+          .get(Uri.parse('$proxyUrl/v1/catalog/stops'), headers: _headers)
+          .timeout(_catalogTimeout);
+      if (response.statusCode != 200) {
+        debugPrint('❌ Catalog API ${response.statusCode}: ${response.body}');
+        return cached;
+      }
+      fresh = parseStopCatalog(jsonDecode(utf8.decode(response.bodyBytes)));
+    } catch (e) {
+      debugPrint('❌ Catalog API error: $e');
+      return cached;
+    }
+    if (fresh.isEmpty) return cached;
+
+    _catalog = fresh;
+    // Only what the search needs: ~270 KB of the proxy's ~520 KB
+    await CacheService.set(
+        CacheService.keyStopCatalog,
+        jsonEncode({
+          'stops': [
+            for (final s in fresh) {'id': s.id, 'name': s.name},
+          ],
+        }));
+    await CacheService.set(CacheService.keyStopCatalogFetchedAt,
+        DateTime.now().millisecondsSinceEpoch);
+    return fresh;
+  }
+
+  static List<CatalogStop>? _cachedCatalog() {
+    if (_catalog != null) return _catalog;
+    final raw = CacheService.get<String>(CacheService.keyStopCatalog);
+    if (raw == null) return null;
+    try {
+      final stops = parseStopCatalog(jsonDecode(raw));
+      return _catalog = stops.isEmpty ? null : stops;
+    } catch (e) {
+      debugPrint('⚠️ Catalog cache error: $e');
+      return null;
+    }
+  }
+
+  /// Forgets the decoded catalog; the copy in Hive stays.
+  @visibleForTesting
+  static void clearCatalogMemory() => _catalog = null;
+
+  /// Stops whose name contains every word of [query], in any order,
+  /// ignoring case, accents and punctuation: "18 de julio ejido" finds
+  /// "AV 18 DE JULIO y EJIDO". Several words typed in a row that make a
+  /// street name come first ("san jose" → "SAN JOSE y ANDES" before "AV
+  /// GRAL SAN MARTIN y BV JOSE BATLLE…"), then names where the words start
+  /// a word ("rio" → "RIO NEGRO" before "GREGORIO"), then alphabetical.
+  /// At most [limit] stops.
+  static List<CatalogStop> searchStops(
+      List<CatalogStop> catalog, String query,
+      {int limit = 50}) {
+    final words =
+        foldForSearch(query).split(' ').where((w) => w.isNotEmpty).toList();
+    if (words.isEmpty) return [];
+    final phrase = words.length > 1 ? words.join(' ') : null;
+
+    final hits = <(CatalogStop, bool, int)>[];
+    for (final stop in catalog) {
+      final key = stop.searchKey;
+      if (!words.every(key.contains)) continue;
+      final inARow = phrase != null &&
+          (key.startsWith(phrase) || key.contains(' $phrase'));
+      final wordStarts = words
+          .where((w) => key.startsWith(w) || key.contains(' $w'))
+          .length;
+      hits.add((stop, inARow, wordStarts));
+    }
+
+    hits.sort((a, b) {
+      if (a.$2 != b.$2) return a.$2 ? -1 : 1;
+      final byStarts = b.$3.compareTo(a.$3);
+      if (byStarts != 0) return byStarts;
+      final byName = a.$1.name.compareTo(b.$1.name);
+      return byName != 0 ? byName : a.$1.id.compareTo(b.$1.id);
+    });
+    return [for (final h in hits.take(limit)) h.$1];
+  }
+
+  static const _plainLetters = {
+    'á': 'a', 'à': 'a', 'â': 'a', 'ä': 'a', 'ã': 'a', //
+    'é': 'e', 'è': 'e', 'ê': 'e', 'ë': 'e', //
+    'í': 'i', 'ì': 'i', 'î': 'i', 'ï': 'i', //
+    'ó': 'o', 'ò': 'o', 'ô': 'o', 'ö': 'o', 'õ': 'o', //
+    'ú': 'u', 'ù': 'u', 'û': 'u', 'ü': 'u', //
+    'ñ': 'n', 'ç': 'c',
+    // The catalog writes ORDOÑEZ as "ORDOÐEZ" (stops 5340–5346)
+    'ð': 'n',
+  };
+  static final _accented = RegExp('[${_plainLetters.keys.join()}]');
+  static final _combiningMarks = RegExp('[\u0300-\u036f]');
+  // "O´HIGGINS" = "ohiggins", whichever apostrophe the user types
+  static final _apostrophes = RegExp('[´\'’‘`]');
+  static final _separators = RegExp('[^a-z0-9]+');
+
+  /// Lower case, no accents, apostrophes dropped, any other punctuation
+  /// ("Nº", "S/N", parentheses) turned into single spaces.
+  @visibleForTesting
+  static String foldForSearch(String text) => text
+      .toLowerCase()
+      .replaceAll(_combiningMarks, '')
+      .replaceAllMapped(_accented, (m) => _plainLetters[m[0]]!)
+      .replaceAll(_apostrophes, '')
+      .replaceAll(_separators, ' ')
+      .trim();
+
+  /// Parses the proxy's `GET /v1/catalog/stops` (and the copy kept in Hive):
+  /// `{"fetchedAt":"…","stops":[{"id":574,"name":"SAN JOSE y ANDES",
+  ///   "location":{"lat":-34.9,"lng":-56.2}}]}`
+  /// Stops without a name cannot be found by streets and are left out.
+  @visibleForTesting
+  static List<CatalogStop> parseStopCatalog(dynamic data) {
+    final list = data is Map ? data['stops'] : null;
+    if (list is! List) return [];
+    return [
+      for (final item in list)
+        if (item is Map &&
+            item['id'] is int &&
+            item['name'] is String &&
+            (item['name'] as String).trim().isNotEmpty)
+          CatalogStop(
+            id: item['id'] as int,
+            name: (item['name'] as String).trim(),
+            searchKey: foldForSearch(item['name'] as String),
+          ),
+    ];
   }
 
   /// Parses `GET /transporteRest/siguientesParada/{id}`:

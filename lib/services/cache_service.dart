@@ -14,6 +14,10 @@ class CacheService {
   static const String keyNewsFromId = 'news_from_id';
   static const String keyNewsFetchedAt = 'news_fetched_at';
   static const String keyNewsLastReadId = 'news_last_read_id';
+  // Stop catalog for the search by streets: {"stops":[{"id","name"}]}
+  // (JSON string) and the last fetch (ms since epoch)
+  static const String keyStopCatalog = 'stop_catalog';
+  static const String keyStopCatalogFetchedAt = 'stop_catalog_fetched_at';
 
   /// [path] overrides the storage directory (tests run without path_provider).
   static Future<void> init({String? path}) async {

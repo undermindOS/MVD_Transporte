@@ -297,7 +297,8 @@ SnackBar, «Ver en Cómo Ir» → `/comoir/parada?numero=1234`, возврат �
    Приложение ходит в прокси, если собрано с `--dart-define=MVD_PROXY_URL=…`.
 2. **Поиск остановок без номера.** WFS `imm:v_uptu_paradas` (`srsName=EPSG:4326`) или
    `/buses/busstops` → «остановки рядом» по геолокации и поиск по улице.
-   ✅ «Остановки рядом» сделаны через WFS («Paradas cercanas», §2.2); поиск по улице — нет.
+   ✅ «Остановки рядом» сделаны через WFS («Paradas cercanas», §2.2). 🟡 Поиск по улицам
+   («Buscar por calles») — по каталогу `/v1/catalog/stops`, только в сборке с прокси.
 3. **«Ver en Cómo Ir»** на карточке остановки — deep link `/comoir/parada?numero={id}`:
    официальная интеграция без скрейпинга. ✅ Сделано.
 4. ✅ **Новости транспорта.** `notificacion/mensajes` — объезды и изменения линий, которые

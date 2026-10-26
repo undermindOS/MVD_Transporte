@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import '../models/bus_arrival.dart';
 import '../models/bus_stop.dart';
 import '../models/bus_wait.dart';
+import '../models/catalog_stop.dart';
 import '../models/nearby_stop.dart';
 import '../models/route_alert.dart';
 import '../models/transport_news.dart';
@@ -1009,8 +1010,9 @@ class _FieldIcon extends StatelessWidget {
       );
 }
 
-/// Add-stop dialog: type the stop number or pick one of the stops around
-/// the user ("Paradas cercanas"). Pops with the chosen stop ID.
+/// Add-stop dialog: type the stop number, search by street names (through
+/// the proxy only) or pick one of the stops around the user ("Paradas
+/// cercanas"). Pops with the chosen stop ID.
 class _AddStopDialog extends StatefulWidget {
   const _AddStopDialog();
 
@@ -1020,25 +1022,68 @@ class _AddStopDialog extends StatefulWidget {
 
 class _AddStopDialogState extends State<_AddStopDialog> {
   final _controller = TextEditingController();
+  final _streetController = TextEditingController();
   bool _searching = false;
   List<NearbyStop>? _nearby;
   NearbyStopsError? _error;
 
+  // Search by streets: the catalog is loaded on the first letter typed
+  List<CatalogStop>? _catalog;
+  bool _catalogLoading = false;
+  bool _catalogFailed = false;
+  List<CatalogStop>? _matches;
+
+  static const _maxMatches = 50;
   static final _radiusLabel = '${NearbyStopsService.radiusMeters.round()} m';
 
   @override
   void dispose() {
     _controller.dispose();
+    _streetController.dispose();
     super.dispose();
+  }
+
+  void _onStreetQuery(String query) {
+    final catalog = _catalog;
+    final empty = query.trim().isEmpty;
+    // One list at a time: street matches replace the nearby stops
+    setState(() {
+      _nearby = null;
+      _error = null;
+      // One extra match tells that there are more than shown
+      _matches = empty || catalog == null
+          ? null
+          : MvdApiService.searchStops(catalog, query, limit: _maxMatches + 1);
+    });
+    if (!empty && catalog == null && !_catalogLoading) _loadCatalog();
+  }
+
+  Future<void> _loadCatalog() async {
+    setState(() {
+      _catalogLoading = true;
+      _catalogFailed = false;
+    });
+    final catalog = await MvdApiService.getStopCatalog();
+    if (!mounted) return;
+    setState(() {
+      _catalogLoading = false;
+      _catalog = catalog;
+      _catalogFailed = catalog == null;
+    });
+    // Search what was typed meanwhile
+    if (catalog != null) _onStreetQuery(_streetController.text);
   }
 
   Future<void> _findNearby() async {
     // Hide the keyboard so the list has room
     FocusScope.of(context).unfocus();
+    _streetController.clear();
     setState(() {
       _searching = true;
       _error = null;
       _nearby = null;
+      _matches = null;
+      _catalogFailed = false;
     });
     try {
       final stops = await NearbyStopsService.findNearMe();
@@ -1070,6 +1115,7 @@ class _AddStopDialogState extends State<_AddStopDialog> {
   Widget build(BuildContext context) {
     final nearby = _nearby;
     final error = _error;
+    final matches = _matches;
 
     return AlertDialog(
       title: const Text('Agregar parada'),
@@ -1091,6 +1137,60 @@ class _AddStopDialogState extends State<_AddStopDialog> {
               ),
               autofocus: true,
             ),
+            // The catalog with street names comes from the proxy only
+            if (MvdApiService.usesProxy) ...[
+              const SizedBox(height: 10),
+              TextField(
+                controller: _streetController,
+                autocorrect: false,
+                textInputAction: TextInputAction.search,
+                decoration: const InputDecoration(
+                  labelText: 'Buscar por calles',
+                  hintText: 'Ej: San José y Andes',
+                  prefixIcon: _FieldIcon(PixelGlyphs.search),
+                ),
+                onChanged: _onStreetQuery,
+              ),
+              if (_catalogLoading)
+                const Padding(
+                  padding: EdgeInsets.all(16),
+                  child: Center(child: CircularProgressIndicator()),
+                ),
+              if (_catalogFailed)
+                const Padding(
+                  padding: EdgeInsets.only(top: 12),
+                  child: Text(
+                      'No se pudo cargar la lista de paradas. '
+                      'Revisá la conexión.',
+                      style:
+                          TextStyle(color: TimbreColors.rojoLed, fontSize: 13)),
+                ),
+              if (matches != null && matches.isEmpty)
+                const Padding(
+                  padding: EdgeInsets.only(top: 12),
+                  child: Text('Ninguna parada coincide',
+                      style: TextStyle(
+                          color: TimbreColors.etiquetaCartel, fontSize: 13)),
+                ),
+              if (matches != null && matches.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                Flexible(
+                  child: ListView.builder(
+                    shrinkWrap: true,
+                    itemCount: matches.length.clamp(0, _maxMatches),
+                    itemBuilder: (_, i) => _buildMatchTile(matches[i]),
+                  ),
+                ),
+                if (matches.length > _maxMatches)
+                  const Padding(
+                    padding: EdgeInsets.only(top: 8),
+                    child: Text(
+                        'Hay más de $_maxMatches: agregá la otra calle',
+                        style: TextStyle(
+                            color: TimbreColors.etiquetaCartel, fontSize: 13)),
+                  ),
+              ],
+            ],
             const SizedBox(height: 12),
             OutlinedButton.icon(
               onPressed: _searching ? null : _findNearby,
@@ -1168,6 +1268,22 @@ class _AddStopDialogState extends State<_AddStopDialog> {
           style: const TextStyle(
               fontSize: 12.5, color: TimbreColors.etiquetaCartel),
         ),
+        onTap: () => Navigator.pop(context, stop.id),
+      );
+
+  /// A stop found by its streets: the same tile as a nearby one, with
+  /// the number under the name.
+  Widget _buildMatchTile(CatalogStop stop) => ListTile(
+        contentPadding: EdgeInsets.zero,
+        dense: true,
+        leading: const PixelIcon(PixelGlyphs.pin,
+            size: 22, color: TimbreColors.ambar),
+        title: Text(stop.name,
+            style: const TextStyle(
+                fontWeight: FontWeight.w600, color: TimbreColors.papel)),
+        subtitle: Text('#${stop.id}',
+            style: const TextStyle(
+                fontSize: 12.5, color: TimbreColors.etiquetaCartel)),
         onTap: () => Navigator.pop(context, stop.id),
       );
 }
