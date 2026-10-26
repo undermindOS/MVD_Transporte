@@ -347,7 +347,7 @@ class _StopsPageState extends State<StopsPage>
               decoration: const InputDecoration(
                 labelText: 'Parada de origen *',
                 hintText: 'Ej: 1234',
-                prefixIcon: _FieldIcon(PixelGlyphs.pin),
+                prefixIcon: _FieldIcon(PixelGlyphs.stop),
               ),
             ),
             const SizedBox(height: 12),
@@ -576,7 +576,7 @@ class _StopsPageState extends State<StopsPage>
           tabAlignment: largeText ? TabAlignment.start : null,
           tabs: [
             const Tab(
-                icon: PixelIcon(PixelGlyphs.pin, size: 22), text: 'Paradas'),
+                icon: PixelIcon(PixelGlyphs.stop, size: 22), text: 'Paradas'),
             const Tab(
                 icon: PixelIcon(PixelGlyphs.route, size: 22), text: 'Rutas'),
             Tab(
@@ -755,7 +755,7 @@ class _StopsPageState extends State<StopsPage>
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Row(children: [
-                      const PixelIcon(PixelGlyphs.pin,
+                      const PixelIcon(PixelGlyphs.stop,
                           size: 14, color: TimbreColors.etiquetaCartel),
                       const SizedBox(width: 6),
                       Expanded(
@@ -1254,7 +1254,7 @@ class _AddStopDialogState extends State<_AddStopDialog> {
   Widget _buildNearbyTile(NearbyStop stop) => ListTile(
         contentPadding: EdgeInsets.zero,
         dense: true,
-        leading: const PixelIcon(PixelGlyphs.pin,
+        leading: const PixelIcon(PixelGlyphs.stop,
             size: 22, color: TimbreColors.ambar),
         title: Text(stop.name,
             style: const TextStyle(
@@ -1276,7 +1276,7 @@ class _AddStopDialogState extends State<_AddStopDialog> {
   Widget _buildMatchTile(CatalogStop stop) => ListTile(
         contentPadding: EdgeInsets.zero,
         dense: true,
-        leading: const PixelIcon(PixelGlyphs.pin,
+        leading: const PixelIcon(PixelGlyphs.stop,
             size: 22, color: TimbreColors.ambar),
         title: Text(stop.name,
             style: const TextStyle(
