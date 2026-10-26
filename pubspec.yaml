@@ -168,16 +168,17 @@ flutter_launcher_icons:
   android: true
   ios: true
   image_path: "assets/app_icon.png"
-  # Android < 8: rounded tile as on the brand board
+  # Android < 8: rounded tile
   image_path_android: "assets/app_icon_android.png"
-  adaptive_icon_background: "#0038A8"  # Azul MVD
+  # Android 8+: the ink board with unlit LEDs, the lit bus on top
+  adaptive_icon_background: "assets/app_icon_background.png"
   adaptive_icon_foreground: "assets/app_icon_foreground.png"
   # The bus is already inside the 66 dp safe zone of the PNG
   adaptive_icon_foreground_inset: 0
   # Android 13+ themed icons
   adaptive_icon_monochrome: "assets/app_icon_monochrome.png"
   remove_alpha_ios: true
-  # iOS 18 dark and tinted icons: the bus on transparent
+  # iOS 18 dark: the lit bus on transparent; tinted: the white bus
   image_path_ios_dark_transparent: "assets/app_icon_ios_dark.png"
-  image_path_ios_tinted_grayscale: "assets/app_icon_ios_dark.png"
+  image_path_ios_tinted_grayscale: "assets/app_icon_ios_tinted.png"
   desaturate_tinted_to_grayscale_ios: true

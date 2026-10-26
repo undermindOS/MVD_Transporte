@@ -1,6 +1,9 @@
+import 'dart:ui' show ImageFilter;
+
 import 'package:flutter/material.dart';
 
 import '../theme/timbre_tokens.dart';
+import 'led_matrix.dart';
 
 /// Colors of the bus glyph: [body] for the bodywork, mirrors and wheels,
 /// [ink] for the destination sign, windshield and corner lights, [light]
@@ -111,7 +114,8 @@ class TimbreBus extends StatelessWidget {
   }
 }
 
-/// App icon: the white bus on a blue rounded square, as on the home screen.
+/// App icon. [night] is the one on the home screen: the bus lit in amber
+/// on the ink board. Otherwise the first version, white bus on blue.
 class TimbreAppIcon extends StatelessWidget {
   const TimbreAppIcon({
     super.key,
@@ -123,22 +127,57 @@ class TimbreAppIcon extends StatelessWidget {
   final double size;
   final String? semanticLabel;
 
-  /// The night board version: amber bus on an ink tile.
+  /// The home screen icon: the bus lit in amber on the ink board.
   final bool night;
 
   @override
   Widget build(BuildContext context) {
-    final icon = CustomPaint(
-      size: Size.square(size),
-      painter: TimbreBusPainter(
-        palette: night ? TimbreBusPalette.led : TimbreBusPalette.onBlue,
-        detail: TimbreBusDetail.forIconSize(size),
-        tile: true,
-        tileColor: night ? TimbreColors.tinta : TimbreColors.azul,
-      ),
-    );
+    final icon = night
+        ? _night()
+        : CustomPaint(
+            size: Size.square(size),
+            painter: TimbreBusPainter(
+              palette: TimbreBusPalette.onBlue,
+              detail: TimbreBusDetail.forIconSize(size),
+              tile: true,
+            ),
+          );
     if (semanticLabel == null) return ExcludeSemantics(child: icon);
     return Semantics(label: semanticLabel, image: true, child: icon);
+  }
+
+  /// The same layers as the launcher icon (assets/README.md): ink, unlit
+  /// LEDs, the bloom of the lit bus, then the bus with its sign and
+  /// windshield cut out, so the board shows through.
+  Widget _night() {
+    final bus = CustomPaint(
+      size: Size.square(size),
+      painter: TimbreBusPainter(
+        palette: TimbreBusPalette.led,
+        detail: TimbreBusDetail.forIconSize(size),
+        tile: true,
+        tileColor: Colors.transparent,
+        cutout: true,
+      ),
+    );
+    final bloom = size * 0.022;
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(size * 232 / 1024),
+      child: SizedBox.square(
+        dimension: size,
+        child: Stack(children: [
+          const Positioned.fill(child: ColoredBox(color: TimbreColors.tinta)),
+          Positioned.fill(
+            child: LedMatrix(pitch: size / 32, dot: size * 10 / 1024),
+          ),
+          ImageFiltered(
+            imageFilter: ImageFilter.blur(sigmaX: bloom, sigmaY: bloom),
+            child: Opacity(opacity: 0.45, child: bus),
+          ),
+          bus,
+        ]),
+      ),
+    );
   }
 }
 
@@ -151,6 +190,7 @@ class TimbreBusPainter extends CustomPainter {
     required this.detail,
     this.tile = false,
     this.tileColor = TimbreColors.azul,
+    this.cutout = false,
   });
 
   final TimbreBusPalette palette;
@@ -158,8 +198,13 @@ class TimbreBusPainter extends CustomPainter {
   final bool tile;
   final Color tileColor;
 
+  /// The sign, windshield and corner lights are holes instead of
+  /// [TimbreBusPalette.ink]: whatever is behind the bus shows through.
+  final bool cutout;
+
   @override
   void paint(Canvas canvas, Size size) {
+    if (cutout) canvas.saveLayer(Offset.zero & size, Paint());
     canvas.save();
     if (tile) {
       final s = size.width / 1024;
@@ -176,7 +221,9 @@ class TimbreBusPainter extends CustomPainter {
     }
 
     final body = Paint()..color = palette.body;
-    final ink = Paint()..color = palette.ink;
+    final ink = Paint()
+      ..color = palette.ink
+      ..blendMode = cutout ? BlendMode.clear : BlendMode.srcOver;
     final light = Paint()..color = palette.light;
 
     // Mirror arms and heads
@@ -259,7 +306,7 @@ class TimbreBusPainter extends CustomPainter {
     // Windshield
     canvas.drawRRect(
         RRect.fromLTRBR(290, 336, 734, 666, const Radius.circular(30)), ink);
-    if (tile && detail == TimbreBusDetail.full) {
+    if (tile && !cutout && detail == TimbreBusDetail.full) {
       final glare = Paint()
         ..color = const Color(0x29FFFFFF)
         ..style = PaintingStyle.stroke
@@ -288,12 +335,14 @@ class TimbreBusPainter extends CustomPainter {
         lights,
         Paint()
           ..color = palette.ink
+          ..blendMode = ink.blendMode
           ..style = PaintingStyle.stroke
           ..strokeWidth = 12
           ..strokeJoin = StrokeJoin.round,
       );
     }
     canvas.restore();
+    if (cutout) canvas.restore();
   }
 
   @override
@@ -301,5 +350,6 @@ class TimbreBusPainter extends CustomPainter {
       oldDelegate.palette != palette ||
       oldDelegate.detail != detail ||
       oldDelegate.tile != tile ||
-      oldDelegate.tileColor != tileColor;
+      oldDelegate.tileColor != tileColor ||
+      oldDelegate.cutout != cutout;
 }

@@ -7,6 +7,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:stm_app/ui/theme/timbre_theme.dart';
 import 'package:stm_app/ui/theme/timbre_tokens.dart';
 import 'package:stm_app/ui/widgets/cartel.dart';
+import 'package:stm_app/ui/widgets/led_matrix.dart';
 import 'package:stm_app/ui/widgets/timbre_bus.dart';
 
 Widget _wrap(Widget child) => MaterialApp(
@@ -157,17 +158,35 @@ void main() {
 
     testWidgets('paints at every size without errors', (tester) async {
       for (final h in [20.0, 32.0, 48.0, 100.0]) {
-        await tester.pumpWidget(_wrap(Row(
-          mainAxisSize: MainAxisSize.min,
+        await tester.pumpWidget(_wrap(Wrap(
           children: [
             TimbreBus(height: h),
             TimbreBus(height: h, palette: TimbreBusPalette.led),
             TimbreAppIcon(size: h),
+            TimbreAppIcon(size: h, night: true),
           ],
         )));
         expect(tester.takeException(), isNull);
         expect(tester.getSize(find.byType(TimbreBus).first).width,
             closeTo(h * TimbreBus.aspectRatio, 0.01));
+      }
+    });
+
+    testWidgets('night icon is the launcher icon: lit bus, LED board behind',
+        (tester) async {
+      await tester
+          .pumpWidget(_wrap(const TimbreAppIcon(size: 64, night: true)));
+      expect(find.byType(LedMatrix), findsOneWidget);
+      // The bus and its bloom: amber, the sign and windshield cut out so
+      // the board shows through
+      final buses = tester
+          .widgetList<CustomPaint>(find.byType(CustomPaint))
+          .map((p) => p.painter)
+          .whereType<TimbreBusPainter>();
+      expect(buses, hasLength(2));
+      for (final bus in buses) {
+        expect(bus.cutout, isTrue);
+        expect(bus.palette, TimbreBusPalette.led);
       }
     });
   });
