@@ -81,7 +81,7 @@ class NotificationService {
         importance: Importance.high,
         priority: Priority.high,
         icon: '@drawable/ic_stat_timbre',
-        color: TimbreColors.ambar,
+        color: TimbreColors.tinta,
       ),
       iOS: const DarwinNotificationDetails(
         presentAlert: true,
@@ -114,7 +114,7 @@ class NotificationService {
         importance: Importance.high,
         priority: Priority.high,
         icon: '@drawable/ic_stat_timbre',
-        color: TimbreColors.ambar,
+        color: TimbreColors.tinta,
         styleInformation: BigTextStyleInformation(body),
       ),
       iOS: const DarwinNotificationDetails(
@@ -147,7 +147,7 @@ class NotificationService {
         importance: Importance.high,
         priority: Priority.high,
         icon: '@drawable/ic_stat_timbre',
-        color: TimbreColors.ambar,
+        color: TimbreColors.tinta,
       ),
       iOS: const DarwinNotificationDetails(
         presentAlert: true,

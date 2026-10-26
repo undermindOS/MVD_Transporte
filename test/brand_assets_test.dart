@@ -62,8 +62,10 @@ void main() {
     expect(manifest, contains('@drawable/ic_stat_timbre'));
     expect(_read('lib/services/bus_wait_service.dart'),
         contains('com.liberontech.stmapp.NOTIFICATION_ICON'));
-    // The accent is the LED amber, as in the app
-    expect(service, contains('color: TimbreColors.ambar'));
+    // The accent is the navy of the board: on a light shade amber would
+    // turn brown, the navy stays itself
+    expect(service, contains('color: TimbreColors.tinta'));
+    expect(service, isNot(contains('TimbreColors.ambar')));
   });
 
   test('the home widget is a small night board', () {
