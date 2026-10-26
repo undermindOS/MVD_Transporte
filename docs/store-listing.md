@@ -69,8 +69,9 @@ Live Montevideo bus arrivals and alerts for your stops. Unofficial app.
 
 ## Gráficos
 
-- Ícono: `assets/app_icon.png` (ómnibus blanco sobre azul, sin escudo ni
-  símbolos oficiales).
+- Ícono: `assets/app_icon.png` (el ómnibus encendido en ámbar sobre el
+  tablero oscuro, sin escudo ni símbolos oficiales). Para Play (512 px):
+  el mismo archivo reducido.
 - Capturas: solo pantallas propias de la app (Mis paradas, Rutas, alertas).
   No usar capturas de stm.gub.uy ni logos del STM o la Intendencia.
 

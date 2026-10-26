@@ -1,6 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- The widget is a small board: ink, a fine night-blue frame -->
 <shape xmlns:android="http://schemas.android.com/apk/res/android"
     android:shape="rectangle">
-    <solid android:color="#FF0066CC" />
-    <corners android:radius="16dp" />
+    <solid android:color="@color/tinta" />
+    <stroke
+        android:width="1dp"
+        android:color="@color/linea_noche" />
+    <corners android:radius="20dp" />
 </shape>

@@ -17,6 +17,9 @@ import 'package:stm_app/main.dart';
 import 'package:stm_app/models/bus_stop.dart';
 import 'package:stm_app/services/cache_service.dart';
 import 'package:stm_app/services/official_sites.dart';
+import 'package:stm_app/ui/lock_screen.dart';
+
+import 'support/layout.dart';
 
 void main() {
   late Directory hiveDir;
@@ -51,21 +54,24 @@ void main() {
 
     expect(find.byType(NavigationBar), findsOneWidget);
     expect(find.byType(NavigationDestination), findsNWidgets(2));
-    expect(find.text('Mis paradas'), findsNWidgets(2)); // AppBar + nav label
+    expect(find.text('MIS PARADAS'), findsOneWidget); // the header sign
+    expect(find.text('Mis paradas'), findsOneWidget); // nav label
     expect(find.text('Servicios'), findsOneWidget);
-    expect(find.text('Sin paradas guardadas'), findsOneWidget);
-    expect(find.byIcon(Icons.info_outline), findsOneWidget);
+    expect(find.text('SIN PARADAS'), findsOneWidget);
+    expect(find.byTooltip('Info'), findsOneWidget);
   });
 
   testWidgets('Servicios lists the official sites',
       (WidgetTester tester) async {
+    // Portrait phone: the 800 × 600 test window hides the last tile
+    usePhoneScreen(tester);
     await tester.pumpWidget(const MiTransporteMVDApp());
     await tester.pump();
 
     await tester.tap(find.text('Servicios'));
     await tester.pump();
 
-    expect(find.text('Servicios'), findsNWidgets(2));
+    expect(find.text('SERVICIOS'), findsOneWidget);
     for (final title in ['Mi STM', 'Recarga', 'Cómo Ir', 'Avisos']) {
       expect(find.text(title), findsOneWidget);
     }
@@ -168,7 +174,7 @@ void main() {
     cycle();
     await tester.pump();
     expect(auth.calls, 1);
-    expect(find.text('Aplicación bloqueada'), findsNothing);
+    expect(find.byType(LockScreen), findsNothing);
 
     cycle();
     await tester.pump();

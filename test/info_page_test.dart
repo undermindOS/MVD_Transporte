@@ -39,7 +39,7 @@ void main() {
 
   testWidgets('shows data source attribution', (tester) async {
     await pumpInfo(tester, (value) async => value);
-    expect(find.textContaining('Fuente de datos'), findsOneWidget);
+    expect(find.text('FUENTE DE DATOS'), findsOneWidget);
     expect(find.textContaining('Intendencia de Montevideo'), findsWidgets);
     // Covers every IM service the native screens read
     expect(find.textContaining('novedades del transporte'), findsOneWidget);

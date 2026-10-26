@@ -2,9 +2,18 @@ import 'package:flutter/material.dart';
 import '../models/bus_stop.dart';
 import '../models/scheduled_pass.dart';
 import '../services/mvd_api_service.dart';
+import 'spoken_text.dart';
+import 'theme/timbre_text.dart';
+import 'theme/timbre_tokens.dart';
+import 'widgets/empty_state.dart';
+import 'widgets/line_badge.dart';
+import 'widgets/pixel_icon.dart';
+import 'widgets/segmented.dart';
+import 'widgets/timbre_app_bar.dart';
 
 /// Theoretical timetable of a saved stop by day type and start time —
-/// the "Elegir horario" of Cómo Ir.
+/// the "Elegir horario" of Cómo Ir. Timetable data never uses the LED
+/// cartel or dot-matrix digits: no GPS is involved.
 class SchedulePage extends StatefulWidget {
   final BusStop stop;
 
@@ -29,6 +38,22 @@ class _SchedulePageState extends State<SchedulePage> {
   bool _failed = false;
   // Drops answers of superseded requests (fast day/time changes)
   int _request = 0;
+
+  static const _time21 = TextStyle(
+    fontFamily: TimbreFonts.firaCondensed,
+    fontWeight: FontWeight.w700,
+    fontSize: 21,
+    color: TimbreColors.papel,
+    fontFeatures: [FontFeature.tabularFigures()],
+  );
+
+  static const _stopLine = TextStyle(
+    fontFamily: TimbreFonts.firaCondensed,
+    fontWeight: FontWeight.w700,
+    fontSize: 17,
+    height: 1.2,
+    color: TimbreColors.etiquetaCartel,
+  );
 
   @override
   void initState() {
@@ -72,74 +97,81 @@ class _SchedulePageState extends State<SchedulePage> {
 
   @override
   Widget build(BuildContext context) {
-    final primary = Theme.of(context).primaryColor;
     final stop = widget.stop;
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Horarios',
-            style: TextStyle(fontWeight: FontWeight.w600, fontSize: 20)),
-        centerTitle: true,
-        backgroundColor: primary,
-        foregroundColor: Colors.white,
-        elevation: 0,
+      backgroundColor: TimbreColors.noche,
+      // The identity bar of the tabs; a long stop name is cut, the stop
+      // number never is
+      appBar: buildTimbreAppBar(
+        context,
+        title: 'Horarios',
+        subtitle: stop.name,
+        subtitleTrailing: ' · ${stop.id}',
+        subtitleStyle: _stopLine,
+        semanticLabel:
+            'Horarios de la parada ${stop.id}, ${spokenName(stop.name)}',
       ),
-      backgroundColor: Colors.white,
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
-            child: Row(children: [
-              Icon(Icons.place, color: primary, size: 20),
-              const SizedBox(width: 6),
-              Expanded(
-                child: Text(stop.name,
-                    style: const TextStyle(
-                        fontWeight: FontWeight.w600, fontSize: 15)),
-              ),
-              Text('#${stop.id}',
-                  style: const TextStyle(color: Colors.black38, fontSize: 13)),
-            ]),
-          ),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: SegmentedButton<DayType>(
-              segments: [
-                for (final d in DayType.values)
-                  ButtonSegment(value: d, label: Text(d.label)),
+          Container(
+            padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
+            decoration: const BoxDecoration(
+              color: TimbreColors.noche,
+              border: Border(bottom: BorderSide(color: TimbreColors.lineaNoche)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                TimbreSegmented<DayType>(
+                  values: DayType.values,
+                  selected: _day,
+                  labelOf: (d) => d.label,
+                  semanticLabel: 'Tipo de día',
+                  onChanged: (d) {
+                    _day = d;
+                    _load();
+                  },
+                ),
+                const SizedBox(height: 12),
+                Row(children: [
+                  OutlinedButton.icon(
+                    onPressed: _pickTime,
+                    icon: const PixelIcon(PixelGlyphs.clock, size: 18),
+                    label: Text('Desde ${_formatTime(_time)}'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: TimbreColors.ambar,
+                      minimumSize: const Size(0, TimbreSpace.touch),
+                      padding: const EdgeInsets.fromLTRB(12, 0, 14, 0),
+                      side: const BorderSide(
+                          color: TimbreColors.ambarTenue, width: 1.5),
+                      shape: const StadiumBorder(),
+                      textStyle: const TextStyle(
+                          fontFamily: TimbreFonts.fira,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 15),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  const Expanded(
+                    child: Text('Horarios teóricos, sin ubicación GPS',
+                        style: TextStyle(
+                            color: TimbreColors.etiquetaCartel,
+                            fontSize: 13,
+                            height: 1.35)),
+                  ),
+                ]),
               ],
-              selected: {_day},
-              showSelectedIcon: false,
-              onSelectionChanged: (s) {
-                _day = s.first;
-                _load();
-              },
             ),
           ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
-            child: Row(children: [
-              OutlinedButton.icon(
-                onPressed: _pickTime,
-                icon: const Icon(Icons.access_time, size: 18),
-                label: Text('Desde ${_formatTime(_time)}'),
-              ),
-              const SizedBox(width: 12),
-              const Expanded(
-                child: Text('Horarios teóricos, sin ubicación GPS',
-                    style: TextStyle(color: Colors.black45, fontSize: 12)),
-              ),
-            ]),
-          ),
-          const Divider(height: 1),
-          Expanded(child: _buildList(primary)),
+          Expanded(child: _buildList()),
         ],
       ),
     );
   }
 
-  Widget _buildList(Color primary) {
+  Widget _buildList() {
     if (_loading) {
       return const Center(child: CircularProgressIndicator(strokeWidth: 2));
     }
@@ -147,9 +179,15 @@ class _SchedulePageState extends State<SchedulePage> {
     if (_failed) {
       return Center(
         child: Column(mainAxisSize: MainAxisSize.min, children: [
-          const Text('No se pudo cargar el horario',
-              style: TextStyle(color: Colors.redAccent, fontSize: 14)),
+          const PixelIcon(PixelGlyphs.warning,
+              size: 28, color: TimbreColors.ambar),
           const SizedBox(height: 8),
+          const Text('No se pudo cargar el horario',
+              style: TextStyle(
+                  color: TimbreColors.papel,
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600)),
+          const SizedBox(height: 4),
           TextButton(onPressed: _load, child: const Text('Reintentar')),
         ]),
       );
@@ -157,59 +195,113 @@ class _SchedulePageState extends State<SchedulePage> {
     final passes = _passes ?? const [];
     if (passes.isEmpty) {
       return const Center(
-        child: Text('Sin pasadas para este horario',
-            style: TextStyle(color: Colors.black45, fontSize: 14)),
+        child: SingleChildScrollView(
+          child: TimbreEmptyState('Sin pasadas para este horario',
+              sign: 'SIN PASADAS',
+              detail: 'Probá con otro día o con una hora más temprano.'),
+        ),
       );
     }
 
     final rows = <Widget>[];
+    int? hour;
     for (var i = 0; i < passes.length; i++) {
       // The list continues after midnight
       if (i > 0 && passes[i].hhmm < passes[i - 1].hhmm) {
         rows.add(const Padding(
-          padding: EdgeInsets.fromLTRB(16, 12, 16, 4),
+          padding: EdgeInsets.fromLTRB(16, 14, 16, 6),
           child: Text('Después de medianoche',
               style: TextStyle(
-                  color: Colors.black45,
-                  fontSize: 12,
+                  color: TimbreColors.etiquetaCartel,
+                  fontSize: 13,
                   fontWeight: FontWeight.w600)),
         ));
+        hour = null;
       }
-      rows.add(_buildRow(passes[i], primary));
+      final h = passes[i].hhmm ~/ 100;
+      if (h != hour) {
+        rows.add(_HourHeader(h));
+        hour = h;
+      }
+      rows.add(_PassRow(passes[i]));
     }
     return ListView(padding: const EdgeInsets.only(bottom: 24), children: rows);
   }
 
-  Widget _buildRow(ScheduledPass p, Color primary) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 7),
-      child: Row(children: [
-        SizedBox(
-          width: 52,
-          child: Text(p.time,
-              style:
-                  const TextStyle(fontWeight: FontWeight.w600, fontSize: 15)),
-        ),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
-          decoration: BoxDecoration(
-            color: primary.withAlpha(30),
-            borderRadius: BorderRadius.circular(20),
-          ),
-          child: Text(p.line,
-              style: TextStyle(
-                  fontWeight: FontWeight.bold, fontSize: 13, color: primary)),
-        ),
-        const SizedBox(width: 10),
-        Expanded(
-          child: Text(p.destination,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(fontSize: 13, color: Colors.black87)),
-        ),
-      ]),
-    );
-  }
-
   static String _formatTime(TimeOfDay t) =>
       '${t.hour}:${t.minute.toString().padLeft(2, '0')}';
+}
+
+class _HourHeader extends StatelessWidget {
+  const _HourHeader(this.hour);
+
+  final int hour;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      header: true,
+      label: 'Las $hour',
+      excludeSemantics: true,
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 6),
+        decoration: const BoxDecoration(
+          color: TimbreColors.tinta,
+          border: Border(bottom: BorderSide(color: TimbreColors.lineaNoche)),
+        ),
+        child: Text('$hour h',
+            style: const TextStyle(
+                fontFamily: TimbreFonts.firaCondensed,
+                fontWeight: FontWeight.w800,
+                fontSize: 20,
+                color: TimbreColors.ambar)),
+      ),
+    );
+  }
+}
+
+class _PassRow extends StatelessWidget {
+  const _PassRow(this.pass);
+
+  final ScheduledPass pass;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = pass;
+    return Semantics(
+      label: '${p.time}, línea ${p.line} a ${spokenName(p.destination)}',
+      excludeSemantics: true,
+      child: Container(
+        // Grows with the system font size instead of cutting the time
+        constraints: const BoxConstraints(minHeight: TimbreSpace.touch),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+        decoration: const BoxDecoration(
+          border: Border(bottom: BorderSide(color: TimbreColors.lineaNoche)),
+        ),
+        child: Row(children: [
+          // Fits "23:55" at the default size; scales down rather than
+          // wrapping with the largest fonts
+          SizedBox(
+              width: 56,
+              child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerLeft,
+                  child: Text(p.time, style: _SchedulePageState._time21))),
+          const SizedBox(width: 10),
+          LineBadge(p.line, live: false, compact: true),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(p.destination,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                    fontFamily: TimbreFonts.firaCondensed,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 17,
+                    color: TimbreColors.papel)),
+          ),
+        ]),
+      ),
+    );
+  }
 }

@@ -17,7 +17,7 @@
          Google Play restricts it to alarm/calendar apps -->
 
     <application
-        android:label="MVD Transporte"
+        android:label="Timbre MVD"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher"
         android:usesCleartextTraffic="false">
@@ -59,6 +59,12 @@
             android:name="com.pravera.flutter_foreground_task.service.ForegroundService"
             android:foregroundServiceType="dataSync"
             android:exported="false"/>
+
+        <!-- Status bar icon of the "Estoy esperando" notification
+             (NotificationIcon in BusWaitService) -->
+        <meta-data
+            android:name="com.liberontech.stmapp.NOTIFICATION_ICON"
+            android:resource="@drawable/ic_stat_timbre" />
 
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->

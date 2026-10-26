@@ -8,8 +8,11 @@ import '../services/cache_service.dart';
 import '../services/notification_service.dart';
 import '../services/official_sites.dart';
 import 'info_page.dart';
+import 'lock_screen.dart';
 import 'services_page.dart';
 import 'stops_page.dart';
+import 'widgets/pixel_icon.dart';
+import 'widgets/timbre_app_bar.dart';
 
 // ---------------------------------------------------------------------------
 // Tab model — single source of truth for navigation structure
@@ -17,13 +20,15 @@ import 'stops_page.dart';
 
 class _TabDef {
   final String label;
-  final IconData icon;
-  final IconData selectedIcon;
+  final PixelGlyph icon;
+
+  /// Line under the page title in the header.
+  final String? subtitle;
 
   const _TabDef({
     required this.label,
     required this.icon,
-    required this.selectedIcon,
+    this.subtitle,
   });
 }
 
@@ -70,13 +75,12 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   static const List<_TabDef> _tabs = [
     _TabDef(
       label: 'Mis paradas',
-      icon: Icons.directions_bus_outlined,
-      selectedIcon: Icons.directions_bus,
+      icon: PixelGlyphs.bus,
     ),
     _TabDef(
       label: 'Servicios',
-      icon: Icons.apps_outlined,
-      selectedIcon: Icons.apps,
+      icon: PixelGlyphs.grid,
+      subtitle: 'Sitios oficiales, en tu navegador',
     ),
   ];
 
@@ -164,7 +168,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       }
 
       final ok = await _localAuth.authenticate(
-        localizedReason: 'Autentícate para acceder a MVD Transporte',
+        localizedReason: 'Autenticate para acceder a Timbre MVD',
         options: const AuthenticationOptions(
           stickyAuth: true,
           biometricOnly: false,
@@ -205,7 +209,6 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
           ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
             content:
                 Text('Tu dispositivo no soporta autenticación biométrica'),
-            backgroundColor: Colors.red,
           ));
         }
         return _biometricLockEnabled;
@@ -238,7 +241,6 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
         content: Text(value
             ? 'Bloqueo biométrico activado'
             : 'Bloqueo biométrico desactivado'),
-        backgroundColor: value ? Colors.green : Colors.orange,
       ));
     }
     return value;
@@ -252,7 +254,6 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     if (!opened && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
         content: Text('No se pudo abrir el navegador'),
-        backgroundColor: Colors.red,
       ));
     }
   }
@@ -283,21 +284,13 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     }
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text(
-          _tabs[_currentIndex].label,
-          style: const TextStyle(
-            fontWeight: FontWeight.w600,
-            fontSize: 20,
-          ),
-        ),
-        centerTitle: true,
-        backgroundColor: Theme.of(context).primaryColor,
-        foregroundColor: Colors.white,
-        elevation: 0,
+      appBar: buildTimbreAppBar(
+        context,
+        title: _tabs[_currentIndex].label,
+        subtitle: _tabs[_currentIndex].subtitle,
         actions: [
           IconButton(
-            icon: const Icon(Icons.info_outline),
+            icon: const PixelIcon(PixelGlyphs.info),
             tooltip: 'Info',
             onPressed: _openInfoPage,
           ),
@@ -320,8 +313,9 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
             setState(() => _currentIndex = index),
         destinations: _tabs
             .map((tab) => NavigationDestination(
-                  icon: Icon(tab.icon),
-                  selectedIcon: Icon(tab.selectedIcon),
+                  icon: PixelIcon(tab.icon),
+                  // The selected tab is lit
+                  selectedIcon: PixelIcon(tab.icon, glow: true),
                   label: tab.label,
                 ))
             .toList(),
@@ -329,62 +323,6 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     );
   }
 
-  Widget _buildLockScreen() {
-    final primary = Theme.of(context).primaryColor;
-    return Scaffold(
-      body: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [primary, primary.withAlpha((0.7 * 255).toInt())],
-          ),
-        ),
-        child: SafeArea(
-          child: Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Icon(Icons.lock_outline, size: 100, color: Colors.white),
-                const SizedBox(height: 32),
-                const Text(
-                  'MVD Transporte',
-                  style: TextStyle(
-                    fontSize: 28,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                  ),
-                ),
-                const SizedBox(height: 16),
-                const Text(
-                  'Aplicación bloqueada',
-                  style: TextStyle(fontSize: 18, color: Colors.white70),
-                ),
-                const SizedBox(height: 48),
-                ElevatedButton.icon(
-                  onPressed: _authenticate,
-                  icon: const Icon(Icons.fingerprint, size: 28),
-                  label: const Text(
-                    'Desbloquear',
-                    style: TextStyle(fontSize: 18),
-                  ),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.white,
-                    foregroundColor: primary,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 32,
-                      vertical: 16,
-                    ),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(30),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
+  /// The LED board with the lock; the button opens the system prompt.
+  Widget _buildLockScreen() => LockScreen(onUnlock: _authenticate);
 }

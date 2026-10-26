@@ -17,6 +17,10 @@ import 'package:stm_app/services/bus_wait_service.dart';
 import 'package:stm_app/services/cache_service.dart';
 import 'package:stm_app/services/mvd_api_service.dart';
 import 'package:stm_app/ui/stops_page.dart';
+import 'package:stm_app/ui/theme/timbre_text.dart';
+import 'package:stm_app/ui/theme/timbre_theme.dart';
+import 'package:stm_app/ui/widgets/cartel.dart';
+import 'package:stm_app/ui/widgets/pixel_icon.dart';
 
 const _lineas574 =
     '{"descripcion":"SAN JOSE y ANDES","lineas":[{"descripcion":"116","codigo":38},'
@@ -42,7 +46,14 @@ void main() {
   });
 
   Widget app() => MaterialApp(
+      theme: buildTimbreTheme(),
       home: StopsPage(onOpenStopInComoIr: opened.add));
+
+  // Live minutes in lit digits, and the comfort marks of a row
+  Finder liveMinutes(int m) =>
+      find.byWidgetPredicate((w) => w is MinutosEnVivo && w.minutes == m);
+  Finder mark(String label) => find.byWidgetPredicate(
+      (w) => w is PixelIcon && w.semanticLabel == label);
 
   setUpAll(() async {
     hiveDir = await Directory.systemTemp.createTemp('mvd_stops_test');
@@ -66,7 +77,7 @@ void main() {
       (tester) async {
     await http.runWithClient(() async {
       await tester.pumpWidget(app());
-      await tester.tap(find.byIcon(Icons.add));
+      await tester.tap(find.byTooltip('Agregar parada'));
       await tester.pumpAndSettle();
 
       expect(find.text('Agregar parada'), findsWidgets);
@@ -85,6 +96,11 @@ void main() {
       expect(find.text('ANDES y AV 18 DE JULIO'), findsOneWidget);
       expect(find.textContaining('#5109 · 48 m · 124, 124 SD, 125'),
           findsOneWidget);
+      // In the app font, not the platform one
+      final details = tester.widget<RichText>(find.descendant(
+          of: find.textContaining('#5109 · 48 m'),
+          matching: find.byType(RichText)));
+      expect(details.text.style?.fontFamily, TimbreFonts.fira);
       expect(find.text('SAN JOSE y ANDES'), findsOneWidget);
 
       await tester.tap(find.text('SAN JOSE y ANDES'));
@@ -146,7 +162,7 @@ void main() {
     await http.runWithClient(() async {
       await tester.pumpWidget(app());
       await tester.pump();
-      expect(find.text('7 min'), findsOneWidget);
+      expect(liveMinutes(7), findsOneWidget);
       final initial = etaRequests.length;
 
       minutes = 6;
@@ -156,7 +172,7 @@ void main() {
       await tester.pump(const Duration(seconds: 1));
       await tester.pump();
       expect(etaRequests.length, initial + 1);
-      expect(find.text('6 min'), findsOneWidget);
+      expect(liveMinutes(6), findsOneWidget);
 
       // A system dialog (inactive) keeps the timer, no extra request
       lifecycle([AppLifecycleState.inactive, AppLifecycleState.resumed]);
@@ -181,7 +197,7 @@ void main() {
       ]);
       await tester.pump();
       expect(etaRequests.length, initial + 2);
-      expect(find.text('3 min'), findsOneWidget);
+      expect(liveMinutes(3), findsOneWidget);
       await tester.pump(StopsPage.autoRefreshInterval);
       expect(etaRequests.length, initial + 3);
     }, () => etaClient);
@@ -203,29 +219,31 @@ void main() {
     await tester.pump();
 
     await http.runWithClient(() async {
+      final handle = tester.ensureSemantics();
       await tester.pumpWidget(app());
       await tester.pump();
 
       expect(find.text('121'), findsOneWidget);
-      expect(find.byIcon(Icons.ac_unit), findsNWidgets(3));
-      expect(find.byIcon(Icons.electric_bolt), findsOneWidget);
-      // Screen readers say what the icons mean
+      // Three buses per card, the rest on request
+      expect(find.text('116'), findsNothing);
+      await tester.tap(find.text('Ver las 6'));
+      await tester.pump();
+      expect(find.text('116'), findsOneWidget);
+      expect(mark('Aire acondicionado'), findsNWidgets(3));
+      expect(mark('Cero emisiones'), findsOneWidget);
+      // Screen readers hear the whole row, marks included
       expect(
-          tester
-              .widgetList<Icon>(find.byIcon(Icons.ac_unit))
-              .map((i) => i.semanticLabel),
-          everyElement('Aire acondicionado'));
-      expect(
-          tester.widget<Icon>(find.byIcon(Icons.electric_bolt)).semanticLabel,
-          'Cero emisiones');
-
-      // The zero-emission icon is on the 121 chip
-      final chip121 = find.ancestor(
-          of: find.text('121'), matching: find.byType(InkWell));
-      expect(
-          find.descendant(
-              of: chip121, matching: find.byIcon(Icons.electric_bolt)),
+          find.bySemanticsLabel(RegExp(
+              r'^Línea 121 a Punta Carretas, .*con GPS.*, '
+              r'aire acondicionado, cero emisiones$')),
           findsOneWidget);
+
+      // The zero-emission mark is on the 121 row
+      final row121 = find.ancestor(
+          of: find.text('121'), matching: find.byType(InkWell));
+      expect(find.descendant(of: row121, matching: mark('Cero emisiones')),
+          findsOneWidget);
+      handle.dispose();
     }, () => proxyClient);
   });
 
@@ -256,7 +274,8 @@ void main() {
 
     Finder bell(String line) => find.descendant(
         of: find.widgetWithText(InkWell, line),
-        matching: find.byIcon(Icons.notifications_active));
+        matching: find.byWidgetPredicate(
+            (w) => w is PixelIcon && w.glyph == PixelGlyphs.bellRing));
 
     await http.runWithClient(() async {
       await tester.pumpWidget(app());
@@ -274,8 +293,15 @@ void main() {
 
       await tester.tap(find.text('116'));
       await tester.pumpAndSettle();
-      expect(find.text('116 → POCITOS'), findsOneWidget);
-      expect(find.text('Llega en 9 min · SAN JOSE y ANDES'), findsOneWidget);
+      // The followed bus on its LED strip, with the stop under it
+      expect(
+          find.byWidgetPredicate((w) =>
+              w is CartelTira &&
+              w.line == '116' &&
+              w.destination == 'POCITOS' &&
+              w.etaMinutes == 9),
+          findsOneWidget);
+      expect(find.text('SAN JOSE y ANDES · con GPS'), findsOneWidget);
       await tester.tap(find.text('3 min'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Avisarme cuando llegue'));
@@ -304,7 +330,7 @@ void main() {
     geolocator.answer = LocationPermission.deniedForever;
     await http.runWithClient(() async {
       await tester.pumpWidget(app());
-      await tester.tap(find.byIcon(Icons.add));
+      await tester.tap(find.byTooltip('Agregar parada'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Paradas cercanas'));
       await tester.pumpAndSettle();

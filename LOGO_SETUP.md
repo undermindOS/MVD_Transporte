@@ -1,5 +1,9 @@
 # Adding App Icon to MVD Transporte
 
+> **Outdated.** The app is Timbre MVD now, and its icon and splash are the
+> night board (amber bus on ink), not blue and white. The current files,
+> colors and commands are in [assets/README.md](assets/README.md).
+
 ## 📱 Easy Method: Using flutter_launcher_icons
 
 This is the **recommended and easiest** way to add your icon to the app.
