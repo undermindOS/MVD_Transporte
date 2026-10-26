@@ -98,11 +98,13 @@ flutter:
   # the material Icons class.
   uses-material-design: true
 
-  # Font licenses, shown in the app's license page (SIL OFL 1.1)
+  # Licenses of bundled fonts (SIL OFL 1.1) and pixel icons (MIT), shown
+  # in the app's license page
   assets:
     - assets/fonts/OFL-FiraSans.txt
     - assets/fonts/OFL-FiraSansExtraCondensed.txt
     - assets/fonts/OFL-Doto.txt
+    - assets/licenses/MIT-pixelarticons.txt
 
   # Timbre MVD typefaces, bundled (no runtime download): Latin subsets of
   # Fira Sans, Fira Sans Extra Condensed and a static Black instance of Doto

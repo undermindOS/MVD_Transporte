@@ -7,6 +7,7 @@ import 'theme/timbre_text.dart';
 import 'theme/timbre_tokens.dart';
 import 'widgets/empty_state.dart';
 import 'widgets/line_badge.dart';
+import 'widgets/pixel_icon.dart';
 import 'widgets/segmented.dart';
 import 'widgets/timbre_app_bar.dart';
 
@@ -42,7 +43,7 @@ class _SchedulePageState extends State<SchedulePage> {
     fontFamily: TimbreFonts.firaCondensed,
     fontWeight: FontWeight.w700,
     fontSize: 21,
-    color: TimbreColors.tinta,
+    color: TimbreColors.papel,
     fontFeatures: [FontFeature.tabularFigures()],
   );
 
@@ -51,7 +52,7 @@ class _SchedulePageState extends State<SchedulePage> {
     fontWeight: FontWeight.w700,
     fontSize: 17,
     height: 1.2,
-    color: TimbreColors.sobreAzulSuave,
+    color: TimbreColors.etiquetaCartel,
   );
 
   @override
@@ -99,7 +100,7 @@ class _SchedulePageState extends State<SchedulePage> {
     final stop = widget.stop;
 
     return Scaffold(
-      backgroundColor: TimbreColors.blanco,
+      backgroundColor: TimbreColors.noche,
       // The identity bar of the tabs; a long stop name is cut, the stop
       // number never is
       appBar: buildTimbreAppBar(
@@ -117,8 +118,8 @@ class _SchedulePageState extends State<SchedulePage> {
           Container(
             padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
             decoration: const BoxDecoration(
-              color: TimbreColors.blanco,
-              border: Border(bottom: BorderSide(color: TimbreColors.borde)),
+              color: TimbreColors.noche,
+              border: Border(bottom: BorderSide(color: TimbreColors.lineaNoche)),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -137,14 +138,14 @@ class _SchedulePageState extends State<SchedulePage> {
                 Row(children: [
                   OutlinedButton.icon(
                     onPressed: _pickTime,
-                    icon: const Icon(Icons.access_time, size: 18),
+                    icon: const PixelIcon(PixelGlyphs.clock, size: 18),
                     label: Text('Desde ${_formatTime(_time)}'),
                     style: OutlinedButton.styleFrom(
-                      foregroundColor: TimbreColors.azul,
+                      foregroundColor: TimbreColors.ambar,
                       minimumSize: const Size(0, TimbreSpace.touch),
                       padding: const EdgeInsets.fromLTRB(12, 0, 14, 0),
                       side: const BorderSide(
-                          color: TimbreColors.azul, width: 1.5),
+                          color: TimbreColors.ambarTenue, width: 1.5),
                       shape: const StadiumBorder(),
                       textStyle: const TextStyle(
                           fontFamily: TimbreFonts.fira,
@@ -156,7 +157,7 @@ class _SchedulePageState extends State<SchedulePage> {
                   const Expanded(
                     child: Text('Horarios teóricos, sin ubicación GPS',
                         style: TextStyle(
-                            color: TimbreColors.grisTexto,
+                            color: TimbreColors.etiquetaCartel,
                             fontSize: 13,
                             height: 1.35)),
                   ),
@@ -178,11 +179,12 @@ class _SchedulePageState extends State<SchedulePage> {
     if (_failed) {
       return Center(
         child: Column(mainAxisSize: MainAxisSize.min, children: [
-          const Icon(Icons.cloud_off, size: 28, color: TimbreColors.aviso),
+          const PixelIcon(PixelGlyphs.warning,
+              size: 28, color: TimbreColors.ambar),
           const SizedBox(height: 8),
           const Text('No se pudo cargar el horario',
               style: TextStyle(
-                  color: TimbreColors.tinta,
+                  color: TimbreColors.papel,
                   fontSize: 15,
                   fontWeight: FontWeight.w600)),
           const SizedBox(height: 4),
@@ -210,7 +212,7 @@ class _SchedulePageState extends State<SchedulePage> {
           padding: EdgeInsets.fromLTRB(16, 14, 16, 6),
           child: Text('Después de medianoche',
               style: TextStyle(
-                  color: TimbreColors.grisTexto,
+                  color: TimbreColors.etiquetaCartel,
                   fontSize: 13,
                   fontWeight: FontWeight.w600)),
         ));
@@ -244,15 +246,15 @@ class _HourHeader extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 6),
         decoration: const BoxDecoration(
-          color: Color(0xFFF6F8FC),
-          border: Border(bottom: BorderSide(color: TimbreColors.separador)),
+          color: TimbreColors.tinta,
+          border: Border(bottom: BorderSide(color: TimbreColors.lineaNoche)),
         ),
         child: Text('$hour h',
             style: const TextStyle(
                 fontFamily: TimbreFonts.firaCondensed,
                 fontWeight: FontWeight.w800,
                 fontSize: 20,
-                color: TimbreColors.azul)),
+                color: TimbreColors.ambar)),
       ),
     );
   }
@@ -274,7 +276,7 @@ class _PassRow extends StatelessWidget {
         constraints: const BoxConstraints(minHeight: TimbreSpace.touch),
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
         decoration: const BoxDecoration(
-          border: Border(bottom: BorderSide(color: TimbreColors.niebla)),
+          border: Border(bottom: BorderSide(color: TimbreColors.lineaNoche)),
         ),
         child: Row(children: [
           // Fits "23:55" at the default size; scales down rather than
@@ -296,7 +298,7 @@ class _PassRow extends StatelessWidget {
                     fontFamily: TimbreFonts.firaCondensed,
                     fontWeight: FontWeight.w600,
                     fontSize: 17,
-                    color: TimbreColors.tinta)),
+                    color: TimbreColors.papel)),
           ),
         ]),
       ),

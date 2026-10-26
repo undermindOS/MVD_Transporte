@@ -6,6 +6,7 @@ import 'theme/timbre_text.dart';
 import 'theme/timbre_tokens.dart';
 import 'widgets/empty_state.dart';
 import 'widgets/led_matrix.dart';
+import 'widgets/pixel_icon.dart';
 
 /// Official transport news (detours, line changes), newest first.
 class NewsList extends StatelessWidget {
@@ -30,7 +31,7 @@ class NewsList extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ColoredBox(
-      color: TimbreColors.blanco,
+      color: TimbreColors.noche,
       child: RefreshIndicator(
         onRefresh: onRefresh,
         // A lit dot on the plate while it reloads
@@ -62,7 +63,7 @@ class NewsList extends StatelessWidget {
                 padding: EdgeInsets.fromLTRB(16, 14, 16, 0),
                 child: Text(
                   'Publicadas por la Intendencia de Montevideo (Cómo Ir).',
-                  style: TextStyle(color: TimbreColors.grisTexto, fontSize: 12),
+                  style: TextStyle(color: TimbreColors.tenue, fontSize: 12),
                 ),
               ),
           ],
@@ -81,18 +82,19 @@ class _FailedBanner extends StatelessWidget {
       margin: const EdgeInsets.fromLTRB(12, 12, 12, 4),
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: BoxDecoration(
-        color: TimbreColors.avisoFondo,
+        color: TimbreColors.avisoNoche,
+        border: Border.all(color: TimbreColors.ambarTenue),
         borderRadius: BorderRadius.circular(TimbreRadii.control),
       ),
       child: const Row(
         children: [
-          Icon(Icons.cloud_off, size: 20, color: TimbreColors.aviso),
+          PixelIcon(PixelGlyphs.warning, size: 20, color: TimbreColors.ambar),
           SizedBox(width: 10),
           Expanded(
             child: Text(
               'No se pudo actualizar. Deslizá para reintentar',
               style: TextStyle(
-                color: TimbreColors.aviso,
+                color: TimbreColors.ambar,
                 fontSize: 14,
                 fontWeight: FontWeight.w600,
               ),
@@ -114,13 +116,14 @@ class _NewsRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final n = news;
     return Material(
-      color: isNew ? const Color(0xFFF6F8FC) : TimbreColors.blanco,
+      // Unread rows are lifted from the board
+      color: isNew ? TimbreColors.tinta : TimbreColors.noche,
       child: InkWell(
         onTap: () => showNewsDetail(context, n),
         child: Container(
           padding: const EdgeInsets.all(16),
           decoration: const BoxDecoration(
-            border: Border(bottom: BorderSide(color: TimbreColors.separador)),
+            border: Border(bottom: BorderSide(color: TimbreColors.lineaNoche)),
           ),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -138,7 +141,7 @@ class _NewsRow extends StatelessWidget {
                           fontSize: 12,
                           fontWeight: FontWeight.w700,
                           letterSpacing: 0.72,
-                          color: TimbreColors.azul,
+                          color: TimbreColors.ambar,
                         ),
                       ),
                       const SizedBox(height: 4),
@@ -149,7 +152,7 @@ class _NewsRow extends StatelessWidget {
                         fontSize: 17,
                         height: 1.25,
                         fontWeight: isNew ? FontWeight.w700 : FontWeight.w600,
-                        color: TimbreColors.tinta,
+                        color: TimbreColors.papel,
                       ),
                     ),
                     if (n.summary.isNotEmpty) ...[
@@ -159,7 +162,7 @@ class _NewsRow extends StatelessWidget {
                         style: const TextStyle(
                           fontSize: 14,
                           height: 1.4,
-                          color: TimbreColors.grisTexto,
+                          color: TimbreColors.etiquetaCartel,
                         ),
                       ),
                     ],
@@ -200,7 +203,7 @@ class _DateTile extends StatelessWidget {
     fontWeight: FontWeight.w800,
     fontSize: 26,
     height: 1,
-    color: TimbreColors.tinta,
+    color: TimbreColors.etiquetaCartel,
   );
   static final _ledDay = TimbreText.cartel(24);
 
@@ -228,10 +231,10 @@ class _DateTile extends StatelessWidget {
         width: 52,
         height: 56,
         decoration: BoxDecoration(
-          color: filled ? TimbreColors.tinta : TimbreColors.blanco,
+          // Unread: an inset LED display; read: an empty frame
+          color: filled ? TimbreColors.noche : null,
           borderRadius: BorderRadius.circular(10),
-          border:
-              filled ? null : Border.all(color: TimbreColors.linea, width: 1.5),
+          border: Border.all(color: TimbreColors.lineaNoche, width: 1.5),
         ),
         clipBehavior: Clip.antiAlias,
         child: Stack(alignment: Alignment.center, children: [
@@ -263,7 +266,7 @@ class _DateTile extends StatelessWidget {
                       letterSpacing: 0.96,
                       color: filled
                           ? TimbreColors.etiquetaCartel
-                          : TimbreColors.grisTexto,
+                          : TimbreColors.tenue,
                     ),
                   ),
                 ],
@@ -296,20 +299,21 @@ Future<void> showNewsDetail(BuildContext context, TransportNews n) {
               fontSize: 20,
               height: 1.25,
               fontWeight: FontWeight.w700,
-              color: TimbreColors.tinta,
+              color: TimbreColors.papel,
             ),
           ),
           const SizedBox(height: 6),
           Text(
             formatNewsDate(n.date),
-            style: const TextStyle(color: TimbreColors.grisTexto, fontSize: 13),
+            style: const TextStyle(
+                color: TimbreColors.etiquetaCartel, fontSize: 13),
           ),
           const SizedBox(height: 14),
           DefaultTextStyle.merge(
             style: const TextStyle(
               fontSize: 15,
               height: 1.5,
-              color: TimbreColors.tinta,
+              color: TimbreColors.papel,
             ),
             child: SafeHtml(n.body.trim().isNotEmpty ? n.body : n.summary),
           ),
@@ -319,7 +323,7 @@ Future<void> showNewsDetail(BuildContext context, TransportNews n) {
               alignment: Alignment.centerLeft,
               child: FilledButton.icon(
                 onPressed: () => openExternalLink(ctx, n.link!),
-                icon: const Icon(Icons.open_in_new, size: 18),
+                icon: const PixelIcon(PixelGlyphs.external, size: 18),
                 label: const Text('Ver más'),
               ),
             ),

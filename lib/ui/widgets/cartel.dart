@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../spoken_text.dart';
 import '../theme/timbre_text.dart';
 import '../theme/timbre_tokens.dart';
+import 'pixel_icon.dart';
 import 'timbre_bus.dart';
 
 // The "cartel": an amber dot-matrix LED display on ink, like the
@@ -69,29 +70,28 @@ class CartelCompacto extends StatelessWidget {
   }
 }
 
-/// "Live" mark (GPS): a dot with a soft halo. Blue on white, amber
-/// inside the cartel.
+/// "Live" mark (GPS): one lit pixel with its glow.
 class LiveDot extends StatelessWidget {
-  const LiveDot({super.key, this.color = TimbreColors.azul, this.size = 12});
+  const LiveDot({super.key, this.color = TimbreColors.ambar, this.size = 12});
 
   final Color color;
   final double size;
 
   @override
   Widget build(BuildContext context) {
-    final halo = color == TimbreColors.ambar ? 0.25 : 0.18;
     return SizedBox.square(
       dimension: size,
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          color: color.withValues(alpha: halo),
-        ),
-        child: Center(
-          child: SizedBox.square(
-            dimension: size * 0.5,
-            child: DecoratedBox(
-              decoration: BoxDecoration(shape: BoxShape.circle, color: color),
+      child: Center(
+        child: SizedBox.square(
+          dimension: size * 0.5,
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              color: color,
+              boxShadow: [
+                BoxShadow(
+                    color: color.withValues(alpha: 0.6),
+                    blurRadius: size * 0.45),
+              ],
             ),
           ),
         ),
@@ -100,8 +100,8 @@ class LiveDot extends StatelessWidget {
   }
 }
 
-/// "LLEGANDO" chip: the only moment a cartel enters a list
-/// (etaMinutes <= 0).
+/// "LLEGANDO" chip: the bus is at the stop (etaMinutes <= 0). The one
+/// state lit in full: amber plate, dark letters.
 class LlegandoChip extends StatelessWidget {
   const LlegandoChip({super.key, this.fontSize = 20});
 
@@ -114,14 +114,20 @@ class LlegandoChip extends StatelessWidget {
       child: ExcludeSemantics(
         child: DecoratedBox(
           decoration: BoxDecoration(
-            color: TimbreColors.tinta,
-            borderRadius: BorderRadius.circular(10),
+            color: TimbreColors.ambar,
+            borderRadius: BorderRadius.circular(8),
+            boxShadow: [
+              BoxShadow(
+                  color: TimbreColors.ambar.withValues(alpha: 0.35),
+                  blurRadius: 12),
+            ],
           ),
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
             child: Text(
               'LLEGANDO',
-              style: TimbreText.cartel(fontSize).copyWith(letterSpacing: 1),
+              style: TimbreText.cartel(fontSize, color: TimbreColors.tinta)
+                  .copyWith(letterSpacing: 1),
               maxLines: 1,
               softWrap: false,
             ),
@@ -132,7 +138,7 @@ class LlegandoChip extends StatelessWidget {
   }
 }
 
-/// Live (GPS) minutes in white lists: blue dot-matrix digits + "min".
+/// Live (GPS) minutes in lists: lit dot-matrix digits + "min".
 /// Timetable times must use [TimbreText.scheduleTime] instead.
 class MinutosEnVivo extends StatelessWidget {
   const MinutosEnVivo({super.key, required this.minutes, this.size = 30});
@@ -205,9 +211,9 @@ class CartelParada extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final amenities = <Widget>[
-      if (accessible) _amenity(Icons.accessible, 'Accesible'),
-      if (airConditioning) _amenity(Icons.ac_unit, 'Aire acondicionado'),
-      if (zeroEmission) _amenity(Icons.bolt, 'Cero emisiones'),
+      if (accessible) _amenity(PixelGlyphs.accessible, 'Accesible'),
+      if (airConditioning) _amenity(PixelGlyphs.snow, 'Aire acondicionado'),
+      if (zeroEmission) _amenity(PixelGlyphs.bolt, 'Cero emisiones'),
     ];
 
     return Semantics(
@@ -218,7 +224,10 @@ class CartelParada extends StatelessWidget {
       child: ExcludeSemantics(
         child: Material(
           color: TimbreColors.tinta,
-          borderRadius: BorderRadius.circular(TimbreRadii.card),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(TimbreRadii.card),
+            side: const BorderSide(color: TimbreColors.lineaNoche),
+          ),
           clipBehavior: Clip.antiAlias,
           child: InkWell(
             onTap: onTap,
@@ -316,19 +325,19 @@ class CartelParada extends StatelessWidget {
     );
   }
 
-  Widget _amenity(IconData icon, String label) => Padding(
+  Widget _amenity(PixelGlyph icon, String label) => Padding(
         padding: const EdgeInsets.only(top: 5),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 16, color: TimbreColors.sobreAzul),
+            PixelIcon(icon, size: 16, color: TimbreColors.etiquetaCartel),
             const SizedBox(width: 6),
             Text(
               label,
               style: const TextStyle(
                 fontFamily: TimbreFonts.fira,
                 fontSize: 13,
-                color: TimbreColors.sobreAzul,
+                color: TimbreColors.etiquetaCartel,
               ),
             ),
           ],
@@ -353,6 +362,18 @@ class CartelTira extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final arriving = etaMinutes <= 0;
+    final time = arriving
+        ? Text('LLEGANDO', style: TimbreText.cartel(22))
+        : Row(mainAxisSize: MainAxisSize.min, children: [
+            const LiveDot(color: TimbreColors.ambar),
+            const SizedBox(width: 6),
+            Text('$etaMinutes', style: TimbreText.cartel(34)),
+            const SizedBox(width: 4),
+            Text('min', style: TimbreText.cartel(19)),
+          ]);
+    // With large text the destination gets its own line under the line
+    // and the minutes, instead of being cut to nothing
+    final stacked = TimbreText.isLarge(context);
     return Semantics(
       label: '$line a ${spokenName(destination)}, '
           '${arriving ? 'llegando' : 'llega en ${_minutosLabel(etaMinutes)}'}'
@@ -362,35 +383,50 @@ class CartelTira extends StatelessWidget {
           decoration: BoxDecoration(
             color: TimbreColors.tinta,
             borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: TimbreColors.lineaNoche),
           ),
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                Text(line, style: TimbreText.cartel(26)),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    destination,
-                    style: TimbreText.cartel(22),
-                    maxLines: 1,
-                    softWrap: false,
-                    overflow: TextOverflow.ellipsis,
+            child: stacked
+                ? Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(children: [
+                        Text(line, style: TimbreText.cartel(26)),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Align(
+                            alignment: AlignmentDirectional.centerEnd,
+                            child: FittedBox(
+                                fit: BoxFit.scaleDown, child: time),
+                          ),
+                        ),
+                      ]),
+                      const SizedBox(height: 8),
+                      Text(destination,
+                          style: TimbreText.cartel(22),
+                          maxLines: 3,
+                          overflow: TextOverflow.ellipsis),
+                    ],
+                  )
+                : Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      Text(line, style: TimbreText.cartel(26)),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          destination,
+                          style: TimbreText.cartel(22),
+                          maxLines: 1,
+                          softWrap: false,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      time,
+                    ],
                   ),
-                ),
-                const SizedBox(width: 12),
-                if (arriving)
-                  Text('LLEGANDO', style: TimbreText.cartel(22))
-                else ...[
-                  const LiveDot(color: TimbreColors.ambar),
-                  const SizedBox(width: 6),
-                  Text('$etaMinutes', style: TimbreText.cartel(34)),
-                  const SizedBox(width: 4),
-                  Text('min', style: TimbreText.cartel(19)),
-                ],
-              ],
-            ),
           ),
         ),
       ),

@@ -1,149 +1,193 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../widgets/pixel_icon.dart';
 import 'timbre_text.dart';
 import 'timbre_tokens.dart';
 
-/// Material 3 theme for Timbre MVD: white and flag blue, Fira everywhere.
-/// The LED amber is not part of the color scheme on purpose: it is used
-/// only through the cartel widgets, never as a generic accent.
+/// Material 3 theme for Timbre MVD: a night LED board. Ink panels on
+/// [TimbreColors.noche], text in [TimbreColors.papel], the amber lit where
+/// something matters (the main action, the selection, live data). Fira for
+/// reading, Doto for signs.
 ThemeData buildTimbreTheme() {
   const scheme = ColorScheme(
-    brightness: Brightness.light,
-    primary: TimbreColors.azul,
-    onPrimary: TimbreColors.blanco,
-    primaryContainer: TimbreColors.celeste,
-    onPrimaryContainer: TimbreColors.azul,
-    secondary: TimbreColors.azulNoche,
-    onSecondary: TimbreColors.blanco,
-    secondaryContainer: TimbreColors.celeste,
-    onSecondaryContainer: TimbreColors.tinta,
-    tertiary: TimbreColors.tinta,
-    onTertiary: TimbreColors.blanco,
-    error: Color(0xFFB3261E),
-    onError: TimbreColors.blanco,
-    surface: TimbreColors.blanco,
-    onSurface: TimbreColors.tinta,
-    onSurfaceVariant: TimbreColors.grisTexto,
-    surfaceContainerLowest: TimbreColors.blanco,
-    surfaceContainerLow: TimbreColors.blanco,
-    surfaceContainer: TimbreColors.niebla,
-    surfaceContainerHigh: TimbreColors.niebla,
-    surfaceContainerHighest: TimbreColors.celeste,
-    outline: TimbreColors.anillo,
-    outlineVariant: TimbreColors.linea,
-    inverseSurface: TimbreColors.tinta,
-    onInverseSurface: TimbreColors.blanco,
-    inversePrimary: TimbreColors.sobreAzul,
-    shadow: Color(0x1F0A1A3A),
-    scrim: Color(0x8C0A1A3A),
+    brightness: Brightness.dark,
+    primary: TimbreColors.ambar,
+    onPrimary: TimbreColors.tinta,
+    primaryContainer: TimbreColors.tintaAlta,
+    onPrimaryContainer: TimbreColors.ambar,
+    secondary: TimbreColors.etiquetaCartel,
+    onSecondary: TimbreColors.noche,
+    secondaryContainer: TimbreColors.tintaAlta,
+    onSecondaryContainer: TimbreColors.papel,
+    tertiary: TimbreColors.ambarTenue,
+    onTertiary: TimbreColors.noche,
+    error: TimbreColors.rojoLed,
+    onError: TimbreColors.noche,
+    surface: TimbreColors.tinta,
+    onSurface: TimbreColors.papel,
+    onSurfaceVariant: TimbreColors.etiquetaCartel,
+    surfaceContainerLowest: TimbreColors.noche,
+    surfaceContainerLow: TimbreColors.tinta,
+    surfaceContainer: TimbreColors.tinta,
+    surfaceContainerHigh: TimbreColors.tintaAlta,
+    surfaceContainerHighest: TimbreColors.tintaAlta,
+    outline: TimbreColors.lineaNoche,
+    outlineVariant: TimbreColors.lineaNoche,
+    inverseSurface: TimbreColors.papel,
+    onInverseSurface: TimbreColors.tinta,
+    inversePrimary: TimbreColors.ambarTenue,
+    shadow: Color(0xFF000000),
+    scrim: Color(0xB3000000),
     surfaceTint: Colors.transparent,
   );
 
   final base = ThemeData(
     useMaterial3: true,
     colorScheme: scheme,
+    // Legacy widgets read primaryColor: amber, like the scheme
+    primaryColor: TimbreColors.ambar,
     fontFamily: TimbreFonts.fira,
-    scaffoldBackgroundColor: TimbreColors.niebla,
+    scaffoldBackgroundColor: TimbreColors.noche,
+    canvasColor: TimbreColors.noche,
     splashFactory: InkRipple.splashFactory,
+    splashColor: TimbreColors.ambar.withValues(alpha: 0.16),
+    highlightColor: TimbreColors.ambar.withValues(alpha: 0.08),
   );
 
   final rounded = RoundedRectangleBorder(
     borderRadius: BorderRadius.circular(TimbreRadii.button),
   );
+  const boldFira = TextStyle(
+    fontFamily: TimbreFonts.fira,
+    fontWeight: FontWeight.w700,
+    fontSize: 16,
+  );
 
   return base.copyWith(
     textTheme: base.textTheme.apply(
       fontFamily: TimbreFonts.fira,
-      bodyColor: TimbreColors.tinta,
-      displayColor: TimbreColors.tinta,
+      bodyColor: TimbreColors.papel,
+      displayColor: TimbreColors.papel,
+    ),
+    iconTheme: const IconThemeData(color: TimbreColors.papel, size: 24),
+    // Back and close buttons in pixels, like the rest of the board
+    actionIconTheme: ActionIconThemeData(
+      backButtonIconBuilder: (_) => const PixelIcon(PixelGlyphs.back),
+      closeButtonIconBuilder: (_) => const PixelIcon(PixelGlyphs.close),
     ),
     appBarTheme: const AppBarTheme(
-      backgroundColor: TimbreColors.azul,
-      foregroundColor: TimbreColors.blanco,
+      backgroundColor: TimbreColors.noche,
+      foregroundColor: TimbreColors.papel,
       elevation: 0,
       scrolledUnderElevation: 0,
       centerTitle: false,
       titleSpacing: TimbreSpace.l,
-      systemOverlayStyle: SystemUiOverlayStyle.light,
+      systemOverlayStyle: SystemUiOverlayStyle(
+        statusBarColor: Colors.transparent,
+        statusBarIconBrightness: Brightness.light,
+        statusBarBrightness: Brightness.dark,
+        systemNavigationBarColor: TimbreColors.tinta,
+        systemNavigationBarIconBrightness: Brightness.light,
+      ),
+      iconTheme: IconThemeData(color: TimbreColors.papel, size: 24),
+      actionsIconTheme: IconThemeData(color: TimbreColors.papel, size: 24),
       titleTextStyle: TextStyle(
         fontFamily: TimbreFonts.fira,
         fontWeight: FontWeight.w700,
         fontSize: 19,
-        color: TimbreColors.blanco,
+        color: TimbreColors.papel,
       ),
     ),
     navigationBarTheme: NavigationBarThemeData(
-      backgroundColor: TimbreColors.blanco,
+      backgroundColor: TimbreColors.tinta,
       surfaceTintColor: Colors.transparent,
       elevation: 0,
       height: 72,
-      // The selected tab is a small lit plate, like the one in the header
-      indicatorColor: TimbreColors.tinta,
+      indicatorColor: TimbreColors.tintaAlta,
       labelTextStyle: WidgetStateProperty.resolveWith((states) {
         final selected = states.contains(WidgetState.selected);
         return TextStyle(
           fontFamily: TimbreFonts.fira,
           fontSize: 12,
           fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-          color: selected ? TimbreColors.tinta : TimbreColors.grisTexto,
+          color: selected ? TimbreColors.ambar : TimbreColors.tenue,
         );
       }),
+      // The selected tab is lit
       iconTheme: WidgetStateProperty.resolveWith((states) => IconThemeData(
+            size: 24,
             color: states.contains(WidgetState.selected)
                 ? TimbreColors.ambar
-                : TimbreColors.grisTexto,
+                : TimbreColors.tenue,
           )),
     ),
+    tabBarTheme: const TabBarThemeData(
+      labelColor: TimbreColors.ambar,
+      unselectedLabelColor: TimbreColors.tenue,
+      indicatorColor: TimbreColors.ambar,
+      dividerColor: TimbreColors.lineaNoche,
+      labelStyle: TextStyle(
+          fontFamily: TimbreFonts.fira,
+          fontWeight: FontWeight.w700,
+          fontSize: 13),
+      unselectedLabelStyle: TextStyle(
+          fontFamily: TimbreFonts.fira,
+          fontWeight: FontWeight.w500,
+          fontSize: 13),
+    ),
     cardTheme: CardThemeData(
-      color: TimbreColors.blanco,
+      color: TimbreColors.tinta,
       surfaceTintColor: Colors.transparent,
       elevation: 0,
       margin: EdgeInsets.zero,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(TimbreRadii.card),
-        side: const BorderSide(color: TimbreColors.borde),
+        side: const BorderSide(color: TimbreColors.lineaNoche),
       ),
     ),
+    // The main action is lit amber
     filledButtonTheme: FilledButtonThemeData(
       style: FilledButton.styleFrom(
-        backgroundColor: TimbreColors.azul,
-        foregroundColor: TimbreColors.blanco,
-        minimumSize: const Size(TimbreSpace.touch, 56),
+        backgroundColor: TimbreColors.ambar,
+        foregroundColor: TimbreColors.tinta,
+        disabledBackgroundColor: TimbreColors.tintaAlta,
+        disabledForegroundColor: TimbreColors.tenue,
+        minimumSize: const Size(TimbreSpace.touch, 52),
         shape: rounded,
-        textStyle: const TextStyle(
-          fontFamily: TimbreFonts.fira,
-          fontWeight: FontWeight.w700,
-          fontSize: 17,
-        ),
+        textStyle: boldFira.copyWith(fontSize: 17),
       ),
     ),
     elevatedButtonTheme: ElevatedButtonThemeData(
       style: ElevatedButton.styleFrom(
-        backgroundColor: TimbreColors.azul,
-        foregroundColor: TimbreColors.blanco,
+        backgroundColor: TimbreColors.ambar,
+        foregroundColor: TimbreColors.tinta,
         elevation: 0,
         minimumSize: const Size(TimbreSpace.touch, 48),
         shape: rounded,
+        textStyle: boldFira,
       ),
     ),
     outlinedButtonTheme: OutlinedButtonThemeData(
       style: OutlinedButton.styleFrom(
-        foregroundColor: TimbreColors.azul,
+        foregroundColor: TimbreColors.ambar,
         minimumSize: const Size(TimbreSpace.touch, 48),
-        side: const BorderSide(color: TimbreColors.linea),
+        side: const BorderSide(color: TimbreColors.ambarTenue, width: 1.5),
         shape: rounded,
+        textStyle: boldFira.copyWith(fontSize: 15),
       ),
     ),
     textButtonTheme: TextButtonThemeData(
       style: TextButton.styleFrom(
-        foregroundColor: TimbreColors.azul,
+        foregroundColor: TimbreColors.ambar,
         minimumSize: const Size(TimbreSpace.touch, TimbreSpace.touch),
-        textStyle: const TextStyle(
-          fontFamily: TimbreFonts.fira,
-          fontWeight: FontWeight.w700,
-          fontSize: 15,
-        ),
+        textStyle: boldFira.copyWith(fontSize: 15),
+      ),
+    ),
+    iconButtonTheme: IconButtonThemeData(
+      style: IconButton.styleFrom(
+        foregroundColor: TimbreColors.papel,
+        minimumSize: const Size(TimbreSpace.touch, TimbreSpace.touch),
       ),
     ),
     segmentedButtonTheme: SegmentedButtonThemeData(
@@ -151,35 +195,35 @@ ThemeData buildTimbreTheme() {
         minimumSize: const WidgetStatePropertyAll(Size(TimbreSpace.touch, 48)),
         backgroundColor: WidgetStateProperty.resolveWith((states) =>
             states.contains(WidgetState.selected)
-                ? TimbreColors.azul
-                : TimbreColors.niebla),
+                ? TimbreColors.ambar
+                : TimbreColors.tinta),
         foregroundColor: WidgetStateProperty.resolveWith((states) =>
             states.contains(WidgetState.selected)
-                ? TimbreColors.blanco
-                : TimbreColors.tinta),
-        side: const WidgetStatePropertyAll(BorderSide.none),
-        textStyle: const WidgetStatePropertyAll(TextStyle(
-          fontFamily: TimbreFonts.fira,
-          fontWeight: FontWeight.w700,
-          fontSize: 16,
-        )),
+                ? TimbreColors.tinta
+                : TimbreColors.papel),
+        side: const WidgetStatePropertyAll(
+            BorderSide(color: TimbreColors.lineaNoche)),
+        textStyle: const WidgetStatePropertyAll(boldFira),
       ),
     ),
-    // On = an amber LED lit on the ink
+    // On = a lit LED
     switchTheme: SwitchThemeData(
       thumbColor: WidgetStateProperty.resolveWith((states) =>
           states.contains(WidgetState.selected)
-              ? TimbreColors.ambar
-              : TimbreColors.blanco),
+              ? TimbreColors.tinta
+              : TimbreColors.tenue),
       trackColor: WidgetStateProperty.resolveWith((states) =>
           states.contains(WidgetState.selected)
-              ? TimbreColors.tinta
-              : TimbreColors.anillo),
-      trackOutlineColor: const WidgetStatePropertyAll(Colors.transparent),
+              ? TimbreColors.ambar
+              : TimbreColors.tintaAlta),
+      trackOutlineColor: WidgetStateProperty.resolveWith((states) =>
+          states.contains(WidgetState.selected)
+              ? Colors.transparent
+              : TimbreColors.lineaNoche),
     ),
     chipTheme: ChipThemeData(
-      backgroundColor: TimbreColors.niebla,
-      selectedColor: TimbreColors.celeste,
+      backgroundColor: TimbreColors.tintaAlta,
+      selectedColor: TimbreColors.ambar,
       side: BorderSide.none,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(999),
@@ -188,66 +232,116 @@ ThemeData buildTimbreTheme() {
         fontFamily: TimbreFonts.fira,
         fontWeight: FontWeight.w500,
         fontSize: 13,
-        color: TimbreColors.tinta,
+        color: TimbreColors.papel,
       ),
     ),
     dividerTheme: const DividerThemeData(
-      color: TimbreColors.separador,
+      color: TimbreColors.lineaNoche,
       thickness: 1,
       space: 1,
     ),
     bottomSheetTheme: const BottomSheetThemeData(
-      backgroundColor: TimbreColors.blanco,
+      backgroundColor: TimbreColors.tinta,
+      modalBackgroundColor: TimbreColors.tinta,
       surfaceTintColor: Colors.transparent,
       showDragHandle: true,
-      dragHandleColor: TimbreColors.linea,
+      dragHandleColor: TimbreColors.lineaNoche,
       shape: RoundedRectangleBorder(
         borderRadius:
             BorderRadius.vertical(top: Radius.circular(TimbreRadii.sheet)),
+        side: BorderSide(color: TimbreColors.lineaNoche),
+      ),
+    ),
+    dialogTheme: DialogThemeData(
+      backgroundColor: TimbreColors.tinta,
+      surfaceTintColor: Colors.transparent,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(TimbreRadii.sheet),
+        side: const BorderSide(color: TimbreColors.lineaNoche),
+      ),
+      titleTextStyle: const TextStyle(
+        fontFamily: TimbreFonts.fira,
+        fontWeight: FontWeight.w700,
+        fontSize: 20,
+        color: TimbreColors.papel,
+      ),
+      contentTextStyle: const TextStyle(
+        fontFamily: TimbreFonts.fira,
+        fontSize: 15,
+        color: TimbreColors.papel,
       ),
     ),
     inputDecorationTheme: InputDecorationTheme(
       filled: true,
-      fillColor: TimbreColors.blanco,
+      fillColor: TimbreColors.noche,
+      labelStyle: const TextStyle(color: TimbreColors.etiquetaCartel),
+      floatingLabelStyle: const TextStyle(color: TimbreColors.ambar),
+      hintStyle: const TextStyle(color: TimbreColors.tenue),
+      prefixIconColor: TimbreColors.etiquetaCartel,
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(TimbreRadii.control),
-        borderSide: const BorderSide(color: TimbreColors.linea),
+        borderSide: const BorderSide(color: TimbreColors.lineaNoche),
       ),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(TimbreRadii.control),
-        borderSide: const BorderSide(color: TimbreColors.linea),
+        borderSide: const BorderSide(color: TimbreColors.lineaNoche),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(TimbreRadii.control),
-        borderSide: const BorderSide(color: TimbreColors.azul, width: 2),
+        borderSide: const BorderSide(color: TimbreColors.ambar, width: 2),
       ),
     ),
+    textSelectionTheme: TextSelectionThemeData(
+      cursorColor: TimbreColors.ambar,
+      selectionColor: TimbreColors.ambar.withValues(alpha: 0.32),
+      selectionHandleColor: TimbreColors.ambar,
+    ),
     snackBarTheme: const SnackBarThemeData(
-      backgroundColor: TimbreColors.tinta,
+      backgroundColor: TimbreColors.tintaAlta,
       contentTextStyle: TextStyle(
         fontFamily: TimbreFonts.fira,
         fontSize: 15,
-        color: TimbreColors.blanco,
+        color: TimbreColors.papel,
       ),
       actionTextColor: TimbreColors.ambar,
       behavior: SnackBarBehavior.floating,
     ),
-    // The main action and the counters wear the plate: ink and amber
     floatingActionButtonTheme: const FloatingActionButtonThemeData(
-      backgroundColor: TimbreColors.tinta,
-      foregroundColor: TimbreColors.ambar,
+      backgroundColor: TimbreColors.ambar,
+      foregroundColor: TimbreColors.tinta,
+      elevation: 0,
+      focusElevation: 0,
+      hoverElevation: 0,
+      highlightElevation: 0,
     ),
+    // Counters are tiny lit plates
     badgeTheme: const BadgeThemeData(
-      backgroundColor: TimbreColors.tinta,
-      textColor: TimbreColors.ambar,
+      backgroundColor: TimbreColors.ambar,
+      textColor: TimbreColors.tinta,
     ),
     progressIndicatorTheme: const ProgressIndicatorThemeData(
-      color: TimbreColors.azul,
-      linearTrackColor: TimbreColors.celeste,
+      color: TimbreColors.ambar,
+      linearTrackColor: TimbreColors.lineaNoche,
+      refreshBackgroundColor: TimbreColors.tinta,
     ),
     listTileTheme: const ListTileThemeData(
-      iconColor: TimbreColors.azul,
-      textColor: TimbreColors.tinta,
+      iconColor: TimbreColors.ambar,
+      textColor: TimbreColors.papel,
+    ),
+    tooltipTheme: TooltipThemeData(
+      decoration: BoxDecoration(
+        color: TimbreColors.tintaAlta,
+        borderRadius: BorderRadius.circular(TimbreRadii.chip),
+      ),
+      textStyle: const TextStyle(
+        fontFamily: TimbreFonts.fira,
+        fontSize: 13,
+        color: TimbreColors.papel,
+      ),
+    ),
+    timePickerTheme: const TimePickerThemeData(
+      backgroundColor: TimbreColors.tinta,
+      dialHandColor: TimbreColors.ambar,
     ),
   );
 }

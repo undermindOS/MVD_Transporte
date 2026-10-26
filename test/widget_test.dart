@@ -18,7 +18,6 @@ import 'package:stm_app/models/bus_stop.dart';
 import 'package:stm_app/services/cache_service.dart';
 import 'package:stm_app/services/official_sites.dart';
 import 'package:stm_app/ui/lock_screen.dart';
-import 'package:stm_app/ui/theme/timbre_tokens.dart';
 
 import 'support/layout.dart';
 
@@ -55,23 +54,11 @@ void main() {
 
     expect(find.byType(NavigationBar), findsOneWidget);
     expect(find.byType(NavigationDestination), findsNWidgets(2));
-    expect(find.text('Mis paradas'), findsNWidgets(2)); // AppBar + nav label
+    expect(find.text('MIS PARADAS'), findsOneWidget); // the header sign
+    expect(find.text('Mis paradas'), findsOneWidget); // nav label
     expect(find.text('Servicios'), findsOneWidget);
-    expect(find.text('Sin paradas guardadas'), findsOneWidget);
-    expect(find.byIcon(Icons.info_outline), findsOneWidget);
-  });
-
-  testWidgets('Paradas / Rutas / Novedades sit on a white bar',
-      (WidgetTester tester) async {
-    // Their blue labels vanished on the blue app bar of the theme
-    await tester.pumpWidget(const MiTransporteMVDApp());
-    await tester.pump();
-
-    final bar =
-        find.ancestor(of: find.byType(TabBar), matching: find.byType(AppBar));
-    final material = tester.widget<Material>(
-        find.descendant(of: bar, matching: find.byType(Material)).first);
-    expect(material.color, TimbreColors.blanco);
+    expect(find.text('SIN PARADAS'), findsOneWidget);
+    expect(find.byTooltip('Info'), findsOneWidget);
   });
 
   testWidgets('Servicios lists the official sites',
@@ -84,7 +71,7 @@ void main() {
     await tester.tap(find.text('Servicios'));
     await tester.pump();
 
-    expect(find.text('Servicios'), findsNWidgets(2));
+    expect(find.text('SERVICIOS'), findsOneWidget);
     for (final title in ['Mi STM', 'Recarga', 'Cómo Ir', 'Avisos']) {
       expect(find.text(title), findsOneWidget);
     }

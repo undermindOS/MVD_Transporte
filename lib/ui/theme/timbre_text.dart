@@ -1,4 +1,4 @@
-import 'package:flutter/painting.dart';
+import 'package:flutter/widgets.dart';
 
 import 'timbre_tokens.dart';
 
@@ -10,8 +10,8 @@ abstract final class TimbreFonts {
   /// Numbers, line badges, destinations and stop names.
   static const firaCondensed = 'FiraSansExtraCondensed';
 
-  /// Dot-matrix LED face. Live bus data and the brand plate only, never
-  /// below [dotoMinSize].
+  /// Dot-matrix LED face: page titles, signs, the brand plate and live bus
+  /// data. Never below [dotoMinSize]; timetables never use it.
   static const doto = 'Doto';
 
   /// 19 px = 13 px letter height, the smallest size where the dots still
@@ -21,15 +21,26 @@ abstract final class TimbreFonts {
 
 /// Text styles shared by the rows, badges and the LED display.
 abstract final class TimbreText {
+  /// Text scale from which layouts stack (the time under the destination)
+  /// and tab bars scroll: 150 % and up, the largest Android sizes and the
+  /// iOS accessibility sizes.
+  static const largeFrom = 1.5;
+
+  /// Whether the user reads with [largeFrom] or bigger text.
+  static bool isLarge(BuildContext context) =>
+      MediaQuery.textScalerOf(context).scale(17) >= 17 * largeFrom;
+
   static const _tabular = [FontFeature.tabularFigures()];
 
-  /// Big white page title in the blue header ("Mis paradas").
+  /// Page title on the header board, lit like a destination sign
+  /// ("MIS PARADAS"): uppercase dot-matrix amber.
   static const pageTitle = TextStyle(
-    fontFamily: TimbreFonts.fira,
-    fontWeight: FontWeight.w700,
-    fontSize: 30,
+    fontFamily: TimbreFonts.doto,
+    fontWeight: FontWeight.w900,
+    fontSize: 28,
     height: 1.1,
-    color: TimbreColors.blanco,
+    letterSpacing: 1,
+    color: TimbreColors.ambar,
   );
 
   /// Uppercase section label ("DESPUÉS", "LÍNEAS EN ESTA PARADA").
@@ -38,16 +49,16 @@ abstract final class TimbreText {
     fontWeight: FontWeight.w700,
     fontSize: 12,
     letterSpacing: 1.44,
-    color: TimbreColors.grisTexto,
+    color: TimbreColors.etiquetaCartel,
   );
 
   /// Stop name in cards and headers.
   static const stopName = TextStyle(
     fontFamily: TimbreFonts.firaCondensed,
     fontWeight: FontWeight.w700,
-    fontSize: 21,
+    fontSize: 20,
     height: 1.1,
-    color: TimbreColors.tinta,
+    color: TimbreColors.papel,
   );
 
   /// Line number inside the badge (filled = GPS, outlined = timetable).
@@ -64,16 +75,16 @@ abstract final class TimbreText {
     fontWeight: FontWeight.w700,
     fontSize: 18,
     height: 1.05,
-    color: TimbreColors.tinta,
+    color: TimbreColors.papel,
   );
 
-  /// Live (GPS) minutes in white lists: dot-matrix digits in blue.
+  /// Live (GPS) minutes: lit dot-matrix digits.
   static TextStyle liveMinutes([double size = 30]) => TextStyle(
         fontFamily: TimbreFonts.doto,
         fontWeight: FontWeight.w900,
         fontSize: size < TimbreFonts.dotoMinSize ? TimbreFonts.dotoMinSize : size,
         height: 1,
-        color: TimbreColors.azul,
+        color: TimbreColors.ambar,
       );
 
   /// "min" next to [liveMinutes].
@@ -82,7 +93,7 @@ abstract final class TimbreText {
     fontWeight: FontWeight.w700,
     fontSize: 14,
     height: 1,
-    color: TimbreColors.azul,
+    color: TimbreColors.ambarTenue,
   );
 
   /// Timetable time ("20:17"): never a countdown, never dot-matrix.
@@ -91,7 +102,7 @@ abstract final class TimbreText {
     fontWeight: FontWeight.w600,
     fontSize: 22,
     height: 1,
-    color: TimbreColors.grisTexto,
+    color: TimbreColors.etiquetaCartel,
     fontFeatures: _tabular,
   );
 

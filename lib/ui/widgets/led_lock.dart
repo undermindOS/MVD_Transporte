@@ -192,11 +192,12 @@ class _LedLockPainter extends CustomPainter {
       }
     }
 
-    final dot = p * 0.74;
+    final dot = p * 0.8;
     Paint dots(Color color) => Paint()
       ..color = color
       ..strokeWidth = dot
-      ..strokeCap = StrokeCap.round;
+      // Square pixels, like the dot-matrix letters and the icons
+      ..strokeCap = StrokeCap.square;
 
     canvas.drawPoints(ui.PointMode.points, dim,
         dots(TimbreColors.ambar.withValues(alpha: 0.16)));

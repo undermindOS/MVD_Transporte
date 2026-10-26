@@ -29,17 +29,19 @@ void main() async {
   runApp(const MiTransporteMVDApp());
 }
 
-/// Fira and Doto ship inside the app (SIL OFL 1.1): their licenses show up
-/// in the system license page next to the packages.
+/// Fira and Doto (SIL OFL 1.1) and part of the pixel icons (pixelarticons,
+/// MIT) ship inside the app: their licenses show up in the system license
+/// page next to the packages.
 void _registerFontLicenses() {
   LicenseRegistry.addLicense(() async* {
-    for (final (family, file) in const [
-      ('Fira Sans', 'OFL-FiraSans.txt'),
-      ('Fira Sans Extra Condensed', 'OFL-FiraSansExtraCondensed.txt'),
-      ('Doto', 'OFL-Doto.txt'),
+    for (final (name, file) in const [
+      ('Fira Sans', 'fonts/OFL-FiraSans.txt'),
+      ('Fira Sans Extra Condensed', 'fonts/OFL-FiraSansExtraCondensed.txt'),
+      ('Doto', 'fonts/OFL-Doto.txt'),
+      ('pixelarticons', 'licenses/MIT-pixelarticons.txt'),
     ]) {
-      final text = await rootBundle.loadString('assets/fonts/$file');
-      yield LicenseEntryWithLineBreaks([family], text);
+      final text = await rootBundle.loadString('assets/$file');
+      yield LicenseEntryWithLineBreaks([name], text);
     }
   });
 }

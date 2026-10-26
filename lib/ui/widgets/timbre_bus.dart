@@ -113,19 +113,28 @@ class TimbreBus extends StatelessWidget {
 
 /// App icon: the white bus on a blue rounded square, as on the home screen.
 class TimbreAppIcon extends StatelessWidget {
-  const TimbreAppIcon({super.key, required this.size, this.semanticLabel});
+  const TimbreAppIcon({
+    super.key,
+    required this.size,
+    this.semanticLabel,
+    this.night = false,
+  });
 
   final double size;
   final String? semanticLabel;
+
+  /// The night board version: amber bus on an ink tile.
+  final bool night;
 
   @override
   Widget build(BuildContext context) {
     final icon = CustomPaint(
       size: Size.square(size),
       painter: TimbreBusPainter(
-        palette: TimbreBusPalette.onBlue,
+        palette: night ? TimbreBusPalette.led : TimbreBusPalette.onBlue,
         detail: TimbreBusDetail.forIconSize(size),
         tile: true,
+        tileColor: night ? TimbreColors.tinta : TimbreColors.azul,
       ),
     );
     if (semanticLabel == null) return ExcludeSemantics(child: icon);
@@ -141,11 +150,13 @@ class TimbreBusPainter extends CustomPainter {
     required this.palette,
     required this.detail,
     this.tile = false,
+    this.tileColor = TimbreColors.azul,
   });
 
   final TimbreBusPalette palette;
   final TimbreBusDetail detail;
   final bool tile;
+  final Color tileColor;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -155,7 +166,7 @@ class TimbreBusPainter extends CustomPainter {
       canvas.scale(s);
       canvas.drawRRect(
         RRect.fromLTRBR(0, 0, 1024, 1024, const Radius.circular(232)),
-        Paint()..color = TimbreColors.azul,
+        Paint()..color = tileColor,
       );
       canvas.translate(0, -6);
     } else {
@@ -289,5 +300,6 @@ class TimbreBusPainter extends CustomPainter {
   bool shouldRepaint(TimbreBusPainter oldDelegate) =>
       oldDelegate.palette != palette ||
       oldDelegate.detail != detail ||
-      oldDelegate.tile != tile;
+      oldDelegate.tile != tile ||
+      oldDelegate.tileColor != tileColor;
 }

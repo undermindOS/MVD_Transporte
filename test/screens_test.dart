@@ -160,8 +160,9 @@ void main() {
               .ancestor(of: find.text(day), matching: find.byType(Container))
               .first)
           .decoration! as BoxDecoration;
-      expect(tileOf('02').color, TimbreColors.tinta); // a small LED board
-      expect(tileOf('11').color, TimbreColors.blanco);
+      // Unread: an inset LED display; read: an empty frame
+      expect(tileOf('02').color, TimbreColors.noche);
+      expect(tileOf('11').color, isNull);
     });
 
     testWidgets('never opened: everything is new', (tester) async {
@@ -285,8 +286,8 @@ void main() {
   // blue surfaces as boards, the bus when a list is empty
   group('Timbre identity', () {
     for (final (name, page, title) in [
-      ('Info', _info(), 'Info'),
-      ('Horarios', _schedule(), 'Horarios'),
+      ('Info', _info(), 'INFO'),
+      ('Horarios', _schedule(), 'HORARIOS'),
     ]) {
       testWidgets('$name: identity bar with the plate and the back arrow',
           (tester) async {
@@ -384,7 +385,7 @@ void main() {
       ));
 
       final bar = tester.getRect(find.byType(AppBar));
-      expect(tester.getRect(find.text('Servicios')).bottom,
+      expect(tester.getRect(find.text('SERVICIOS')).bottom,
           lessThanOrEqualTo(bar.bottom));
       expect(tester.getRect(find.text('Sitios oficiales, en tu navegador')).bottom,
           lessThanOrEqualTo(bar.bottom));

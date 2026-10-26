@@ -3,8 +3,8 @@ import 'package:flutter/material.dart';
 import '../theme/timbre_text.dart';
 import '../theme/timbre_tokens.dart';
 
-/// Line number badge. Filled = the bus has GPS; outlined = timetable only.
-/// The difference does not rely on color alone.
+/// Line number badge. Lit (amber, filled) = the bus has GPS; an unlit
+/// outline = timetable only. The difference does not rely on color alone.
 class LineBadge extends StatelessWidget {
   const LineBadge(
     this.line, {
@@ -28,9 +28,11 @@ class LineBadge extends StatelessWidget {
       constraints: BoxConstraints(minWidth: width, maxWidth: width + 24),
       child: DecoratedBox(
         decoration: BoxDecoration(
-          color: live ? TimbreColors.azul : TimbreColors.blanco,
+          color: live ? TimbreColors.ambar : null,
           borderRadius: BorderRadius.circular(radius),
-          border: live ? null : Border.all(color: TimbreColors.azul, width: 2),
+          border: live
+              ? null
+              : Border.all(color: TimbreColors.etiquetaCartel, width: 1.5),
         ),
         child: Padding(
           padding: EdgeInsets.symmetric(horizontal: live ? 7 : 5, vertical: 2),
@@ -42,7 +44,7 @@ class LineBadge extends StatelessWidget {
               textAlign: TextAlign.center,
               style: TimbreText.lineBadge.copyWith(
                 fontSize: fontSize,
-                color: live ? TimbreColors.blanco : TimbreColors.azul,
+                color: live ? TimbreColors.tinta : TimbreColors.etiquetaCartel,
               ),
             ),
           ),

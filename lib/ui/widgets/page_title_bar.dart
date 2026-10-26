@@ -3,8 +3,8 @@ import 'package:flutter/material.dart';
 import '../theme/timbre_text.dart';
 import '../theme/timbre_tokens.dart';
 
-/// Big page title under the brand plate in the blue header ("Mis paradas",
-/// "Servicios", "Horarios"), with an optional one-line subtitle.
+/// Big page title under the brand plate on the header board ("MIS
+/// PARADAS", "SERVICIOS", "HORARIOS"), with an optional one-line subtitle.
 ///
 /// The height follows the system font size: a fixed height cut the title
 /// with the "Largest" text setting.
@@ -40,7 +40,7 @@ class PageTitleBar extends StatelessWidget implements PreferredSizeWidget {
     fontFamily: TimbreFonts.fira,
     fontSize: 14,
     height: 1.2,
-    color: TimbreColors.sobreAzul,
+    color: TimbreColors.etiquetaCartel,
   );
 
   // Breathing room under the plate, then the title, then the bottom edge
@@ -65,10 +65,13 @@ class PageTitleBar extends StatelessWidget implements PreferredSizeWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
+        // A sign: uppercase on screen, plain words for screen readers
         Semantics(
           header: true,
+          label: title,
+          excludeSemantics: true,
           child: Text(
-            title,
+            title.toUpperCase(),
             style: TimbreText.pageTitle,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,

@@ -4,16 +4,17 @@ import '../services/official_sites.dart';
 import 'theme/timbre_text.dart';
 import 'theme/timbre_tokens.dart';
 import 'widgets/led_matrix.dart';
+import 'widgets/pixel_icon.dart';
 
 typedef _Site = ({
   OfficialSite site,
-  IconData icon,
+  PixelGlyph icon,
   String title,
   String subtitle,
 });
 
-/// Official web services as blue tiles; each one opens in the system
-/// browser (the ↗ on the tile says so).
+/// Official web services as small LED boards; each one opens in the
+/// system browser (the ↗ on the tile says so).
 class ServicesPage extends StatelessWidget {
   final ValueChanged<OfficialSite> onOpen;
 
@@ -22,19 +23,19 @@ class ServicesPage extends StatelessWidget {
   static const List<_Site> _card = [
     (
       site: OfficialSite.miStm,
-      icon: Icons.badge_outlined,
+      icon: PixelGlyphs.card,
       title: 'Mi STM',
       subtitle: 'Saldo y movimientos de tu tarjeta',
     ),
     (
       site: OfficialSite.recarga,
-      icon: Icons.add_card_outlined,
+      icon: PixelGlyphs.money,
       title: 'Recarga',
       subtitle: 'Recargá tu tarjeta STM',
     ),
     (
       site: OfficialSite.avisos,
-      icon: Icons.notifications_none,
+      icon: PixelGlyphs.bell,
       title: 'Avisos',
       subtitle: 'Notificaciones de tu cuenta STM',
     ),
@@ -43,7 +44,7 @@ class ServicesPage extends StatelessWidget {
   static const List<_Site> _travel = [
     (
       site: OfficialSite.comoIr,
-      icon: Icons.map_outlined,
+      icon: PixelGlyphs.map,
       title: 'Cómo Ir',
       subtitle: 'Planificá tu viaje en ómnibus',
     ),
@@ -52,15 +53,15 @@ class ServicesPage extends StatelessWidget {
   static const _sectionTitle = TextStyle(
     fontFamily: TimbreFonts.fira,
     fontWeight: FontWeight.w700,
-    fontSize: 20,
-    color: TimbreColors.tinta,
+    fontSize: 18,
+    color: TimbreColors.papel,
   );
 
   @override
   Widget build(BuildContext context) {
     // A Material, not a colored box: the tiles' tap ripple paints on it
     return Material(
-      color: TimbreColors.blanco,
+      color: TimbreColors.noche,
       child: ListView(
         padding: const EdgeInsets.fromLTRB(16, 22, 16, 24),
         children: [
@@ -113,9 +114,6 @@ class ServicesPage extends StatelessWidget {
   static const _maxTile = 168.0;
 }
 
-/// The soft light around a lit LED icon.
-const _glow = Shadow(color: Color(0x99FFB21E), blurRadius: 14);
-
 class _SiteTile extends StatelessWidget {
   const _SiteTile({required this.site, required this.onTap});
 
@@ -158,18 +156,18 @@ class _SiteTile extends StatelessWidget {
                             LedMatrix(color: TimbreColors.ambar, opacity: 0.11),
                       ),
                       Center(
-                        child: Icon(
+                        child: PixelIcon(
                           site.icon,
-                          size: 44,
+                          size: 48,
                           color: TimbreColors.ambar,
-                          shadows: const [_glow],
+                          glow: true,
                         ),
                       ),
                       const Positioned(
                         top: 9,
                         right: 9,
-                        child: Icon(
-                          Icons.north_east,
+                        child: PixelIcon(
+                          PixelGlyphs.external,
                           size: 16,
                           color: TimbreColors.ambarTenue,
                         ),
@@ -187,7 +185,7 @@ class _SiteTile extends StatelessWidget {
                 fontWeight: FontWeight.w700,
                 fontSize: 16,
                 height: 1.2,
-                color: TimbreColors.tinta,
+                color: TimbreColors.papel,
               ),
             ),
             const SizedBox(height: 4),
@@ -197,7 +195,7 @@ class _SiteTile extends StatelessWidget {
                 fontFamily: TimbreFonts.fira,
                 fontSize: 13,
                 height: 1.35,
-                color: TimbreColors.grisTexto,
+                color: TimbreColors.etiquetaCartel,
               ),
             ),
           ],
@@ -214,15 +212,17 @@ class _BrowserNote extends StatelessWidget {
   Widget build(BuildContext context) {
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: TimbreColors.niebla,
+        color: TimbreColors.tinta,
         borderRadius: BorderRadius.circular(TimbreRadii.button),
+        border: Border.all(color: TimbreColors.lineaNoche),
       ),
       child: const Padding(
         padding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Icon(Icons.open_in_new, size: 22, color: TimbreColors.azul),
+            PixelIcon(PixelGlyphs.external,
+                size: 22, color: TimbreColors.ambar),
             SizedBox(width: 12),
             Expanded(
               child: Text(
@@ -234,7 +234,7 @@ class _BrowserNote extends StatelessWidget {
                   fontFamily: TimbreFonts.fira,
                   fontSize: 14,
                   height: 1.45,
-                  color: TimbreColors.tinta,
+                  color: TimbreColors.papel,
                 ),
               ),
             ),

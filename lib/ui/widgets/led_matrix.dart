@@ -4,17 +4,17 @@ import 'package:flutter/material.dart';
 
 import '../theme/timbre_tokens.dart';
 
-/// The unlit LEDs of a bus destination board: a dot grid that turns the
-/// brand-blue surfaces (header, Servicios tiles) into the board the
-/// cartel lives on. Texture only: live data keeps the lit dot-matrix
+/// The unlit LEDs of a bus destination board: a dot grid that turns dark
+/// surfaces (header, Servicios tiles, the lock screen) into the board the
+/// lit letters live on. Texture only: live data keeps the lit dot-matrix
 /// digits, timetables never get dots.
 class LedMatrix extends StatelessWidget {
   const LedMatrix({
     super.key,
     this.pitch = 6,
     this.dot = 2,
-    this.color = TimbreColors.azulNoche,
-    this.opacity = 0.55,
+    this.color = TimbreColors.ambar,
+    this.opacity = 0.1,
     this.fadeFrom,
   });
 

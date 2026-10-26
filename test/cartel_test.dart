@@ -172,17 +172,15 @@ void main() {
     });
   });
 
-  test('theme: flag blue, Fira, mist background, no amber in the scheme', () {
+  test('theme: the night board, amber lit, Fira to read', () {
     final theme = buildTimbreTheme();
-    expect(theme.colorScheme.primary, TimbreColors.azul);
-    expect(theme.scaffoldBackgroundColor, TimbreColors.niebla);
+    expect(theme.brightness, Brightness.dark);
+    expect(theme.scaffoldBackgroundColor, TimbreColors.noche);
+    expect(theme.colorScheme.surface, TimbreColors.tinta);
+    expect(theme.colorScheme.primary, TimbreColors.ambar);
+    // Text on the lit amber is the ink, never white (1.8:1)
+    expect(theme.colorScheme.onPrimary, TimbreColors.tinta);
+    expect(theme.colorScheme.onSurface, TimbreColors.papel);
     expect(theme.textTheme.bodyMedium!.fontFamily, 'FiraSans');
-    final schemeColors = [
-      theme.colorScheme.primary,
-      theme.colorScheme.secondary,
-      theme.colorScheme.tertiary,
-      theme.colorScheme.surface,
-    ];
-    expect(schemeColors, isNot(contains(TimbreColors.ambar)));
   });
 }

@@ -11,7 +11,7 @@ import 'info_page.dart';
 import 'lock_screen.dart';
 import 'services_page.dart';
 import 'stops_page.dart';
-import 'theme/timbre_tokens.dart';
+import 'widgets/pixel_icon.dart';
 import 'widgets/timbre_app_bar.dart';
 
 // ---------------------------------------------------------------------------
@@ -20,8 +20,7 @@ import 'widgets/timbre_app_bar.dart';
 
 class _TabDef {
   final String label;
-  final IconData icon;
-  final IconData selectedIcon;
+  final PixelGlyph icon;
 
   /// Line under the page title in the blue header.
   final String? subtitle;
@@ -29,7 +28,6 @@ class _TabDef {
   const _TabDef({
     required this.label,
     required this.icon,
-    required this.selectedIcon,
     this.subtitle,
   });
 }
@@ -77,13 +75,11 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   static const List<_TabDef> _tabs = [
     _TabDef(
       label: 'Mis paradas',
-      icon: Icons.directions_bus_outlined,
-      selectedIcon: Icons.directions_bus,
+      icon: PixelGlyphs.bus,
     ),
     _TabDef(
       label: 'Servicios',
-      icon: Icons.apps_outlined,
-      selectedIcon: Icons.apps,
+      icon: PixelGlyphs.grid,
       subtitle: 'Sitios oficiales, en tu navegador',
     ),
   ];
@@ -213,7 +209,6 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
           ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
             content:
                 Text('Tu dispositivo no soporta autenticación biométrica'),
-            backgroundColor: Colors.red,
           ));
         }
         return _biometricLockEnabled;
@@ -246,7 +241,6 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
         content: Text(value
             ? 'Bloqueo biométrico activado'
             : 'Bloqueo biométrico desactivado'),
-        backgroundColor: value ? Colors.green : Colors.orange,
       ));
     }
     return value;
@@ -260,7 +254,6 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     if (!opened && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
         content: Text('No se pudo abrir el navegador'),
-        backgroundColor: Colors.red,
       ));
     }
   }
@@ -284,13 +277,6 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
 
   // --- Build ---
 
-  static ThemeData _subTabsTheme(ThemeData theme) => theme.copyWith(
-        appBarTheme: theme.appBarTheme.copyWith(
-          backgroundColor: TimbreColors.blanco,
-          foregroundColor: TimbreColors.tinta,
-        ),
-      );
-
   @override
   Widget build(BuildContext context) {
     if (_biometricLockEnabled && !_isAuthenticated) {
@@ -304,7 +290,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
         subtitle: _tabs[_currentIndex].subtitle,
         actions: [
           IconButton(
-            icon: const Icon(Icons.info_outline),
+            icon: const PixelIcon(PixelGlyphs.info),
             tooltip: 'Info',
             onPressed: _openInfoPage,
           ),
@@ -314,15 +300,9 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       body: IndexedStack(
         index: _currentIndex,
         children: [
-          // StopsPage draws its own bar for Paradas / Rutas / Novedades
-          // with blue labels: on the blue app bar of the theme they
-          // vanished. A white bar here, stops_page.dart stays untouched.
-          Theme(
-            data: _subTabsTheme(Theme.of(context)),
-            child: StopsPage(
-              onOpenStopInComoIr: (stopId) =>
-                  _openInBrowser(OfficialSite.comoIrStop(stopId)),
-            ),
+          StopsPage(
+            onOpenStopInComoIr: (stopId) =>
+                _openInBrowser(OfficialSite.comoIrStop(stopId)),
           ),
           ServicesPage(onOpen: (site) => _openInBrowser(site.uri)),
         ],
@@ -333,8 +313,9 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
             setState(() => _currentIndex = index),
         destinations: _tabs
             .map((tab) => NavigationDestination(
-                  icon: Icon(tab.icon),
-                  selectedIcon: Icon(tab.selectedIcon),
+                  icon: PixelIcon(tab.icon),
+                  // The selected tab is lit
+                  selectedIcon: PixelIcon(tab.icon, glow: true),
                   label: tab.label,
                 ))
             .toList(),

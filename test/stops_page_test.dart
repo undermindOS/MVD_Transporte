@@ -16,6 +16,8 @@ import 'package:stm_app/models/bus_wait.dart';
 import 'package:stm_app/services/bus_wait_service.dart';
 import 'package:stm_app/services/cache_service.dart';
 import 'package:stm_app/ui/stops_page.dart';
+import 'package:stm_app/ui/widgets/cartel.dart';
+import 'package:stm_app/ui/widgets/pixel_icon.dart';
 
 const _lineas574 =
     '{"descripcion":"SAN JOSE y ANDES","lineas":[{"descripcion":"116","codigo":38},'
@@ -43,6 +45,10 @@ void main() {
   Widget app() => MaterialApp(
       home: StopsPage(onOpenStopInComoIr: opened.add));
 
+  // Live minutes in lit digits
+  Finder liveMinutes(int m) =>
+      find.byWidgetPredicate((w) => w is MinutosEnVivo && w.minutes == m);
+
   setUpAll(() async {
     hiveDir = await Directory.systemTemp.createTemp('mvd_stops_test');
     await CacheService.init(path: hiveDir.path);
@@ -65,7 +71,7 @@ void main() {
       (tester) async {
     await http.runWithClient(() async {
       await tester.pumpWidget(app());
-      await tester.tap(find.byIcon(Icons.add));
+      await tester.tap(find.byTooltip('Agregar parada'));
       await tester.pumpAndSettle();
 
       expect(find.text('Agregar parada'), findsWidgets);
@@ -145,7 +151,7 @@ void main() {
     await http.runWithClient(() async {
       await tester.pumpWidget(app());
       await tester.pump();
-      expect(find.text('7 min'), findsOneWidget);
+      expect(liveMinutes(7), findsOneWidget);
       final initial = etaRequests.length;
 
       minutes = 6;
@@ -155,7 +161,7 @@ void main() {
       await tester.pump(const Duration(seconds: 1));
       await tester.pump();
       expect(etaRequests.length, initial + 1);
-      expect(find.text('6 min'), findsOneWidget);
+      expect(liveMinutes(6), findsOneWidget);
 
       // A system dialog (inactive) keeps the timer, no extra request
       lifecycle([AppLifecycleState.inactive, AppLifecycleState.resumed]);
@@ -180,7 +186,7 @@ void main() {
       ]);
       await tester.pump();
       expect(etaRequests.length, initial + 2);
-      expect(find.text('3 min'), findsOneWidget);
+      expect(liveMinutes(3), findsOneWidget);
       await tester.pump(StopsPage.autoRefreshInterval);
       expect(etaRequests.length, initial + 3);
     }, () => etaClient);
@@ -213,7 +219,8 @@ void main() {
 
     Finder bell(String line) => find.descendant(
         of: find.widgetWithText(InkWell, line),
-        matching: find.byIcon(Icons.notifications_active));
+        matching: find.byWidgetPredicate(
+            (w) => w is PixelIcon && w.glyph == PixelGlyphs.bellRing));
 
     await http.runWithClient(() async {
       await tester.pumpWidget(app());
@@ -231,8 +238,15 @@ void main() {
 
       await tester.tap(find.text('116'));
       await tester.pumpAndSettle();
-      expect(find.text('116 → POCITOS'), findsOneWidget);
-      expect(find.text('Llega en 9 min · SAN JOSE y ANDES'), findsOneWidget);
+      // The followed bus on its LED strip, with the stop under it
+      expect(
+          find.byWidgetPredicate((w) =>
+              w is CartelTira &&
+              w.line == '116' &&
+              w.destination == 'POCITOS' &&
+              w.etaMinutes == 9),
+          findsOneWidget);
+      expect(find.text('SAN JOSE y ANDES · con GPS'), findsOneWidget);
       await tester.tap(find.text('3 min'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Avisarme cuando llegue'));
@@ -261,7 +275,7 @@ void main() {
     geolocator.answer = LocationPermission.deniedForever;
     await http.runWithClient(() async {
       await tester.pumpWidget(app());
-      await tester.tap(find.byIcon(Icons.add));
+      await tester.tap(find.byTooltip('Agregar parada'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Paradas cercanas'));
       await tester.pumpAndSettle();

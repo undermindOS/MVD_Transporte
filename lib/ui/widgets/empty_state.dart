@@ -38,6 +38,7 @@ class TimbreEmptyState extends StatelessWidget {
               decoration: BoxDecoration(
                 color: TimbreColors.tinta,
                 borderRadius: BorderRadius.circular(TimbreRadii.card),
+                border: Border.all(color: TimbreColors.lineaNoche),
               ),
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(TimbreRadii.card),
@@ -72,7 +73,7 @@ class TimbreEmptyState extends StatelessWidget {
                     fontFamily: TimbreFonts.fira,
                     fontSize: 14,
                     height: 1.4,
-                    color: TimbreColors.grisTexto)),
+                    color: TimbreColors.etiquetaCartel)),
           ],
         ],
       ),

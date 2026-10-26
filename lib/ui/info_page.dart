@@ -5,6 +5,7 @@ import '../services/official_sites.dart';
 import 'theme/timbre_text.dart';
 import 'theme/timbre_tokens.dart';
 import 'widgets/led_matrix.dart';
+import 'widgets/pixel_icon.dart';
 import 'widgets/timbre_app_bar.dart';
 import 'widgets/timbre_bus.dart';
 
@@ -77,7 +78,14 @@ class _InfoPageState extends State<InfoPage> {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 Row(children: [
-                  const TimbreAppIcon(size: 64),
+                  // The app icon of the night board
+                  DecoratedBox(
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(15),
+                      border: Border.all(color: TimbreColors.lineaNoche),
+                    ),
+                    child: const TimbreAppIcon(size: 64, night: true),
+                  ),
                   const SizedBox(width: 14),
                   // The wordmark is a logo: with the largest fonts it
                   // scales down to the row instead of overflowing
@@ -93,7 +101,7 @@ class _InfoPageState extends State<InfoPage> {
                             TextSpan(
                               text: ' MVD',
                               style: TextStyle(
-                                  color: TimbreColors.anillo,
+                                  color: TimbreColors.ambar,
                                   fontWeight: FontWeight.w700),
                             ),
                           ]),
@@ -102,7 +110,7 @@ class _InfoPageState extends State<InfoPage> {
                               fontWeight: FontWeight.w800,
                               fontSize: 34,
                               height: 1,
-                              color: TimbreColors.azul),
+                              color: TimbreColors.papel),
                         ),
                       ),
                     ),
@@ -115,9 +123,11 @@ class _InfoPageState extends State<InfoPage> {
                   label: 'Aplicación no oficial. $_notAffiliated',
                   excludeSemantics: true,
                   child: DecoratedBox(
+                    // An inset board in the card
                     decoration: BoxDecoration(
-                      color: TimbreColors.tinta,
+                      color: TimbreColors.noche,
                       borderRadius: BorderRadius.circular(TimbreRadii.control),
+                      border: Border.all(color: TimbreColors.lineaNoche),
                     ),
                     child: ClipRRect(
                       borderRadius: BorderRadius.circular(TimbreRadii.control),
@@ -140,7 +150,7 @@ class _InfoPageState extends State<InfoPage> {
                                 style: TextStyle(
                                     fontSize: 14,
                                     height: 1.45,
-                                    color: TimbreColors.sobreAzulSuave),
+                                    color: TimbreColors.papel),
                               ),
                             ],
                           ),
@@ -157,8 +167,8 @@ class _InfoPageState extends State<InfoPage> {
             padding: const EdgeInsets.fromLTRB(16, 10, 12, 10),
             child: MergeSemantics(
               child: Row(children: [
-                const Icon(Icons.lock_outline,
-                    color: TimbreColors.azul, size: 24),
+                const PixelIcon(PixelGlyphs.lock,
+                    color: TimbreColors.ambar, size: 24),
                 const SizedBox(width: 12),
                 const Expanded(
                   child: Column(
@@ -168,13 +178,14 @@ class _InfoPageState extends State<InfoPage> {
                           style: TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.w600,
-                              color: TimbreColors.tinta)),
+                              color: TimbreColors.papel)),
                       SizedBox(height: 2),
                       // Mi STM lives in the browser now: the lock guards only
                       // what the app stores (saved stops and route alerts)
                       Text('Protege tus paradas y rutas guardadas',
                           style: TextStyle(
-                              fontSize: 13, color: TimbreColors.grisTexto)),
+                              fontSize: 13,
+                              color: TimbreColors.etiquetaCartel)),
                     ],
                   ),
                 ),
@@ -202,14 +213,14 @@ class _InfoPageState extends State<InfoPage> {
                   'transporte y estado del GPS: servicios en línea de la '
                   'Intendencia de Montevideo, los mismos que usa Cómo Ir.',
                   style: TextStyle(
-                      fontSize: 14, height: 1.45, color: TimbreColors.tinta),
+                      fontSize: 14, height: 1.45, color: TimbreColors.papel),
                 ),
                 SizedBox(height: 8),
                 Text(
                   'Aire acondicionado y cero emisiones: API de transporte '
                   'público de Montevideo.',
                   style: TextStyle(
-                      fontSize: 14, height: 1.45, color: TimbreColors.tinta),
+                      fontSize: 14, height: 1.45, color: TimbreColors.papel),
                 ),
                 SizedBox(height: 8),
                 Text(
@@ -218,7 +229,7 @@ class _InfoPageState extends State<InfoPage> {
                   style: TextStyle(
                       fontSize: 13,
                       height: 1.45,
-                      color: TimbreColors.grisTexto),
+                      color: TimbreColors.etiquetaCartel),
                 ),
               ],
             ),
@@ -230,7 +241,7 @@ class _InfoPageState extends State<InfoPage> {
               if (widget.privacyPolicyUrl != null) ...[
                 _LinkRow(
                   title: 'Política de privacidad',
-                  icon: Icons.open_in_new,
+                  icon: PixelGlyphs.external,
                   onTap: () => _openWeb(widget.privacyPolicyUrl!),
                 ),
                 const Divider(),
@@ -238,14 +249,14 @@ class _InfoPageState extends State<InfoPage> {
               _LinkRow(
                 title: 'Código fuente',
                 subtitle: _sourceCode,
-                icon: Icons.open_in_new,
+                icon: PixelGlyphs.external,
                 onTap: () => _openWeb(Uri.parse('https://$_sourceCode')),
               ),
               const Divider(),
               _LinkRow(
                 title: 'Contacto',
                 subtitle: _contact,
-                icon: Icons.mail_outline,
+                icon: PixelGlyphs.mail,
                 onTap: _writeEmail,
               ),
             ]),
@@ -261,7 +272,7 @@ class _InfoPageState extends State<InfoPage> {
                   fontSize: 13,
                   height: 1.45,
                   fontStyle: FontStyle.italic,
-                  color: TimbreColors.grisTexto),
+                  color: TimbreColors.tenue),
             ),
           ),
         ],
@@ -285,7 +296,7 @@ class _LinkRow extends StatelessWidget {
 
   final String title;
   final String? subtitle;
-  final IconData icon;
+  final PixelGlyph icon;
   final VoidCallback onTap;
 
   @override
@@ -305,18 +316,18 @@ class _LinkRow extends StatelessWidget {
                       style: const TextStyle(
                           fontSize: 15,
                           fontWeight: FontWeight.w500,
-                          color: TimbreColors.tinta)),
+                          color: TimbreColors.papel)),
                   if (subtitle != null) ...[
                     const SizedBox(height: 2),
                     Text(subtitle!,
                         style: const TextStyle(
-                            fontSize: 13, color: TimbreColors.grisTexto)),
+                            fontSize: 13, color: TimbreColors.etiquetaCartel)),
                   ],
                 ],
               ),
             ),
             const SizedBox(width: 12),
-            Icon(icon, size: 20, color: TimbreColors.azul),
+            PixelIcon(icon, size: 20, color: TimbreColors.ambar),
           ]),
         ),
       ),

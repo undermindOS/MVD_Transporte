@@ -6,6 +6,7 @@ import 'theme/timbre_tokens.dart';
 import 'widgets/cartel.dart';
 import 'widgets/led_lock.dart';
 import 'widgets/led_matrix.dart';
+import 'widgets/pixel_icon.dart';
 
 /// The whole lock screen is the LED board: ink, dim amber dots, the lock
 /// lit in amber. Unlocking asks the system prompt through [onUnlock];
@@ -89,7 +90,8 @@ class _LockScreenState extends State<LockScreen> {
                           const SizedBox(height: 36),
                           FilledButton.icon(
                             onPressed: _scanning ? null : _unlock,
-                            icon: const Icon(Icons.fingerprint, size: 26),
+                            icon: const PixelIcon(PixelGlyphs.unlock,
+                                size: 24),
                             label: const Text('Desbloquear'),
                             style: FilledButton.styleFrom(
                               backgroundColor: TimbreColors.ambar,
