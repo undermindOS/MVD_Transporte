@@ -19,18 +19,12 @@ const ISO_MS = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/;
 const PENDING = {
   'stop.574': 'P5 (directions from the stop metadata)',
   'stop.574.degraded': 'P5 (directions from the stop metadata)',
-  'arrivals.574': 'P2 (arrivals in the screen shape)',
-  'arrivals.3140': 'P2 (arrivals in the screen shape)',
-  'arrivals.empty': 'P2 (arrivals in the screen shape)',
-  'schedule.noncanonical': 'P2 (canonical timetable path)',
   'catalog.sample': 'P4 (geoserver stop index) and P5 (linevariants)',
   'catalog.nolines': 'P4 (geoserver stop index)',
   'news.cold': 'P3 (GET /v1/news)',
   'news.page_fails': 'P3 (GET /v1/news)',
   'gps.ok': 'P3 (GET /v1/status/gps)',
   'gps.empty': 'P3 (GET /v1/status/gps)',
-  'removed.lines_buses': 'P2 (unused routes removed)',
-  'removed.catalog_lines': 'P2 (unused routes removed)',
 };
 
 // Error codes no GET case can produce; index.test.js covers them

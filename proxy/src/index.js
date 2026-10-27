@@ -23,7 +23,6 @@ const STOP_TTL = 24 * 3600; // name and lines change rarely
 const MISSING_STOP_TTL = 3600; // a new stop may appear
 const ARRIVALS_TTL = 15; // the app refreshes every 30 s
 const SCHEDULE_TTL = 6 * 3600; // same as the app's own timetable cache
-const LINE_BUSES_TTL = 15; // ImGateway refreshes the fleet as often
 const CATALOG_TTL = 24 * 3600;
 
 // Comfort data is optional: arrivals do not wait longer for it
@@ -31,15 +30,14 @@ const VEHICLES_WAIT_MS = 2000;
 
 // Stop codes are positive ints; no leading zeros, so one stop = one cache key
 const STOP = '([1-9]\\d{0,6})';
-// Line names as the official API writes them: "121", "D10", "CE1"
-const LINE = '([0-9A-Z]{1,6})';
+// "H:MM" only, as the app writes it: 8:05, never 08:05 or 8:5 (one cache key)
+const TIME = '(0|[1-9]\\d?):([0-5]\\d)';
 // Exported for the contract tests: every route needs a case
 export const ROUTES = [
   [new RegExp(`^/v1/stops/${STOP}$`), stop],
   [new RegExp(`^/v1/stops/${STOP}/arrivals$`), arrivals],
-  [new RegExp(`^/v1/stops/${STOP}/schedule/([a-z]+)/(\\d{1,2}):(\\d{2})$`), schedule],
-  [new RegExp(`^/v1/lines/${LINE}/buses$`), lineBuses],
-  [/^\/v1\/catalog\/(stops|lines)$/, catalog],
+  [new RegExp(`^/v1/stops/${STOP}/schedule/([a-z]+)/${TIME}$`), schedule],
+  [/^\/v1\/catalog\/stops$/, catalog],
 ];
 
 export default {
@@ -94,16 +92,21 @@ async function stop(_env, id) {
 }
 
 async function arrivals(env, id) {
-  const list = await getArrivals(Number(id));
+  const { fetchedAtMs, arrivals: list } = await getArrivals(Number(id));
   const vehicles = await lookupVehicles(env, list);
   return json(
     {
+      id: Number(id),
       // Cached up to ARRIVALS_TTL: lets the app tell how old the minutes are
-      fetchedAt: new Date().toISOString(),
-      arrivals: list.map(({ busId, ...arrival }) => ({
-        ...arrival,
-        vehicle: vehicles[`${arrival.companyId}:${busId}`] ?? null,
-      })),
+      fetchedAt: new Date(fetchedAtMs).toISOString(),
+      arrivals: list.map(({ _bus, ...arrival }) => {
+        const comfort = (_bus && vehicles[_bus]) ?? null;
+        return {
+          ...arrival,
+          airConditioning: comfort?.airConditioning ?? null,
+          zeroEmission: comfort?.zeroEmission ?? null,
+        };
+      }),
     },
     ARRIVALS_TTL,
   );
@@ -114,12 +117,7 @@ async function arrivals(env, id) {
  * official API is not configured, busy or slow: arrivals never fail for it.
  */
 async function lookupVehicles(env, list) {
-  const ids = new Set();
-  for (const a of list) {
-    if (a.realTime && a.companyId !== null && a.busId !== null) {
-      ids.add(`${a.companyId}:${a.busId}`);
-    }
-  }
+  const ids = new Set(list.map((a) => a._bus).filter(Boolean));
   if (ids.size === 0 || !env.IM_GATEWAY) return {};
 
   let timer;
@@ -143,20 +141,13 @@ async function lookupVehicles(env, list) {
 
 async function schedule(_env, id, day, hour, minute) {
   const h = Number(hour);
-  const m = Number(minute);
-  if (!Object.hasOwn(DAY_TYPES, day) || h > 23 || m > 59) {
-    return error(400, 'bad_request');
-  }
-  const passes = await getSchedule(Number(id), day, h, m);
+  if (!Object.hasOwn(DAY_TYPES, day) || h > 23) return error(400, 'bad_request');
+  const passes = await getSchedule(Number(id), day, h, Number(minute));
   return json({ passes }, SCHEDULE_TTL);
 }
 
-function lineBuses(env, line) {
-  return fromGateway(env, `/lines/${line}/buses`, LINE_BUSES_TTL);
-}
-
-function catalog(env, name) {
-  return fromGateway(env, `/catalog/${name}`, CATALOG_TTL);
+function catalog(env) {
+  return fromGateway(env, '/catalog/stops', CATALOG_TTL);
 }
 
 /** Passes an ImGateway answer on, with this proxy's cache and error rules. */

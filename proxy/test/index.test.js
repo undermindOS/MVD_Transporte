@@ -85,8 +85,42 @@ describe('GET /v1/stops/{id}', () => {
       id: 574,
       name: 'SAN JOSE y ANDES',
       lines: ['116', '117', '121', '141', '142', '144', '538'],
+      directions: [],
     });
     assert.deepEqual(calls, [`${UPSTREAM}/lineas/574`]);
+  });
+
+  it('sorts lines like the app and trims the name', async () => {
+    mockUpstream(() =>
+      Response.json({
+        descripcion: ' AV ITALIA y PROPIOS \n',
+        lineas: [
+          { descripcion: 'D10' },
+          { descripcion: '121' },
+          { descripcion: 'D9' },
+          { descripcion: '21' },
+          { descripcion: '121' },
+          { descripcion: 'CE1' },
+        ],
+      }),
+    );
+    const { response } = await call('/v1/stops/2210');
+    const body = await response.json();
+
+    assert.equal(body.name, 'AV ITALIA y PROPIOS');
+    assert.deepEqual(body.lines, ['21', '121', 'CE1', 'D10', 'D9']);
+  });
+
+  it('answers a null name when transporteRest has none', async () => {
+    mockUpstream(() => Response.json({ descripcion: '  ', lineas: [] }));
+    const { response } = await call('/v1/stops/2210');
+
+    assert.deepEqual(await response.json(), {
+      id: 2210,
+      name: null,
+      lines: [],
+      directions: [],
+    });
   });
 
   it('answers 404 stop_not_found for an unknown stop, cached for an hour', async () => {
@@ -102,6 +136,7 @@ describe('GET /v1/stops/{id}', () => {
 describe('GET /v1/stops/{id}/arrivals', () => {
   it('maps arrivals soonest first, cached for 15 s', async () => {
     const calls = mockUpstream(() => new Response(fixture('transporte_rest/arrivals_3140.json')));
+    const before = Date.now();
     const { response } = await call('/v1/stops/3140/arrivals');
 
     assert.equal(response.status, 200);
@@ -109,28 +144,50 @@ describe('GET /v1/stops/{id}/arrivals', () => {
     assert.deepEqual(calls, [`${UPSTREAM}/siguientesParada/3140`]);
 
     const body = await response.json();
-    assert.ok(!Number.isNaN(Date.parse(body.fetchedAt)));
+    assert.equal(body.id, 3140);
+    assert.ok(Date.parse(body.fetchedAt) >= before);
     assert.deepEqual(
-      body.arrivals.map((a) => [a.line, a.etaMinutes]),
-      [['494', 8], ['145', 10], ['143', 11], ['140', 40], ['495', 262]],
+      body.arrivals.map((a) => [a.line, a.etaMinutes, a.state]),
+      [
+        ['494', 8, 'live'],
+        ['145', 10, 'live'],
+        ['143', 11, 'scheduled'],
+        ['140', 40, 'scheduled'],
+        ['495', 262, 'scheduled'],
+      ],
     );
     assert.deepEqual(body.arrivals[0], {
+      tripId: 'bus-10-27',
+      variantId: 4414,
       line: '494',
       destination: 'DELTA DEL TIGRE',
+      state: 'live',
       etaMinutes: 8,
-      realTime: true,
-      scheduledTime: '19:06',
-      companyId: 10,
-      location: { lat: -34.897755, lng: -56.12432 },
+      // transporteRest's own time, not the Worker's clock
+      expectedAt: '2026-10-19T22:06:00.000Z',
+      clockTime: '19:06',
       accessible: false,
-      accessibilityType: 1,
       // No ImGateway in this env: comfort is unknown, arrivals still work
-      vehicle: null,
+      airConditioning: null,
+      zeroEmission: null,
     });
-    // Timetable-only bus: no GPS position, no operator
-    assert.equal(body.arrivals[2].realTime, false);
-    assert.equal(body.arrivals[2].location, null);
-    assert.equal(body.arrivals[2].companyId, null);
+    // Timetable-only bus: a trip id from its variant and time
+    assert.equal(body.arrivals[2].tripId, 'sched-4615-1909');
+  });
+
+  it('keeps the API order for equal minutes', async () => {
+    mockUpstream(() =>
+      Response.json([
+        { linea: '142', minutos: 9, real: false, variante: 3700, hora: 2001 },
+        { linea: '116', minutos: 9, real: true, idEmpresa: 50, idBus: 139 },
+        { linea: '117', minutos: 4, real: true, idEmpresa: 50, idBus: 111 },
+        { linea: '144', minutos: 9, real: false, variante: 883, hora: 2001 },
+      ]),
+    );
+    const { response } = await call('/v1/stops/574/arrivals');
+    const { arrivals } = await response.json();
+
+    assert.deepEqual(arrivals.map((a) => a.line), ['117', '142', '116', '144']);
   });
 
   it('skips items without line or minutes', async () => {
@@ -175,18 +232,20 @@ describe('GET /v1/stops/{id}/arrivals with comfort from the official API', () =>
     assert.equal(response.status, 200);
     const { arrivals } = await response.json();
 
-    const byLine = Object.fromEntries(arrivals.map((a) => [a.line, a.vehicle]));
+    const byLine = Object.fromEntries(
+      arrivals.map((a) => [a.line, [a.airConditioning, a.zeroEmission]]),
+    );
     assert.deepEqual(byLine, {
-      117: { airConditioning: true, zeroEmission: false }, // bus 111, Euro V
-      121: { airConditioning: true, zeroEmission: false }, // bus 1118
-      116: { airConditioning: true, zeroEmission: true }, // bus 139, eléctrico
+      117: [true, false], // bus 111, Euro V
+      121: [true, false], // bus 1118
+      116: [true, true], // bus 139, eléctrico
       // Timetable only: no bus to look up
-      144: null,
-      538: null,
-      142: null,
+      144: [null, null],
+      538: [null, null],
+      142: [null, null],
     });
-    // The internal id used for the match is not part of the contract
-    assert.ok(arrivals.every((a) => !('busId' in a)));
+    // The internal key used for the match is not part of the contract
+    assert.ok(arrivals.every((a) => !('_bus' in a)));
     assert.deepEqual(
       gateway.paths.map((p) => p.split('=')[1].split(',').sort()),
       [['50:111', '50:1118', '50:139']],
@@ -204,7 +263,7 @@ describe('GET /v1/stops/{id}/arrivals with comfort from the official API', () =>
     assert.equal(response.status, 200);
     assert.equal(response.headers.get('Cache-Control'), 'public, max-age=15');
     const { arrivals } = await response.json();
-    assert.ok(arrivals.every((a) => a.vehicle === null));
+    assert.ok(arrivals.every((a) => a.airConditioning === null && a.zeroEmission === null));
   });
 
   it('serves arrivals without comfort when the gateway throws', async () => {
@@ -227,6 +286,9 @@ describe('GET /v1/stops/{id}/arrivals with comfort from the official API', () =>
 
     assert.equal(response.status, 200);
     assert.ok(waited >= 1900 && waited < 3000, `waited ${waited} ms`);
+    const { arrivals } = await response.json();
+    assert.equal(arrivals.length, 6);
+    assert.ok(arrivals.every((a) => a.airConditioning === null && a.zeroEmission === null));
   });
 
   it('does not ask the gateway when no bus has GPS', async () => {
@@ -239,31 +301,32 @@ describe('GET /v1/stops/{id}/arrivals with comfort from the official API', () =>
 
     const { response } = await call('/v1/stops/3140/arrivals', { gateway });
     assert.equal(response.status, 200);
-    assert.equal((await response.json()).arrivals[0].vehicle, null);
+    assert.equal((await response.json()).arrivals[0].airConditioning, null);
     assert.deepEqual(gateway.paths, []);
   });
 });
 
 describe('routes served by ImGateway', () => {
-  it('GET /v1/lines/{line}/buses passes the answer on, cached for 15 s', async () => {
-    const body = { fetchedAt: '2026-10-19T22:52:10.000Z', buses: [] };
+  it('GET /v1/catalog/stops passes the answer on, cached for a day', async () => {
+    const body = { fetchedAt: '2026-10-19T22:52:10.000Z', stops: [] };
     const gateway = gatewayNamespace(() => Response.json(body));
 
-    const { response } = await call('/v1/lines/D10/buses', { gateway });
+    const { response } = await call('/v1/catalog/stops', { gateway });
     assert.equal(response.status, 200);
-    assert.equal(response.headers.get('Cache-Control'), 'public, max-age=15');
+    assert.equal(response.headers.get('Cache-Control'), 'public, max-age=86400');
     assert.deepEqual(await response.json(), body);
-    assert.deepEqual(gateway.paths, ['/lines/D10/buses']);
+    assert.deepEqual(gateway.paths, ['/catalog/stops']);
   });
 
-  it('GET /v1/catalog/{stops|lines} are cached for a day', async () => {
-    const gateway = gatewayNamespace(() => Response.json({ stops: [] }));
+  it('no longer exposes the line buses and line variants', async () => {
+    const gateway = gatewayNamespace(() => assert.fail('gateway called'));
 
-    for (const name of ['stops', 'lines']) {
-      const { response } = await call(`/v1/catalog/${name}`, { gateway });
-      assert.equal(response.headers.get('Cache-Control'), 'public, max-age=86400');
+    for (const path of ['/v1/lines/117/buses', '/v1/catalog/lines']) {
+      const { response } = await call(path, { gateway });
+      assert.equal(response.status, 404);
+      assert.deepEqual(await response.json(), { error: 'not_found' });
     }
-    assert.deepEqual(gateway.paths, ['/catalog/stops', '/catalog/lines']);
+    assert.deepEqual(gateway.paths, []);
   });
 
   it('passes gateway errors on, not cached', async () => {
@@ -274,7 +337,7 @@ describe('routes served by ImGateway', () => {
       ),
     );
 
-    const { response } = await call('/v1/lines/117/buses', { gateway });
+    const { response } = await call('/v1/catalog/stops', { gateway });
     assert.equal(response.status, 503);
     assert.equal(response.headers.get('Cache-Control'), 'no-store');
     assert.equal(response.headers.get('Retry-After'), '42');
@@ -291,7 +354,7 @@ describe('routes served by ImGateway', () => {
   });
 
   it('answers 503 not_configured without the binding', async () => {
-    const { response } = await call('/v1/lines/117/buses');
+    const { response } = await call('/v1/catalog/stops');
     assert.equal(response.status, 503);
     assert.deepEqual(await response.json(), { error: 'not_configured' });
   });
@@ -318,10 +381,31 @@ describe('GET /v1/stops/{id}/schedule/{day}/{H:MM}', () => {
     });
   });
 
-  it('maps saturday and sunday and pads minutes', async () => {
+  it('fills time and hhmm from each other, never null', async () => {
+    mockUpstream(() =>
+      Response.json([
+        { linea: '145', destino: 'PLAZA ESPAÑA', hora: 803, horaDesc: '08:03' },
+        { linea: '145', destino: 'PLAZA ESPAÑA', hora: null, horaDesc: '8:10' },
+        { linea: '143', destino: 'CIUDADELA', hora: 2359, horaDesc: '' },
+        { linea: '143', destino: 'CIUDADELA', hora: 5 },
+        { linea: '494', destino: 'DELTA DEL TIGRE', hora: null, horaDesc: '' },
+        { linea: '', hora: 830, horaDesc: '8:30' },
+      ]),
+    );
+    const { response } = await call('/v1/stops/3140/schedule/weekday/8:00');
+
+    assert.deepEqual((await response.json()).passes, [
+      { line: '145', destination: 'PLAZA ESPAÑA', time: '8:03', hhmm: 803 },
+      { line: '145', destination: 'PLAZA ESPAÑA', time: '8:10', hhmm: 810 },
+      { line: '143', destination: 'CIUDADELA', time: '23:59', hhmm: 2359 },
+      { line: '143', destination: 'CIUDADELA', time: '0:05', hhmm: 5 },
+    ]);
+  });
+
+  it('maps saturday and sunday', async () => {
     const calls = mockUpstream(() => Response.json([]));
     await call('/v1/stops/3140/schedule/saturday/23:00');
-    await call('/v1/stops/3140/schedule/sunday/07:30');
+    await call('/v1/stops/3140/schedule/sunday/7:30');
 
     assert.deepEqual(calls, [
       `${UPSTREAM}/siguientesParada/3140/SABADO/23:00`,
@@ -447,10 +531,17 @@ describe('requests that never reach transporteRest', () => {
     ['/v1/stops/3140/schedule/holiday/8:05', 400, 'bad_request'],
     ['/v1/stops/3140/schedule/constructor/8:05', 400, 'bad_request'],
     ['/v1/stops/3140/schedule/weekday/24:00', 400, 'bad_request'],
-    ['/v1/stops/3140/schedule/weekday/8:60', 400, 'bad_request'],
+    ['/v1/stops/3140/schedule/weekday/8:60', 404, 'not_found'],
     ['/v1/stops/3140/schedule/weekday/805', 404, 'not_found'],
-    ['/v1/lines/d10/buses', 404, 'not_found'],
-    ['/v1/lines/1234567/buses', 404, 'not_found'],
+    // One spelling per time: H:MM
+    ['/v1/stops/3140/schedule/weekday/08:05', 404, 'not_found'],
+    ['/v1/stops/3140/schedule/weekday/8:5', 404, 'not_found'],
+    ['/v1/stops/3140/schedule/weekday/00:00', 404, 'not_found'],
+    ['/v1/stops/3140/schedule/weekday/100:00', 404, 'not_found'],
+    // Removed from the public routes
+    ['/v1/lines/117/buses', 404, 'not_found'],
+    ['/v1/lines/D10/buses', 404, 'not_found'],
+    ['/v1/catalog/lines', 404, 'not_found'],
     ['/v1/lines/117/buses?x=1', 400, 'bad_request'],
     ['/v1/catalog/variants', 404, 'not_found'],
   ];
