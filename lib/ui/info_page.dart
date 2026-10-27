@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../services/mvd_api_service.dart';
 import '../services/official_sites.dart';
 import 'theme/timbre_text.dart';
 import 'theme/timbre_tokens.dart';
@@ -231,12 +232,22 @@ class _InfoPageState extends State<InfoPage> {
                   'Intendencia de Montevideo, los mismos que usa Cómo Ir.',
                   style: _reading,
                 ),
-                const SizedBox(height: 8),
-                Text(
-                  'Aire acondicionado y cero emisiones: API de transporte '
-                  'público de Montevideo.',
-                  style: _reading,
-                ),
+                // Only proxy builds get comfort data, and only they have a
+                // server of their own in between
+                if (MvdApiService.usesProxy) ...[
+                  const SizedBox(height: 8),
+                  Text(
+                    'Aire acondicionado y cero emisiones: API de transporte '
+                    'público de Montevideo.',
+                    style: _reading,
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Las consultas pasan por el servidor del proyecto, que no '
+                    'guarda datos personales.',
+                    style: _reading,
+                  ),
+                ],
                 const SizedBox(height: 8),
                 const Text(
                   'Los tiempos son estimados. Los que llevan reloj son '
