@@ -1,11 +1,12 @@
 // MVD Transporte proxy — the app's single backend address.
 //
-// Fixed /v1 routes over two sources: transporteRest (arrivals, stops,
-// timetables) and the official IM API, which only the ImGateway Durable
-// Object calls (fleet, catalogs). Responses are cached by Workers Caching
-// (wrangler.jsonc `cache`) for the Cache-Control set here: on a hit
-// Cloudflare answers without running this code, so neither the IP limit nor
-// the upstreams are touched. On a miss the client IP is counted first.
+// Fixed /v1 routes over four sources: transporteRest (arrivals, stops,
+// timetables), notificacion (news), pci (GPS status) and the official IM
+// API, which only the ImGateway Durable Object calls (fleet, catalogs).
+// Responses are cached by Workers Caching (wrangler.jsonc `cache`) for the
+// Cache-Control set here: on a hit Cloudflare answers without running this
+// code, so neither the IP limit nor the upstreams are touched. On a miss the
+// client IP is counted first.
 
 import {
   getArrivals,
@@ -14,6 +15,8 @@ import {
   StopNotFoundError,
   UpstreamError,
 } from './transporte_rest.js';
+import { getNewest } from './notificacion.js';
+import { getGpsStatus } from './pci.js';
 import { DAY_TYPES } from './rules.js';
 
 export { ImGateway } from './im_gateway.js';
@@ -24,6 +27,8 @@ const MISSING_STOP_TTL = 3600; // a new stop may appear
 const ARRIVALS_TTL = 15; // the app refreshes every 30 s
 const SCHEDULE_TTL = 6 * 3600; // same as the app's own timetable cache
 const CATALOG_TTL = 24 * 3600;
+const NEWS_TTL = 300; // new messages come every few days
+const GPS_TTL = 60; // the app asks at most once a minute
 
 // Comfort data is optional: arrivals do not wait longer for it
 const VEHICLES_WAIT_MS = 2000;
@@ -38,6 +43,8 @@ export const ROUTES = [
   [new RegExp(`^/v1/stops/${STOP}/arrivals$`), arrivals],
   [new RegExp(`^/v1/stops/${STOP}/schedule/([a-z]+)/${TIME}$`), schedule],
   [/^\/v1\/catalog\/stops$/, catalog],
+  [/^\/v1\/news$/, news],
+  [/^\/v1\/status\/gps$/, gpsStatus],
 ];
 
 export default {
@@ -148,6 +155,16 @@ async function schedule(_env, id, day, hour, minute) {
 
 function catalog(env) {
   return fromGateway(env, '/catalog/stops', CATALOG_TTL);
+}
+
+async function news() {
+  const items = await getNewest();
+  return json({ fetchedAt: new Date().toISOString(), news: items }, NEWS_TTL);
+}
+
+async function gpsStatus() {
+  const operators = await getGpsStatus();
+  return json({ fetchedAt: new Date().toISOString(), operators }, GPS_TTL);
 }
 
 /** Passes an ImGateway answer on, with this proxy's cache and error rules. */

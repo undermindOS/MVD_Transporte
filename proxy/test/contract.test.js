@@ -21,10 +21,6 @@ const PENDING = {
   'stop.574.degraded': 'P5 (directions from the stop metadata)',
   'catalog.sample': 'P4 (geoserver stop index) and P5 (linevariants)',
   'catalog.nolines': 'P4 (geoserver stop index)',
-  'news.cold': 'P3 (GET /v1/news)',
-  'news.page_fails': 'P3 (GET /v1/news)',
-  'gps.ok': 'P3 (GET /v1/status/gps)',
-  'gps.empty': 'P3 (GET /v1/status/gps)',
 };
 
 // Error codes no GET case can produce; index.test.js covers them

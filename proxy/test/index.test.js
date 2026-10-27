@@ -484,6 +484,22 @@ describe('logs', () => {
     assert.deepEqual(logs, ['transporteRest: HTTP 500']);
   });
 
+  it('name the news and GPS sources', async () => {
+    const logs = captureLogs();
+    mockUpstream(() => {
+      throw new DOMException('The operation timed out.', 'TimeoutError');
+    });
+    const { response: news } = await call('/v1/news');
+    mockUpstream(() => new Response('Internal Server Error', { status: 500 }));
+    const { response: gps } = await call('/v1/status/gps');
+
+    assert.equal(news.status, 504);
+    assert.deepEqual(await news.json(), { error: 'upstream_timeout' });
+    assert.equal(gps.status, 502);
+    assert.equal(gps.headers.get('Cache-Control'), 'no-store');
+    assert.deepEqual(logs, ['notificacion: TimeoutError', 'pci: HTTP 500']);
+  });
+
   it('never carry a URL, a path or a query string', async () => {
     const logs = captureLogs();
     const failures = [
@@ -544,6 +560,10 @@ describe('requests that never reach transporteRest', () => {
     ['/v1/catalog/lines', 404, 'not_found'],
     ['/v1/lines/117/buses?x=1', 400, 'bad_request'],
     ['/v1/catalog/variants', 404, 'not_found'],
+    ['/v1/news/', 404, 'not_found'],
+    ['/v1/news?fromIdMessage=0', 400, 'bad_request'],
+    ['/v1/status', 404, 'not_found'],
+    ['/v1/status/gps/', 404, 'not_found'],
   ];
 
   for (const [path, status, code] of cases) {
