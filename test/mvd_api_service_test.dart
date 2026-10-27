@@ -743,22 +743,32 @@ void main() {
 
     test('the catalog is downloaded once a day and kept on the device',
         () async {
-      expect(await load(), 4972);
+      // With lines: a catalog without them is asked again after 15 minutes
+      catalogAnswer = withLines;
+      expect(await load(), 1);
       expect(requested, ['https://proxy.test/v1/catalog/stops']);
 
-      // Same app session, then a new one (decoded from Hive): no download
-      expect(await load(), 4972);
+      // Same app session, then a new one (decoded from Hive): no download,
+      // also 23 hours later
+      expect(await load(), 1);
       MvdApiService.clearCatalogMemory();
-      expect(await load(), 4972);
+      expect(await load(), 1);
+      await CacheService.saveCatalog(
+          utf8.decode(withLines),
+          DateTime.now()
+              .subtract(const Duration(hours: 23))
+              .millisecondsSinceEpoch);
+      MvdApiService.clearCatalogMemory();
+      expect(await load(), 1);
       expect(requested, hasLength(1));
 
       // A day later it is downloaded again
       await CacheService.saveCatalog(
-          utf8.decode(catalogBody),
+          utf8.decode(withLines),
           DateTime.now()
               .subtract(const Duration(days: 1, minutes: 1))
               .millisecondsSinceEpoch);
-      expect(await load(), 4972);
+      expect(await load(), 1);
       expect(requested, hasLength(2));
     });
 
