@@ -105,6 +105,8 @@ flutter:
     - assets/fonts/OFL-FiraSansExtraCondensed.txt
     - assets/fonts/OFL-Doto.txt
     - assets/licenses/MIT-pixelarticons.txt
+    # The privacy policy, shown as it is (lib/ui/privacy_policy_page.dart)
+    - docs/privacy-policy.md
 
   # Timbre MVD typefaces, bundled (no runtime download): Latin subsets of
   # Fira Sans, Fira Sans Extra Condensed and a static Black instance of Doto
