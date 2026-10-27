@@ -55,7 +55,8 @@ const COMFORT_SAVE_EVERY_MS = 5 * 60 * 1000; // ≤ 288 storage writes a day
 // each, plus "stopmeta:info": a wake-up reads only the buckets it needs.
 const STOP_META_TTL_MS = 24 * 3600 * 1000;
 const STOP_META_MAX_AGE_MS = 7 * 24 * 3600 * 1000;
-// After a failed build; the Worker caches a catalog without lines as long
+// After a failed build, whose time is stored as "stopmeta:failedAt"; the
+// Worker caches a catalog without lines as long
 const STOP_META_RETRY_MS = 15 * 60 * 1000;
 // How long the catalog waits for a first build before answering without lines
 const STOP_META_WAIT_MS = 20 * 1000;
@@ -232,9 +233,16 @@ export class ImGateway {
    * background.
    */
   async stopMeta() {
-    this.stopMetaRead ??= Promise.resolve(this.state?.storage?.get('stopmeta:info')).then(
-      (info) => (info ? { info, buckets: [] } : null),
-    );
+    const storage = this.state?.storage;
+    // The time of a failed build is read with it: memory does not survive
+    // hibernation, and a woken gateway would otherwise build again at once
+    this.stopMetaRead ??= Promise.all([
+      storage?.get('stopmeta:info'),
+      storage?.get('stopmeta:failedAt'),
+    ]).then(([info, failedAt]) => {
+      if (failedAt > this.stopMetaFailedAt) this.stopMetaFailedAt = failedAt;
+      return info ? { info, buckets: [] } : null;
+    });
     const meta = await this.stopMetaRead;
     const age = meta ? this.now() - meta.info.builtAt : Infinity;
     if (age >= STOP_META_MAX_AGE_MS) return null;
@@ -282,8 +290,9 @@ export class ImGateway {
     if (this.now() - this.stopMetaFailedAt < STOP_META_RETRY_MS) return null;
 
     pending = this.buildStopMeta()
-      .catch((e) => {
+      .catch(async (e) => {
         this.stopMetaFailedAt = this.now();
+        await this.state?.storage?.put('stopmeta:failedAt', this.stopMetaFailedAt);
         throw e;
       })
       .finally(() => this.loading.delete('stopMeta'));

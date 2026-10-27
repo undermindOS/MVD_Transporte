@@ -824,6 +824,29 @@ describe('GET /stops/{id}/meta', () => {
     assert.deepEqual(calls, []);
   });
 
+  it('a woken gateway still waits 15 min after a failed build', async () => {
+    const logs = [];
+    console.error = (...args) => logs.push(args.join(' '));
+    const storage = memoryStorage();
+    const calls = mockIndex({ [STOP_INDEX_URL]: () => new Response('', { status: 500 }) });
+    const first = gateway({ storage });
+    await first.get_('/stops/574/meta');
+    await first.settle();
+
+    const woken = gateway({ storage, start: '2026-10-19T22:54:10Z' });
+    assert.equal((await woken.get_('/stops/574/meta')).status, 503);
+    await woken.settle();
+    assert.equal(calls.filter((c) => c.includes('geoserver')).length, 1);
+    assert.deepEqual(logs, ['geoserver: HTTP 500']);
+
+    const later = mockIndex();
+    const g = gateway({ storage, start: '2026-10-19T23:07:10Z' });
+    await g.get_('/stops/574/meta');
+    await g.settle();
+    assert.equal(later.filter((c) => c.includes('geoserver')).length, 1);
+    assert.equal((await g.get_('/stops/574/meta')).status, 200);
+  });
+
   it('drops copies older than 7 days', async () => {
     const storage = memoryStorage();
     mockIndex();
