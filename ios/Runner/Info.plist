@@ -15,7 +15,7 @@
 		<key>CFBundleInfoDictionaryVersion</key>
 		<string>6.0</string>
 		<key>CFBundleName</key>
-		<string>stm_app</string>
+		<string>Timbre MVD</string>
 		<key>CFBundlePackageType</key>
 		<string>APPL</string>
 		<key>CFBundleShortVersionString</key>
@@ -49,9 +49,9 @@
 			</dict>
 		</dict>
 		<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
-		<string>Timbre MVD necesita acceso a tu ubicación para mostrarte rutas de transporte cercanas.</string>
+		<string>Timbre MVD usa tu ubicación para mostrarte las paradas cercanas.</string>
 		<key>NSLocationWhenInUseUsageDescription</key>
-		<string>Timbre MVD necesita acceso a tu ubicación para mostrarte rutas de transporte cercanas en la función Cómo Ir.</string>
+		<string>Timbre MVD usa tu ubicación para mostrarte las paradas cercanas.</string>
 		<key>NSFaceIDUsageDescription</key>
 		<string>Timbre MVD usa Face ID para proteger tu información de transporte.</string>
 		<key>UIApplicationSceneManifest</key>
