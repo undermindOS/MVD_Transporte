@@ -75,8 +75,10 @@ Widget _newsList({int? readBefore = 179, bool failed = false}) => Scaffold(
       ),
     );
 
-Widget _schedule({List<ScheduledPass> passes = _passes}) => SchedulePage(
-      stop: BusStop(id: 3140, name: 'AV RAMON ANADOR y TIBURCIO GOMEZ'),
+Widget _schedule({List<ScheduledPass> passes = _passes, BusStop? stop}) =>
+    SchedulePage(
+      stop: stop ??
+          BusStop(id: 3140, name: 'AV RAMON ANADOR y TIBURCIO GOMEZ'),
       now: DateTime(2026, 10, 17, 23, 33),
       fetch: (id, day, h, m) async => passes,
     );
@@ -499,6 +501,28 @@ void main() {
         expect(destination.didExceedMaxLines, isFalse);
       });
     }
+
+    // A catalog name ("street1 y street2") that needs three lines at 2x
+    testWidgets('Text at 2x: Horarios shows a three-line stop name whole',
+        (tester) async {
+      usePhoneScreen(tester);
+      await tester.pumpWidget(_app(
+          _schedule(
+              stop: BusStop(
+                  id: 4189,
+                  name: 'AV 18 DE JULIO y CIRCUNVALACION DR ENRIQUE TARIGO')),
+          textScale: 2));
+      await tester.pumpAndSettle();
+
+      final bar = tester.getRect(find.byType(AppBar));
+      final name =
+          find.text('AV 18 DE JULIO y CIRCUNVALACION DR ENRIQUE TARIGO');
+      expect(tester.renderObject<RenderParagraph>(name).didExceedMaxLines,
+          isFalse);
+      expect(tester.getRect(name).bottom, lessThanOrEqualTo(bar.bottom));
+      expect(tester.getRect(find.text(' · 4189')).bottom,
+          lessThanOrEqualTo(bar.bottom));
+    });
 
     testWidgets('the longest page title shrinks to fit, never cut',
         (tester) async {

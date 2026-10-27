@@ -4,7 +4,7 @@ import '../theme/timbre_text.dart';
 
 /// Big page title under the brand plate on the header board ("MIS
 /// PARADAS", "SERVICIOS", "HORARIOS"), with an optional subtitle that wraps
-/// to a second line when it does not fit.
+/// to more lines when it does not fit.
 ///
 /// The height follows the system font size and the subtitle lines: a fixed
 /// height cut the title with the "Largest" text setting.
@@ -44,8 +44,9 @@ class PageTitleBar extends StatelessWidget implements PreferredSizeWidget {
 
   static const defaultSubtitleStyle = TimbreText.subtitle;
 
-  /// A long stop name ends in "…" only after this many lines.
-  static const subtitleMaxLines = 2;
+  /// A long stop name ends in "…" only after this many lines: a catalog
+  /// name ("street1 y street2") takes three at 2x.
+  static const subtitleMaxLines = 4;
 
   // Breathing room under the plate, then the title, then the bottom edge
   static const _top = 5.0;
