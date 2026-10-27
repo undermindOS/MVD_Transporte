@@ -385,5 +385,21 @@ void main() {
       expect(widget[WidgetFeed.keyStatus], 'off');
       expect(redraws, 1);
     });
+
+    test('sync() empties the widget when no route is left, even with a stop '
+        'alert', () async {
+      final route = await saveRoute(lines: ['116']);
+      await saveStop();
+      widget
+        ..[WidgetFeed.keyLine] = '116'
+        ..[WidgetFeed.keyStatus] = 'ok';
+
+      route.enabled = false;
+      await route.save();
+      await BackgroundWorker.sync();
+      await pumpEventQueue(); // the widget is not awaited
+      expect(widget[WidgetFeed.keyLine], isNull);
+      expect(widget[WidgetFeed.keyStatus], 'off');
+    });
   });
 }

@@ -133,10 +133,13 @@ class BackgroundWorker {
     } catch (e) {
       debugPrint('⚠️ WorkManager sync error: $e');
     }
-    // Without the task nothing refreshes the widget: no stale row on it.
+    // Without a route, or without the task, nothing refreshes the widget:
+    // no stale row on it, even while a stop alert keeps the task alive.
     // Not awaited: callers wait for the task only (the app unlocks after
     // this), and the widget catches its own errors
-    if (!active) unawaited(WidgetFeed.clear(WidgetFeed.statusOff));
+    if (CacheService.getEnabledRoutes().isEmpty) {
+      unawaited(WidgetFeed.clear(WidgetFeed.statusOff));
+    }
   }
 
   static Future<void> cancelAll() async {
