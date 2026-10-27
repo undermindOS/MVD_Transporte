@@ -85,8 +85,9 @@ disposición:
 - **Título de página:** una sola línea en Doto que se achica a lo ancho (`FittedBox`). Nunca
   termina en «…».
 - **Alto de la barra:** `PageTitleBar.preferredSize` se calcula con la escala de texto y con las
-  líneas que ocupa el subtítulo al ancho de la pantalla, hasta 2. Horarios muestra el nombre
-  entero de la parada a 2×.
+  líneas que ocupa el subtítulo al ancho de la pantalla, hasta 4 (`subtitleMaxLines`). Horarios
+  muestra el nombre entero de la parada a 2×, también uno del catálogo que necesita tres líneas
+  («AV 18 DE JULIO y CIRCUNVALACION DR ENRIQUE TARIGO»).
 - **Nombre de parada en la tarjeta:** sin límite de líneas.
 - **Destino en las filas** (`ArrivalRow`, fila de Horarios): hasta 2 líneas.
 - **Cosas de tamaño fijo que se achican adentro:** el número de línea en `LineBadge`, la hora de
@@ -238,6 +239,7 @@ texto cortado hace fallar la prueba.
 | `test/stops_layout_test.dart` | las filas del tablero; la nota de error con los estimados; el cartel de «Estoy esperando» con «PUNTA CARRETAS» y «DELTA DEL TIGRE» | 1×, 1.3×, 2× |
 | `test/stops_layout_test.dart` | las etiquetas de las subpestañas enteras | 2× |
 | `test/screens_test.dart` | Horarios: el nombre entero de la parada y el destino en 2 líneas | 1×, 1.3×, 2× |
+| `test/screens_test.dart` | Horarios: un nombre de parada de tres líneas, entero y dentro de la barra | 2× |
 | `test/screens_test.dart` | Servicios, Novedades, Horarios e Info sin desborde; la barra con subtítulo; el título más largo | 2× |
 | `test/stop_search_layout_test.dart` | Agregar parada con la búsqueda por calles | 2× |
 | `test/lock_screen_test.dart` | la pantalla de bloqueo sin desborde; el candado quieto con movimiento reducido | 2× |

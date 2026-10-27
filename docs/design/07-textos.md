@@ -114,8 +114,9 @@ Reglas:
   teórico es siempre una hora de reloj, nunca «en 20 min».
 - **«min» no cambia.** Se escribe «1 min» y «12 min». El lector de pantalla dice «1 minuto» y
   «12 minutos».
-- **«~» solo para estimados.** Lo usan las filas viejas después de un fallo, el widget y el
-  título del recordatorio de iOS («Línea 121 — ~5 min»). Un estimado nunca va en ámbar.
+- **«~» solo para estimados.** Lo usan las filas viejas (después de un fallo, o de un tablero
+  que llegó hace 1 min o más), el widget y el título del recordatorio de iOS
+  («Línea 121 — ~5 min»). Un estimado nunca va en ámbar.
 - **La hora de arribo viene hecha.** `clockTime` sale de `horaDesc` de transporteRest. Con proxy
   lo arma el Worker; sin proxy, el adaptador del teléfono con la misma regla
   (`ContractRules.arrival`). Si la fila no trae `horaDesc`, se usa `time` en UTC−3, y solo si
@@ -150,10 +151,11 @@ Código: `_buildArrivals` y `_buildGpsWarning` en `lib/ui/stops_page.dart`.
 |---|---|---|
 | Falló la última actualización y no hay datos de menos de 5 min | «No se pudo actualizar. Deslizá para reintentar» | nota roja |
 | Falló, pero hay datos de menos de 5 min | «No se pudo actualizar. Datos de las 19:52. Deslizá para reintentar.» y debajo las filas «~H:MM» | nota roja y filas estimadas |
+| No falló, pero el último tablero llegó hace 1 min o más (al volver a Mis paradas, o con `busy`) | ninguno: solo las filas «~H:MM» | filas estimadas, sin nota; desde los 5 min, o si no queda ninguna fila, el indicador de carga |
 | La parada ya no existe (`notFound`) | «Esta parada ya no existe. Deslizá la tarjeta para borrarla.» | nota roja, sin filas |
 | No viene ningún ómnibus, o ninguno pasa el filtro de la ruta | «Sin ómnibus próximos» | nota en `tenue` con el ícono `bus` |
-| Demasiados pedidos (`busy`) | ninguno: la app saltea actualizaciones hasta que pasa `Retry-After` | la tarjeta queda como estaba |
-| Carga inicial | ninguno: un indicador de progreso de 18 px | — |
+| Demasiados pedidos (`busy`) | ninguno: la app saltea actualizaciones hasta que pasa `Retry-After` | la tarjeta queda como estaba, hasta que el tablero cumple 1 min (fila de los estimados sin fallo) |
+| Carga inicial, o un tablero sin fallo de 5 min o más | ninguno: un indicador de progreso de 18 px | — |
 | Un operador manda GPS de menos del 70 % de sus ómnibus | «Datos GPS parciales (CUTCSA 60 %): algunos tiempos pueden ser horarios teóricos o menos precisos.» | panel `avisoNoche` arriba de la lista |
 
 En el aviso de GPS van solo los operadores con datos parciales, separados por coma, con un

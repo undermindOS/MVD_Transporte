@@ -23,7 +23,7 @@ marcas de confort, a la derecha el tiempo. Alto mínimo 52, márgenes 14 × 6.
 | **vivo** | `isRealTime` y `etaMinutes > 0`, no `stale` | lleno, `ambar` | `MinutosEnVivo`: punto, «12» en Doto 26 `ambar`, «min» | «llega en 12 minutos, con GPS» |
 | **llegando** | `isRealTime` y `etaMinutes <= 0`, no `stale` | lleno, `ambar` | `LlegandoChip`: «LLEGANDO» | «llegando, con GPS» |
 | **horario** | `state == scheduled`, no `stale` | contorno `etiquetaCartel` | reloj `tenue` y «20:17» en `scheduleTime` 20 px | «horario 20:17, sin GPS» |
-| **estimado** | `stale: true` (último tablero después de un fallo) | contorno, aunque haya tenido GPS | reloj y «~20:01» en `scheduleTime` 20 px | «alrededor de las 20:01, estimado» |
+| **estimado** | `stale: true` (último tablero después de un fallo, o uno que llegó hace 1 min o más) | contorno, aunque haya tenido GPS | reloj y «~20:01» en `scheduleTime` 20 px | «alrededor de las 20:01, estimado» |
 | **esperado** | `waited: true` y no `stale` | el de su estado | el de su estado | se agrega «estás esperando este ómnibus» |
 
 - *Esperado* se suma a vivo, llegando u horario: la fila se levanta con fondo `tintaAlta` y
@@ -164,7 +164,8 @@ desvanecen hacia el título (`LedMatrix` con `TimbreOpacity.ledUnlit`) y abajo e
 - **Título:** en mayúsculas, Doto 28 `ambar` (`TimbreText.pageTitle`). Si no entra, se achica a
   lo ancho (`FittedBox`); nunca termina en «…». El lector escucha el título como encabezado y como
   se escribe, sin pasarlo a mayúsculas («Mis paradas»).
-- **Subtítulo:** hasta 2 líneas (`subtitleMaxLines`). Por defecto `TimbreText.subtitle`.
+- **Subtítulo:** hasta 4 líneas (`subtitleMaxLines`): un nombre del catálogo como «AV 18 DE
+  JULIO y CIRCUNVALACION DR ENRIQUE TARIGO» ocupa tres a 2×. Por defecto `TimbreText.subtitle`.
 - **`subtitleTrailing`:** el final que nunca se corta. Horarios pone « · 574» después del nombre.
 - **`semanticLabel`:** reemplaza la frase de toda la barra.
 - **Alto:** `preferredSize` se calcula con la escala de texto y con las líneas que ocupa el
@@ -254,11 +255,14 @@ condiciones se revisan en este orden:
 | 2 | fallo `notFound` | nota roja «Esta parada ya no existe. Deslizá la tarjeta para borrarla.» |
 | 3 | otro fallo, sin tablero o con un tablero de 5 min o más | nota roja «No se pudo actualizar. Deslizá para reintentar» |
 | 4 | otro fallo, con un tablero de menos de 5 min | nota roja «No se pudo actualizar. Datos de las 19:52. Deslizá para reintentar.» y las filas estimadas con `expectedAt` ≥ ahora − 1 min |
-| 5 | sin fallo, ninguna fila (o ninguna pasa el filtro) | nota «Sin ómnibus próximos» en `tenue` con el ícono `bus` |
-| 6 | sin fallo, con filas | hasta 6 filas; se ven 3 y el resto con «Ver las 6»; «Ver menos» las vuelve a ocultar |
+| 5 | sin fallo, con un tablero que llegó hace 1 min o más (`_liveFor`) | sin nota, las filas estimadas con `expectedAt` ≥ ahora − 1 min. Con 5 min o más, o si no queda ninguna, el indicador de 18 px, como antes del primer tablero |
+| 6 | sin fallo, ninguna fila (o ninguna pasa el filtro) | nota «Sin ómnibus próximos» en `tenue` con el ícono `bus` |
+| 7 | sin fallo, con filas | hasta 6 filas; se ven 3 y el resto con «Ver las 6»; «Ver menos» las vuelve a ocultar |
 
-Una respuesta `busy` no cambia nada: queda el último tablero y el último fallo. La edad del
-tablero se mide con `fetchedAt` contra el reloj del teléfono.
+Una respuesta `busy` no cambia nada: quedan el último tablero, su hora de llegada y el último
+fallo, así que con varios 429 seguidos el tablero también envejece (fila 5). Con fallo, la edad
+del tablero se mide con `fetchedAt` contra el reloj del teléfono; sin fallo, desde que llegó al
+teléfono (`_BoardView.receivedAt`, con `StopsPage.clock`).
 
 ## Nota de error: `_BoardNote`
 

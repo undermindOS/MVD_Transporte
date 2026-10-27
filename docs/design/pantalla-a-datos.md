@@ -92,7 +92,7 @@ para uno de horario ([contrato-v1.md](contrato-v1.md), regla `arrival`).
 | Vivo | `state: "live"` | badge encendido, punto, minutos en Doto y «min» | `state`, `etaMinutes` (1 o más) |
 | Llegando | `etaMinutes` en 0 con GPS | badge encendido y LLEGANDO | `state`, `etaMinutes` |
 | Horario | `state: "scheduled"` | badge en contorno, reloj y `clockTime` | `state`, `clockTime` |
-| Estimado | el último pedido falló y el último tablero bueno tiene menos de 5 min | badge en contorno, reloj y «~`clockTime`»; nunca ámbar y no se puede tocar | `fetchedAt` del tablero, `expectedAt` (quedan las filas con `expectedAt` desde hace 1 min o después), `clockTime` |
+| Estimado | el último pedido falló y el último tablero bueno tiene menos de 5 min; o no falló, pero ese tablero llegó al teléfono hace 1 min o más y menos de 5 | badge en contorno, reloj y «~`clockTime`»; nunca ámbar y no se puede tocar | `fetchedAt` del tablero (con fallo) o la hora en que llegó al teléfono (sin fallo), `expectedAt` (quedan las filas con `expectedAt` desde hace 1 min o después), `clockTime` |
 | Esperado | `BusWait.follows` da esta fila | además de vivo, llegando u horario: fila levantada en `tintaAlta` y campana ámbar | `tripId`; si no está, el mismo `variantId` (o la misma línea y destino) con el `expectedAt` más cercano, a menos de 10 min |
 
 Una fila estimada nunca se marca como esperada.
@@ -118,11 +118,14 @@ Línea {line} a {spokenName(destination)}, {cuándo}[, accesible][, aire acondic
 | «No se pudo actualizar. Datos de las 19:52. Deslizá para reintentar.» | `MvdApiService.montevideoClock(ArrivalsBoard.fetchedAt)` | `fetchedAt` | el reloj del Worker cuando contestó transporteRest; modo directo: el reloj del teléfono cuando llegó la respuesta |
 | Filas estimadas debajo de esa nota | `BusArrival.expectedAt` desde hace 1 min o después | `arrivals[].expectedAt` | `time` (ms); si no viene, `fetchedAt` más los minutos |
 | Solo «No se pudo actualizar. Deslizá para reintentar» | no hay tablero bueno, o tiene 5 min o más contra el reloj del teléfono | `fetchedAt` | – |
+| Filas estimadas sin nota (no hubo fallo) | el tablero llegó hace 1 min o más (`_BoardView.receivedAt`); quedan las de `expectedAt` desde hace 1 min o después. Desde los 5 min, o sin filas, el indicador de carga | `arrivals[].expectedAt` | – |
 | «Esta parada ya no existe. Deslizá la tarjeta para borrarla.» | `ApiFailure.notFound` | 404 `stop_not_found` | transporteRest contestó un error que empieza con `No existe` |
 
 `fetchedAt` es la hora en que contestó la fuente, no la del pedido: desde la
 caché del proxy puede tener hasta 15 s más. Por eso «Datos de las…» dice de
-cuándo son los minutos.
+cuándo son los minutos. Sin fallo, la edad no sale de `fetchedAt` sino de la
+hora en que el tablero llegó, según el reloj del teléfono (`StopsPage.clock`):
+el reloj del servidor puede estar corrido.
 
 ## Rutas: tarjeta de ruta
 
@@ -212,8 +215,10 @@ página de una vez.
   minúsculas, sin tildes ni signos). Una parada sin calles tiene la clave
   vacía y ninguna búsqueda la encuentra.
 - Con `linesAvailable: false` en el catálogo, `lines` viene vacío y la fila
-  de una parada cercana termina en la distancia. La app no lee
-  `linesAvailable`.
+  de una parada cercana termina en la distancia. Ninguna pantalla lee
+  `linesAvailable`; `MvdApiService.getStopCatalog` sí: ese catálogo no
+  reemplaza una copia guardada con líneas y, si se guarda, vence a los
+  15 min.
 - Los nombres de línea del WFS («M-A», «PA», «124 SD») pueden no ser los de
   transporteRest. Como `BusStop.lines` no se muestra, hoy no se ve la
   diferencia.
@@ -299,6 +304,8 @@ pudo consultar no da ningún aviso.
 cualquier hora, con el primer ómnibus de su parada de origen que pasa
 `RouteAlert.accepts`, tenga GPS o no. Lo escriben la tarea de fondo (cada
 15 min o más) y la app después de cada refresco que incluye esa parada.
+Cuando no queda ninguna ruta activa, `BackgroundWorker.sync()` lo vacía en el
+acto, aunque quede una alerta de parada.
 
 | Qué se ve | Clave | Modelo | Campo /v1 | Fuente |
 |---|---|---|---|---|
@@ -329,12 +336,12 @@ app.
 | `arrivals[].tripId` | seguir el viaje de «Estoy esperando» y marcar la fila esperada |
 | `arrivals[].variantId` | filtro de rutas (`preferredVariantIds`), seguimiento, chips HACIA de respaldo |
 | `arrivals[].expectedAt` | filas estimadas, seguimiento, recordatorio de iOS, caducidad del widget |
-| `fetchedAt` de los arribos | «Datos de las H:MM» y el límite de 5 min de las filas estimadas |
+| `fetchedAt` de los arribos | «Datos de las H:MM» y el límite de 5 min de las filas estimadas después de un fallo (sin fallo cuenta la hora en que el tablero llegó al teléfono) |
 | `id` de la parada y de los arribos | ninguno: `V1Parser` usa el número pedido |
 | `directions[].variantIds` | se guardan en `RouteAlert.preferredVariantIds` |
 | `stops[].location` | la distancia en «Paradas cercanas»; nunca se muestra un mapa |
-| `linesAvailable` | ninguno: `V1Parser` lo lee, pero ninguna pantalla lo usa |
-| `fetchedAt` del catálogo, de novedades y de GPS | ninguno: el catálogo se guarda con la hora del teléfono |
+| `linesAvailable` | ninguna pantalla lo usa; `MvdApiService.getStopCatalog` no deja que un catálogo sin líneas reemplace una copia con líneas, y lo guarda solo 15 min |
+| `fetchedAt` del catálogo, de novedades y de GPS | ninguno: el catálogo se guarda con la hora del teléfono (corrida hacia atrás si vino sin líneas, para que venza a los 15 min) |
 | `passes[].hhmm` | encabezados de hora y «Después de medianoche» |
 | `operators[].partial` | decide si aparece el aviso de GPS |
 | `news[].id` | NUEVA, el número sobre la pestaña y la mezcla con la copia guardada |
@@ -347,5 +354,5 @@ app.
 | Origen, líneas y direcciones de una ruta | `RouteAlert` (caja `routes`) | `/v1/stops/{id}` y, de respaldo, `/v1/stops/{id}/arrivals` al guardar | Nunca. Una ruta guardada sin conexión queda con «Parada N» de origen |
 | El viaje esperado | `BusWait` | el elemento de `arrivals` elegido | En cada consulta adopta el `tripId` y el `expectedAt` del viaje encontrado |
 | Novedades | `news_cache` (caja `settings`) | `/v1/news` | En cada refresco (cada 10 min como mucho; 30 s al deslizar) |
-| Catálogo | caja perezosa `catalog` | `/v1/catalog/stops`, el cuerpo tal como llegó | Una vez por día, cuando se usa |
-| Fila del widget | claves de `home_widget` | `/v1/stops/{id}/arrivals` del origen de la primera ruta | En cada tarea de fondo y en cada refresco de la app que incluye esa parada |
+| Catálogo | caja perezosa `catalog` | `/v1/catalog/stops`, el cuerpo tal como llegó | Una vez por día, cuando se usa; uno sin líneas, a los 15 min, y nunca encima de una copia con líneas |
+| Fila del widget | claves de `home_widget` | `/v1/stops/{id}/arrivals` del origen de la primera ruta | En cada tarea de fondo y en cada refresco de la app que incluye esa parada; se borra apenas no queda ninguna ruta activa |

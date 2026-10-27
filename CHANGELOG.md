@@ -12,8 +12,9 @@ versiones: [SemVer](https://semver.org/lang/es/).
   «ORDOÐEZ», mal escrito en el catálogo); primero las coincidencias al principio de una palabra, hasta 50. La
   parada elegida se guarda al instante con su nombre y sus líneas. El catálogo del proxy (`/v1/catalog/stops`,
   4 972 paradas) se baja al escribir la primera letra y queda en el teléfono un día (unos 660 KB, que se leen del
-  disco solo cuando hacen falta); si el proxy no responde, se usa la copia anterior. Solo en la build con
-  `MVD_PROXY_URL`; sin proxy el campo no aparece.
+  disco solo cuando hacen falta); si el proxy no responde, se usa la copia anterior. Un catálogo que llega sin
+  líneas (el proxy todavía no armó su índice de paradas) nunca pisa una copia que sí las tiene y se vuelve a
+  pedir a los 15 minutos. Solo en la build con `MVD_PROXY_URL`; sin proxy el campo no aparece.
 - «Paradas cercanas» en el diálogo «Agregar parada»: paradas en un radio de 400 m según tu ubicación, las más
   cercanas primero, con número, distancia y líneas; no hace falta ingresar el número. El permiso de ubicación se
   pide al tocar el botón, y la parada elegida se guarda al instante con su nombre y sus líneas. Con el proxy se
@@ -53,6 +54,9 @@ versiones: [SemVer](https://semver.org/lang/es/).
   parada guardada: la tarjeta de la ruta usa los datos de su parada de origen.
 - Si falla la actualización, la tarjeta dice «No se pudo actualizar. Datos de las H:MM. Deslizá para reintentar.»
   y debajo quedan los últimos ómnibus como estimados («~20:01», nunca en ámbar) durante 5 minutos como máximo.
+  Sin error, un tablero que no se renueva hace más de un minuto (al volver de Horarios o Info, o con el proxy
+  saturado) tampoco muestra minutos en vivo: los ómnibus quedan como estimados, sin los que tenían que pasar hace
+  más de un minuto, y pasados 5 minutos la tarjeta espera el tablero nuevo.
 - Si una parada guardada dejó de existir, la tarjeta dice «Esta parada ya no existe. Deslizá la tarjeta para
   borrarla.».
 - Una parada que agregás sin conexión queda como «Parada N» y toma su nombre y sus líneas la próxima vez que abrís
@@ -90,7 +94,8 @@ versiones: [SemVer](https://semver.org/lang/es/).
     destino y los `variantIds`, según las variantes de geoserver y de la API oficial). Se guarda 24 h; si las
     direcciones fallan o tardan más de 2 s, responde `directions: []` y se guarda 5 minutos.
   - `/v1/stops/{id}/arrivals`: cada arribo trae `tripId`, `variantId`, `state` (`arriving`, `live` o `scheduled`),
-    `expectedAt`, `clockTime`, `airConditioning` y `zeroEmission`. Se guarda 15 s.
+    `expectedAt`, `clockTime`, `airConditioning` y `zeroEmission`. Una fila con una hora imposible se descarta,
+    en lugar de un error para toda la parada. Se guarda 15 s.
   - `/v1/stops/{id}/schedule/{weekday|saturday|sunday}/{H:MM}`: solo con la hora canónica (`8:05` anda, `08:05` y
     `8:5` dan 404). Se guarda 6 h.
   - `/v1/catalog/stops`: las 4 972 paradas con sus líneas y `linesAvailable`. Se guarda un día; si todavía no hay
@@ -102,9 +107,10 @@ versiones: [SemVer](https://semver.org/lang/es/).
     baja de 70 %. Si pci devuelve una lista vacía responde 502, así nunca parece que todo anda bien. Se guarda
     1 minuto.
   - Registra los errores de las fuentes con un texto fijo `<fuente>: <tipo>` (por ejemplo
-    `transporteRest: HTTP 500`), sin URL, ruta ni IP, y se identifica siempre con el mismo User-Agent. Cualquier
-    error inesperado responde `500 internal_error` en JSON. `proxy/README.md` está en español: rutas, enlace al
-    contrato, la regla de logs apagados y el orden de despliegue (primero el proxy, después la app).
+    `transporteRest: HTTP 500` o, de la API oficial, `imApi: token refused`), sin URL, ruta ni IP, y se
+    identifica siempre con el mismo User-Agent. Cualquier error inesperado responde `500 internal_error` en JSON.
+    `proxy/README.md` está en español: rutas, enlace al contrato, la regla de logs apagados y el orden de
+    despliegue (primero el proxy, después la app).
 - La API oficial de la IM (`api.montevideo.gub.uy/api/transportepublico`) dentro del proxy. La clave del portal
   está solo en los secretos del Worker (`IM_CLIENT_ID`, `IM_CLIENT_SECRET`), no en la app. Es una sola clave para
   todos y permite 14 pedidos por minuto (medido), así que a la API llama un único Durable Object, `ImGateway`:
@@ -116,7 +122,8 @@ versiones: [SemVer](https://semver.org/lang/es/).
   vacío. Errores nuevos: `503 upstream_busy` (presupuesto agotado, con `Retry-After`) y `503 not_configured`.
 - Índice de paradas en el proxy: una vez por día arma, con el CSV de toda la capa de geoserver, las líneas y
   variantes de cada parada, sin gastar el presupuesto de la API oficial. Lo guarda en el Durable Object en 64 partes,
-  lo sirve hasta 7 días y, si falla, lo reintenta a los 15 minutos.
+  lo sirve hasta 7 días y, si falla, lo reintenta a los 15 minutos, aunque el objeto se haya dormido en el medio
+  (la hora del fallo queda guardada).
 - `proxy/contract/v1/`, el contrato /v1 que comparten el proxy y la app: 24 casos, las respuestas esperadas
   escritas a mano, vectores para cada regla de derivación y capturas fechadas de las fuentes (`upstream/`), entre
   ellas novedades, estado GPS y una muestra del índice de paradas de geoserver del 2026-10-27. Las pruebas de los
@@ -124,7 +131,8 @@ versiones: [SemVer](https://semver.org/lang/es/).
   usan los mismos archivos, así que si el contrato cambia de un solo lado, las pruebas del otro se ponen en rojo.
 - `lib/services/api/`, la capa de datos del contrato /v1 en la app: `ApiResult` y `ApiFailure`, las reglas de
   derivación en Dart (las mismas que el proxy), un único lector por forma (`V1Parser`) y dos fuentes: el proxy, o
-  los servidores de la ciudad convertidos a JSON v1 en el teléfono.
+  los servidores de la ciudad convertidos a JSON v1 en el teléfono. Sin proxy, una respuesta que no se puede
+  convertir hace fallar solo esa parada, no las demás ni los avisos.
 - `proxy/scripts/smoke.js <url>`, para probar un proxy andando: pide cada ruta de los casos 200 del contrato y
   verifica status, `Cache-Control`, `Content-Type` y las claves del cuerpo.
 - Dependencias: `url_launcher` (enlaces de las novedades), `html` (parseo del HTML de las novedades; ya era transitiva).
@@ -196,21 +204,23 @@ versiones: [SemVer](https://semver.org/lang/es/).
 - Las líneas preferidas se comparan sin distinguir mayúsculas de minúsculas («64d» = «64D»).
 - El widget muestra la hora de llegada (`~08:14`), no un «N min» que queda desactualizado.
 - El widget ya no se queda mostrando un ómnibus viejo. Lo deja de mostrar 2 minutos después de la hora en que
-  tenía que pasar, queda vacío si apagás todos los avisos y, sin conexión, muestra el último ómnibus solo hasta su
-  hora.
+  tenía que pasar, queda vacío apenas no te queda ninguna ruta activada (aunque tengas una alerta de parada) y,
+  sin conexión, muestra el último ómnibus solo hasta su hora.
 - Los enlaces «Mi STM» y «Recarga» del widget miden 44 dp de alto, así son más fáciles de tocar, y el widget sigue
   entrando en 3 × 2.
 - Un error de red o una respuesta de arribos con forma inesperada se muestra como «No se pudo actualizar», no como
   «Sin ómnibus próximos».
 - En modo directo, un `minutos` que no es número ya no se muestra como «Llegando».
 - Si falla la consulta del estado GPS, se sigue mostrando el último que llegó bien.
+- Sin el proxy, una novedad con una fecha imposible ya no hace fallar la actualización de Novedades: se descarta y
+  se muestran las demás, como hace el proxy.
 - Ya no aparece una franja blanca (o negra) detrás de la app cuando abrís o cerrás el teclado, tampoco en
   Android 12 o más nuevo: el fondo de la ventana es el azul noche del tablero.
 - Los chips elegidos en «Agregar ruta» y en los días del aviso tienen letras oscuras sobre el ámbar. Antes el texto
   claro casi no se leía.
 - Con letra grande ya no se corta nada con «…». El título de la página se achica hasta entrar entero; el nombre de
-  la parada en Horarios y el subtítulo de Servicios pasan a una segunda línea. El destino en Horarios y en el cartel
-  de «Estoy esperando» también usa dos líneas, o una línea propia cuando dos no alcanzan.
+  la parada en Horarios usa hasta cuatro líneas y el subtítulo de Servicios pasa a una segunda. El destino en
+  Horarios y en el cartel de «Estoy esperando» también usa dos líneas, o una línea propia cuando dos no alcanzan.
 - Aunque achiques la letra del sistema, las letras de puntos («LLEGANDO», el cartel de «Estoy esperando», la placa
   TIMBRE MVD, los carteles de lista vacía) nunca quedan por debajo de 19 px.
 - Si la URL del proxy termina en «/», los pedidos ya no salen con «//».

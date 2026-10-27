@@ -142,8 +142,9 @@ No se enciende:
 
 - Un horario: `TimbreText.scheduleTime` en `etiquetaCartel`,
   `LineBadge(live: false)` en contorno, reloj `tenue`.
-- Una fila vieja después de una actualización fallida:
-  `ArrivalRow(stale: true)` muestra «~20:01» como estimación, con la
+- Una fila vieja, después de una actualización fallida o de un tablero que
+  llegó hace 1 min o más: `ArrivalRow(stale: true)` muestra «~20:01» como
+  estimación, con la
   insignia apagada y sin campana, aunque esa fila haya tenido GPS.
 - El encabezado de hora de Horarios (`etiquetaCartel`).
 - El texto «Aviso 5 min antes · …» de un aviso: es un ajuste, va en

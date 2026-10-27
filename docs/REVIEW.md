@@ -192,7 +192,8 @@ corren tanto las pruebas del proxy como las de la app. Sin desplegar todavía.
   guarda sin pedir nada. «Agregar ruta»: `/v1/stops/{id}` y `/arrivals` en paralelo; `directions` da los chips
   HACIA y los arribos son el respaldo de una línea sin destinos conocidos.
 - «Paradas cercanas» y «Buscar por calles»: `/v1/catalog/stops`, como mucho una vez por día (unos 660 KB, en la
-  caja Hive `catalog`). Las cercanas (400 m) se calculan en el teléfono (`NearbyStopsService.nearbyFrom`):
+  caja Hive `catalog`); uno que llega sin líneas no reemplaza una copia con líneas y se vuelve a pedir a los
+  15 min. Las cercanas (400 m) se calculan en el teléfono (`NearbyStopsService.nearbyFrom`):
   ninguna coordenada sale del dispositivo.
 - «Horarios»: `/schedule/…`, con caché en memoria de 6 h.
 - «Novedades»: `/v1/news` como mucho cada 10 min (cada 30 s con pull-to-refresh), mezclado en la caché Hive de
@@ -226,7 +227,8 @@ corren tanto las pruebas del proxy como las de la app. Sin desplegar todavía.
   adentro.
 - Se arma como mucho una vez por día, una sola vez aunque lleguen muchos pedidos juntos; se sirve hasta 7 días
   y, pasadas 24 h, se rearma en segundo plano. Si el armado falla, o si fallaron solo las variantes (el índice
-  queda incompleto, sin `directions`), se reintenta a los 15 min.
+  queda incompleto, sin `directions`), se reintenta a los 15 min. La hora de un armado fallido se guarda en
+  `stopmeta:failedAt`, así esa espera se cumple aunque el objeto hiberne.
 - Se guarda en 64 partes (`stopmeta:{id % 64}`) más `stopmeta:info`: unas 65 escrituras por armado. Después de
   hibernar, los datos de una parada son como mucho dos lecturas del almacenamiento (`stopmeta:info` y la parte de
   esa parada), sin pedidos.
@@ -246,8 +248,8 @@ proxy esté desplegado.
 **Privacidad y logs.** Una build con proxy no contacta ningún host de la ciudad ni manda coordenadas
 (`test/proxy_privacy_test.dart`, `test/proxy_bff_test.dart`). Los logs de Workers están apagados: `wrangler.jsonc`
 no tiene bloque `observability`. Lo que escribe el Worker son textos fijos `<fuente>: <tipo>`, sin la URL que
-pidió la app, sin número de parada y sin IP; algunas líneas viejas de `ImGateway` todavía nombran el recurso de
-la IM (`im-gateway /buses: HTTP 500`). Ningún encabezado de las fuentes llega al cliente. Detalle en
+pidió la app, sin número de parada y sin IP; también los errores de la API oficial, sin el recurso de la IM
+(`imApi: HTTP 500`, `imApi: token refused`). Ningún encabezado de las fuentes llega al cliente. Detalle en
 [proxy/README.md](../proxy/README.md).
 
 ---

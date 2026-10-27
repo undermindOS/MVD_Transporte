@@ -137,8 +137,9 @@ A cualquier escala:
   con el `textScaler` de la página.
 - El título de página nunca termina en «…»: si no entra, se achica al
   ancho (`FittedBox`).
-- El subtítulo de la app bar ocupa hasta 2 líneas
-  (`PageTitleBar.subtitleMaxLines`). En Horarios el número de parada
+- El subtítulo de la app bar ocupa hasta 4 líneas
+  (`PageTitleBar.subtitleMaxLines`): un nombre de parada del catálogo
+  puede necesitar tres a 2×. En Horarios el número de parada
   (`subtitleTrailing`) nunca se corta.
 - El destino ocupa hasta 2 líneas en `ArrivalRow` y en Horarios.
 - Los textos de los segmentos, la insignia de línea y la hora de Horarios

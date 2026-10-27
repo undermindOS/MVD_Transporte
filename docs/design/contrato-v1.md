@@ -364,6 +364,10 @@ lee (`coordinates`, `parada_actual`, `tipoAccesibilidad`, `dia_anterior`):
 | `zeroEmission` | booleano o `null` | flota de la API oficial: `"Cero emisiones"` → `true`; otro valor que no sea vacío ni `"Sin datos"` → `false`; si no, `null` |
 
 - Se descarta la fila sin `linea` o cuyo `minutos` no es entero.
+- También se descarta la fila cuya hora esperada (`time`, o `fetchedAt` más
+  los minutos) cae fuera de `±8.64e15` ms, lo más lejos que llegan un `Date`
+  de JS y un `DateTime` de Dart. Es una fila menos, no un error para toda la
+  parada (ni un 500 del proxy ni un `failed` en modo directo).
 - Orden: por `etaMinutes`, estable (con los mismos minutos queda el orden de
   transporteRest).
 - **Confort.** Solo para los ómnibus con GPS (`real` y con `idEmpresa` e
@@ -426,15 +430,20 @@ Para «Buscar por calles» y «Paradas cercanas». Golden
 | `stops[].location` | `location.coordinates` de la API oficial (`[lng, lat]`) como `{lat, lng}`. Una parada sin ubicación no entra. |
 | `stops[].lines` | las líneas de esa parada en el índice (`desc_linea` del WFS), sin repetidos, ordenadas con `compareLines`. `[]` con `linesAvailable: false` o si la parada no está en el índice. |
 
-- Son unas 4970 paradas (unos 660 KB). La app las guarda un día.
+- Son unas 4970 paradas (unos 660 KB). La app las guarda un día; un
+  catálogo con `linesAvailable: false`, solo 15 min (ver abajo).
 - Con `linesAvailable: false`, `ImGateway` le avisa al Worker con el
   encabezado interno `X-Lines: 0`. El Worker guarda la respuesta 900 s y no
   pasa ese encabezado. Golden: `responses/catalog_nolines.json`.
 - Los nombres de línea del WFS pueden diferir de los de transporteRest
   (`M-A`, `PA`, `124 SD`): una parada del catálogo puede listar más líneas que
   la tarjeta guardada.
-- La app hoy no lee `linesAvailable`: con `lines` vacío, la fila de una
-  parada cercana termina en la distancia.
+- En la app, `linesAvailable` decide solo qué se guarda
+  (`MvdApiService.getStopCatalog`). Un catálogo sin líneas nunca reemplaza
+  una copia del teléfono que tiene líneas: la app sigue con esa copia. Si no
+  hay una copia con líneas, lo guarda con la fecha corrida hacia atrás, así
+  vence a los 15 min, como en el borde. Ninguna pantalla lo lee: con `lines`
+  vacío, la fila de una parada cercana termina en la distancia.
 
 ### NewsResponse
 
@@ -510,15 +519,15 @@ Para el aviso «Datos GPS parciales». Golden `responses/gps_ok.json`:
 
 Cada regla está dos veces, en `proxy/src/rules.js` y en
 `lib/services/api/contract_rules.dart`. Las dos suites corren todos los
-archivos de `proxy/contract/v1/vectors/` (9 archivos, 138 casos).
+archivos de `proxy/contract/v1/vectors/` (9 archivos, 148 casos).
 
 | Regla | Definición | Vectores |
 |---|---|---|
-| `toIntLoose` | Número → truncado hacia el cero. Texto que, recortado, es `^-?\d+$` → entero (`"007"` → 7). Cualquier otra cosa → `null` (`"5.0"`, `"+5"`, `true`, `""`). | `int_coercion.json` |
+| `toIntLoose` | Número → truncado hacia el cero. Texto que, recortado, es `^-?\d+$` → entero (`"007"` → 7). Cualquier otra cosa → `null` (`"5.0"`, `"+5"`, `true`, `""`). Un entero fuera de ±(2^53 − 1) también → `null` (`1e20`, `"99999999999999999999"`): ahí JS ya redondea y Dart se desborda, así que ninguno tiene el valor. | `int_coercion.json` |
 | `trimText` | Quita `^[\s\u0085]+\|[\s\u0085]+$`. U+0085 se agrega porque el `trim` de JS lo deja y el de Dart lo saca. Los espacios del medio no se tocan. | `text_trim.json` |
 | `compareLines` | Primero el número inicial como entero; una línea con número va antes que una sin número; los empates, por unidades de código UTF-16 (`<` y `>` en JS, `compareTo` en Dart), nunca `localeCompare`. `["124 SD","124","CE1","21","D10","D9","104","M-A","PA"]` → `["21","104","124","124 SD","CE1","D10","D9","M-A","PA"]`. | `line_order.json` |
 | `stopName` | `[calle, esquina]` recortados con `trimText`, sin las partes vacías, unidos con `" y "`; `null` si no queda ninguna. | `stop_name.json` |
-| `arrival` | Una fila de `siguientesParada` → un elemento de `arrivals`, o `null`. Ver la tabla de ArrivalsResponse. `real` cuenta solo si es exactamente `true`; `time` cuenta solo si es un número JSON. `destino` nunca se recorta. `airConditioning` y `zeroEmission` salen en `null`: el confort lo agrega el Worker después. | `arrival.json` |
+| `arrival` | Una fila de `siguientesParada` → un elemento de `arrivals`, o `null`. Ver la tabla de ArrivalsResponse. `real` cuenta solo si es exactamente `true`; `time` cuenta solo si es un número JSON. Una hora esperada fuera de `±8.64e15` ms → `null`. `destino` nunca se recorta. `airConditioning` y `zeroEmission` salen en `null`: el confort lo agrega el Worker después. | `arrival.json` |
 | `newsLink` | Sobre el texto recortado, `^(https?)://([^/?#]+)(.*)$` sin distinguir mayúsculas: esquema y host en minúsculas, el resto igual. Cualquier otra cosa (`""`, `"null"`, `ftp:`, sin host) → `null`. | `news_link.json` |
 | `gpsOperator` | `percent = clamp(round(valor), 0, 100)`, `partial = percent < 70` (69,5 → 70 → `false`). | `gps_status.json` |
 | `stopId` | Válido si y solo si `1 ≤ id ≤ 9999999`. Un id inválido no genera ningún pedido. | `stop_id.json` |
@@ -535,6 +544,8 @@ del proxy:
   ordenan con `compareLines`.
 - **Horario**: `time` y `hhmm` como en la tabla de ScheduleResponse.
 - **Novedades**: `id = toIntLoose(idMensaje)` y la fecha `toIntLoose(fecha)`.
+  Una fecha fuera de `±8.64e15` ms no es fecha y el mensaje se saltea: en el
+  proxy lo descarta el control de `Date`; en Dart, `ContractRules.maxDateMs`.
   `count` cuenta solo si es un número JSON; si no, vale la cantidad de
   mensajes usables.
 - **Catálogo**: solo existe en el proxy (`toStops` en `im_api.js`), así que no
@@ -552,10 +563,10 @@ del proxy:
 | arribos | 15 s | ninguna. Mis paradas pide cada 30 s solo mientras está a la vista (`StopsPage.autoRefreshInterval`); «Estoy esperando» en Android, cada 30 s (`BusWaitTaskHandler.pollInterval`); la tarea de fondo, cada 15 min o más | 1 a transporteRest, más `/vehicles` a `ImGateway` si hay ómnibus con GPS | 0 directas. `/vehicles` contesta de memoria o del almacenamiento y recarga la flota en segundo plano si tiene más de 15 s: como mucho 4 flotas por minuto en total |
 | parada | 86 400 s; 300 s sin `directions` | la parada guardada en Hive (`BusStop`) | 1 a transporteRest, más `/stops/{id}/meta` a `ImGateway` (lee una de las 64 partes del índice) | 0 |
 | horario | 21 600 s | memoria, 6 h, por parada, día y hora | 1 a transporteRest | 0 |
-| catálogo | 86 400 s; 900 s con `linesAvailable: false` | caja perezosa de Hive `catalog`, 1 día; si el proxy no contesta, sirve la copia vieja | `ImGateway`: las paradas de la API oficial (de memoria o de la API) y las líneas del índice | como mucho 1 cada vez que `ImGateway` se despierta, por las paradas (la copia vive solo en memoria). Con 24 h de caché de borde, en la práctica una por día y por centro de datos de Cloudflare |
+| catálogo | 86 400 s; 900 s con `linesAvailable: false` | caja perezosa de Hive `catalog`, 1 día; sin líneas, 15 min, y nunca encima de una copia con líneas; si el proxy no contesta, sirve la copia vieja | `ImGateway`: las paradas de la API oficial (de memoria o de la API) y las líneas del índice | como mucho 1 cada vez que `ImGateway` se despierta, por las paradas (la copia vive solo en memoria). Con 24 h de caché de borde, en la práctica una por día y por centro de datos de Cloudflare |
 | novedades | 300 s | Hive, 30 novedades (`news_cache`); se pide como mucho cada 10 min, o cada 30 s al deslizar | 1 a 8 páginas de notificacion | 0 |
 | GPS | 60 s | memoria, 60 s (`BusStatusService.minInterval`) | 1 a pci | 0 |
-| índice de paradas | – | almacenamiento de `ImGateway`, 64 partes | CSV de geoserver (sin clave; nunca pasa por `spend()`) y `linevariants` de la API oficial | como mucho 1 por armado, por las variantes; un CSV que falla no gasta ninguna. Un armado bueno dura 24 h; uno incompleto o fallido se reintenta a los 15 min |
+| índice de paradas | – | almacenamiento de `ImGateway`, 64 partes | CSV de geoserver (sin clave; nunca pasa por `spend()`) y `linevariants` de la API oficial | como mucho 1 por armado, por las variantes; un CSV que falla no gasta ninguna. Un armado bueno dura 24 h; uno incompleto o fallido se reintenta a los 15 min, también después de hibernar |
 
 - **Caché de borde.** Workers Caching (`"cache": {"enabled": true}` en
   `proxy/wrangler.jsonc`). Ante un acierto, Cloudflare contesta sin correr el
@@ -581,6 +592,10 @@ del proxy:
 - Se guarda en 64 partes (`stopmeta:{id % 64}`) más `stopmeta:info`. Después
   de dormirse, la metadata de una parada se lee de una parte, sin ningún
   pedido.
+- Si un armado falla, su hora queda en `stopmeta:failedAt`, que se lee en la
+  misma lectura que `stopmeta:info`. Así la espera de 15 min se cumple
+  aunque el objeto se duerma en el medio; si no, cada vez que se despertara
+  volvería a bajar la capa entera.
 - `/v1/catalog/stops` espera hasta 20 s el primer armado. `/stops/{id}/meta`
   no espera: sin índice arranca un armado y contesta 503 `upstream_busy` con
   `Retry-After: 30`, y el Worker sirve la parada sin `directions`.
@@ -649,6 +664,8 @@ En modo directo (`DirectSource._get`):
 - un 429 de un servidor de la Intendencia → `busy` con su `Retry-After`;
 - cualquier otro status, JSON inválido o una forma que el adaptador no
   entiende → `failed`;
+- un dato que hace fallar la conversión (`DirectSource._converted`) →
+  `failed` solo para ese pedido: `getBoards` sigue con las otras paradas;
 - `TimeoutException` → `timeout`; `SocketException` y `ClientException` →
   `offline`;
 - el catálogo → siempre `unavailable`.
@@ -676,6 +693,7 @@ ningún pedido (`MvdApiService._call`).
 | `failed`, `timeout`, `offline` | tarjeta, sin un tablero de menos de 5 min | «No se pudo actualizar. Deslizá para reintentar» |
 | `failed`, `timeout`, `offline` | tarjeta, con un tablero de menos de 5 min | «No se pudo actualizar. Datos de las H:MM. Deslizá para reintentar.» y debajo las filas viejas como estimado («~H:MM») |
 | `busy` | tarjetas | nada: siguen igual |
+| ningún fallo, pero el tablero llegó hace 1 min o más | tarjeta | ningún texto: las filas pasan a estimado («~H:MM»); desde los 5 min, o si no queda ninguna fila, el indicador de carga |
 | cualquier falla menos `notFound` | «Agregar parada» con un número escrito | se guarda igual como «Parada N»; al abrir la app, `healPlaceholderStops` le completa nombre y líneas |
 | cualquier falla menos `notFound` | «Agregar ruta» | «No se pudieron cargar las líneas. Revisá la conexión.» |
 | cualquier falla | Horarios | «No se pudo cargar el horario. Revisá la conexión.» y «Reintentar» |
@@ -717,9 +735,11 @@ aparece cada uno, en [09-pantallas.md](09-pantallas.md).
   pedido con la ruta (que lleva el número de parada) y la IP.
 - Lo único que se escribe (`console.error`) son textos fijos
   `<fuente>: <tipo>`, por ejemplo `transporteRest: HTTP 500`,
-  `geoserver: TimeoutError`, `internal: TypeError` o
-  `im-gateway: no line variants`. Sin URL, sin ruta y sin IP.
-  `proxy/test/index.test.js` lo verifica.
+  `geoserver: TimeoutError`, `imApi: HTTP 500`, `imApi: token refused`,
+  `internal: TypeError` o `im-gateway: no line variants`. Sin URL, sin ruta y
+  sin IP.
+  `proxy/test/index.test.js` lo verifica, y `proxy/test/im_gateway.test.js`
+  para las líneas de `ImGateway`.
 - La IP solo sirve de clave para el límite y no se guarda. A `ImGateway` no
   llega: ahí van solo números de ómnibus y de parada.
 - Ningún encabezado de las fuentes llega a la app (por ejemplo, las cookies
@@ -844,15 +864,6 @@ arribos puede venir sin confort, y hasta que termine el primer armado del
   Mientras siga así, `smoke.js` marca esa ruta como FAIL: es un problema de la
   fuente, no del proxy. Cambiar de parada pide una captura y un golden nuevos
   para las dos suites.
-- **Logs con ruta.** Algunas líneas viejas de `ImGateway` todavía nombran el
-  recurso de la API oficial, por ejemplo `im-gateway /buses: HTTP 500` o
-  `im-gateway fleet: /buses: HTTP 500`. No llevan datos de la persona.
-- **`time` fuera de rango.** Un `time` numérico que JS no puede convertir en
-  fecha (por ejemplo `1e20`) hace que el proxy conteste 500 `internal_error` en
-  vez de 502. Ningún vector lo cubre.
-- **Catálogo sin líneas.** El proxy guarda un catálogo con
-  `linesAvailable: false` solo 900 s, pero la app lo guarda un día: cercanas y
-  la búsqueda pueden quedar sin líneas hasta 24 h.
 - **Reloj del modo directo.** `DirectSource` no permite inyectar el reloj. Los
   goldens directos de arribos coinciden porque todas las filas capturadas
   traen `time`; una captura con filas sin `time` dependería del reloj de la

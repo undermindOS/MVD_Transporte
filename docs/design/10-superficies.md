@@ -179,9 +179,12 @@ Archivos:
   - el tablero falló o falta → `offline`; la fila anterior se queda mientras
     `route_expected_at_ms` esté en el futuro, si no `route_line` se borra;
   - no hay ninguna ruta con aviso → `off`, `route_line` se borra.
-- **`WidgetFeed.clear('off')`:** lo llama `BackgroundWorker.sync()` cuando
-  cancela la tarea periódica porque no quedó ningún aviso activado. Sin
-  tarea nadie actualiza el widget, así que no debe quedar una fila vieja.
+- **`WidgetFeed.clear('off')`:** lo llama `BackgroundWorker.sync()` cada vez
+  que no queda ninguna ruta con el aviso activado, aunque una alerta de
+  parada mantenga viva la tarea periódica. Sin ruta, la app no escribe el
+  widget y la tarea lo pondría en `off` recién en su próxima pasada, 15 min o
+  más después, así que no debe quedar una fila vieja. Sin ningún aviso, la
+  tarea además se cancela.
 - **Quién escribe:**
   - la consulta periódica de fondo (`BackgroundWorker.checkAlerts`), al menos
     cada 15 min;

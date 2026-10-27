@@ -234,6 +234,17 @@ y «~20:01» en `TimbreText.scheduleTime`, sin `MinutosEnVivo` y sin ámbar,
 aunque antes tuvieran GPS. Con 5 min o más, solo la nota «No se pudo
 actualizar. Deslizá para reintentar».
 
+Sin fallo, un tablero también envejece: al volver a Mis paradas desde
+Horarios, Info o Servicios, hasta que llega el nuevo, o mientras el proxy
+contesta 429 (`busy` deja el tablero como está). Si llegó hace 1 min o más
+(`_liveFor`, dos vueltas de 30 s), sus filas pasan a estimado igual, sin las
+que debían pasar hace más de 1 min y sin nota: `busy` no dice nada y un
+refresco que está por llegar no es «No se pudo actualizar». Con 5 min o más,
+o si no queda ninguna fila, la tarjeta muestra el indicador de carga, como
+antes del primer tablero. Esta edad se cuenta desde que el tablero llegó al
+teléfono (`_BoardView.receivedAt`, con `StopsPage.clock`), no desde
+`fetchedAt`, que es la hora del servidor.
+
 **Consecuencia.** Una fila vieja no se puede tocar ni muestra la campanita de
 «Estoy esperando». El lector de pantalla dice «alrededor de las 20:01,
 estimado». El mismo formato «~H:MM» es el del widget
@@ -324,8 +335,8 @@ una celda de 0.001°), y filtra en el teléfono con la posición exacta.
 **Consecuencia.** En una build con proxy la posición no sale del teléfono;
 `test/proxy_privacy_test.dart` lo comprueba. Si el catálogo llega con
 `linesAvailable: false`, la lista se muestra sin líneas y no se recurre a
-geoserver. Tema abierto: el teléfono guarda ese catálogo sin líneas un día
-entero, aunque el proxy lo cachea solo 15 min.
+geoserver. Ese catálogo no reemplaza una copia del teléfono que tiene líneas,
+y si se guarda vence a los 15 min, lo mismo que en la caché del proxy.
 
 ### Sin cambio automático al modo directo
 

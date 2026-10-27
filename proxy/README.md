@@ -101,6 +101,9 @@ Un error de una fuente nunca se devuelve como una lista vacía.
     `directions`) y también se reintenta a los 15 minutos.
   - Se guarda en 64 partes (`stopmeta:{id % 64}`) más `stopmeta:info`: unas 65 escrituras por
     armado. Después de dormirse, la metadata de una parada se lee de una parte, sin ningún pedido.
+  - Un armado que falla guarda su hora en `stopmeta:failedAt`, que se lee junto con
+    `stopmeta:info`. Así los 15 minutos se respetan aunque el objeto se duerma en el medio; si no,
+    cada vez que se despertara volvería a bajar la capa entera.
   - `/v1/catalog/stops` espera hasta 20 s el primer armado. Si no hay índice, contesta
     `linesAvailable: false` con `lines: []` en cada parada, y el Worker lo guarda 15 minutos en
     vez de un día.
@@ -133,8 +136,8 @@ de las 12 del presupuesto.
   `observability`, y no hay que agregarlo: Workers Logs guardaría cada pedido, con la ruta (que
   lleva el número de parada) y la IP. Antes de prender cualquier registro, fijate qué guarda.
 - Lo único que se escribe (`console.error`) son textos fijos `<fuente>: <tipo>`, por ejemplo
-  `transporteRest: HTTP 500`, `geoserver: TimeoutError` o `internal: TypeError`: sin URL, sin ruta
-  y sin IP.
+  `transporteRest: HTTP 500`, `geoserver: TimeoutError`, `imApi: HTTP 500`, `imApi: token refused`
+  (la API oficial rechazó el secreto) o `internal: TypeError`: sin URL, sin ruta y sin IP.
 - El proxy ve la IP del cliente y los números de parada. La IP solo sirve de clave para el límite
   y no se guarda. A `ImGateway` no llega: ahí van solo números de ómnibus y de parada.
 - Ningún encabezado de las fuentes llega al cliente (por ejemplo, las cookies de F5).
@@ -266,8 +269,8 @@ Mientras tanto el proxy contesta sin confort y el catálogo da `502`; desde el p
   cuentan como pedidos, pero no gastan CPU.
 - Durable Objects: en el plan gratis solo con almacenamiento SQLite (así está configurado) y
   100 000 filas escritas por día. `ImGateway` escribe una por pedido a la API (≤ 12 por minuto,
-  ≤ 17 280 por día con carga continua), ≤ 288 por día de confort y ~65 por armado del índice de
-  paradas.
+  ≤ 17 280 por día con carga continua), ≤ 288 por día de confort, ~65 por armado del índice de
+  paradas y 1 por armado fallido (`stopmeta:failedAt`, como mucho una cada 15 minutos).
 - Se llama a `ImGateway` en cada pedido sin caché de arribos con ómnibus con GPS, de
   `/v1/stops/{id}` y de `/v1/catalog/stops`.
 - El CSV de geoserver se lee dentro del Durable Object: ~50 ms de CPU en Node la primera vez

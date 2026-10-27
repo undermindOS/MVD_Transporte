@@ -51,7 +51,7 @@ docs/design/             este sistema; tokens.json lo verifica una prueba
 | `cartel.dart` | `CartelCompacto` (la placa TIMBRE MVD), `LiveDot`, `LlegandoChip`, `MinutosEnVivo`, `CartelTira` (la hoja de «Estoy esperando») y `CartelParada` | `CartelCompacto`, en la barra de cada pantalla y en el bloqueo; `MinutosEnVivo` (con `LiveDot`, o `LlegandoChip` a 0 min), en `ArrivalRow`; `CartelTira`, en `stops_page.dart`. `CartelParada` hoy solo aparece en `test/cartel_test.dart` |
 | `empty_state.dart` | `TimbreEmptyState(message, sign, detail)`: una lista vacía como cartel | Mis paradas, Horarios, Novedades |
 | `segmented.dart` | `TimbreSegmented<T>` | Tipo de día en Horarios; 3, 5 o 10 min en «Estoy esperando» |
-| `page_title_bar.dart` | `PageTitleBar`: el título grande y el subtítulo, con la altura medida según la letra del sistema | `buildTimbreAppBar` |
+| `page_title_bar.dart` | `PageTitleBar`: el título grande y el subtítulo (hasta 4 líneas, `subtitleMaxLines`), con la altura medida según la letra del sistema | `buildTimbreAppBar` |
 | `timbre_app_bar.dart` | `buildTimbreAppBar(…)`: el tablero de arriba con sus LED, la placa y el título | `HomePage`, Horarios, Info |
 | `led_matrix.dart` | `LedMatrix(pitch, dot, color, opacity, fadeFrom)`: los LED apagados | La barra de arriba, los mosaicos de Servicios, el bloqueo, Info, la fecha sin leer de Novedades, `TimbreEmptyState`, `TimbreAppIcon` |
 | `led_lock.dart` | `LedLock(pitch, scanning)`: el candado animado | Pantalla de bloqueo |
@@ -76,7 +76,7 @@ y [pantalla-a-datos.md](pantalla-a-datos.md).
 |---|---|
 | `lib/main.dart` | `main()`: deja la pantalla de inicio hasta abrir Hive, las notificaciones, WorkManager y «Estoy esperando»; registra las licencias de las fuentes y de pixelarticons (`_registerFontLicenses`). `MiTransporteMVDApp`: `MaterialApp` con título «Timbre MVD» y `HomePage.routeObserver` |
 | `home_page.dart` | `HomePage`: la navegación de abajo (Mis paradas y Servicios), el bloqueo biométrico (`local_auth`), la apertura de Info y de los sitios en el navegador. `routeObserver` avisa a Mis paradas cuando una página la tapa |
-| `stops_page.dart` | `StopsPage`: las subpestañas Paradas, Rutas y Novedades; las tarjetas; `_refresh` (cada 30 s, `autoRefreshInterval`, solo con la pantalla a la vista); los datos viejos (`_staleFor`, `_staleRowGrace`); la hoja de «Estoy esperando» (`_showWaitSheet`); los diálogos `_AddStopDialog` y `_AddRouteDialog`; los ajustes de aviso (`_AlertSettingsSheet`); el aviso de GPS parcial |
+| `stops_page.dart` | `StopsPage`: las subpestañas Paradas, Rutas y Novedades; las tarjetas; `_refresh` (cada 30 s, `autoRefreshInterval`, solo con la pantalla a la vista); los datos viejos (`_staleFor`, `_staleRowGrace`, `_liveFor`; `_BoardView.receivedAt`, con el reloj `StopsPage.clock` que las pruebas adelantan); la hoja de «Estoy esperando» (`_showWaitSheet`); los diálogos `_AddStopDialog` y `_AddRouteDialog`; los ajustes de aviso (`_AlertSettingsSheet`); el aviso de GPS parcial |
 | `news_list.dart` | `NewsList`, `_NewsRow`, `_DateTile`, `_FailedBanner`; `showNewsDetail` y `openExternalLink` |
 | `schedule_page.dart` | `SchedulePage` (Horarios), `_HourHeader`, `_PassRow` |
 | `services_page.dart` | `ServicesPage`, `_SiteTile`, `_BrowserNote` |
@@ -95,7 +95,7 @@ armado en el teléfono ([contrato-v1.md](contrato-v1.md#en-la-app)).
 | `api_result.dart` | `ApiFailure` (`offline`, `timeout`, `notFound`, `busy`, `unavailable`, `failed`), `ApiResult`, `ApiOk` y `ApiError` (con `retryAfter`) |
 | `v1_source.dart` | La interfaz `V1Source`, un método por ruta: `stop`, `arrivals`, `schedule`, `catalogStops`, `news`, `gpsStatus`. Cada uno devuelve un `SourceAnswer` |
 | `proxy_source.dart` | `ProxySource`: pide `/v1/…` al proxy. Tiempo máximo de 10 s, 30 s para el catálogo y 20 s para las novedades; `retryAfterOf` lee `Retry-After` (60 s si falta) |
-| `direct_source.dart` | `DirectSource`: sin proxy, llama a la Intendencia desde el teléfono, con 10 s de tiempo máximo. `catalogStops` da `unavailable` |
+| `direct_source.dart` | `DirectSource`: sin proxy, llama a la Intendencia desde el teléfono, con 10 s de tiempo máximo. `catalogStops` da `unavailable`. Una respuesta que no se puede convertir da `failed` solo para ese pedido (`_converted`) |
 | `direct/transporte_rest_adapter.dart` | `TransporteRestAdapter`: parada, arribos y horario de transporteRest a /v1 |
 | `direct/wfs_adapter.dart` | `WfsAdapter`: la capa WFS de geoserver a ítems del catálogo (paradas cercanas en modo directo) |
 | `direct/news_adapter.dart` | `NewsAdapter`, `NewsPageV1`: las páginas de notificacion a novedades /v1 |
@@ -107,12 +107,12 @@ armado en el teléfono ([contrato-v1.md](contrato-v1.md#en-la-app)).
 
 | Archivo | Qué tiene |
 |---|---|
-| `mvd_api_service.dart` | `MvdApiService`, la fachada. `proxyUrl` sale de `--dart-define=MVD_PROXY_URL`; `usesProxy` y `source` eligen `ProxySource` o `DirectSource`. Llamadas: `getBoard`, `getBoards` (cada parada una vez, en paralelo), `getStopDetails`, `healPlaceholderStops`, `getSchedule` (guardado 6 h), `getStopCatalog` (guardado un día), `searchStops`, `getNews`, `getGpsStatus`, `isValidStopId`, `montevideoClock`. Después de un 429 no pide nada hasta `retryAfter`. Quedan por compatibilidad `getNextArrivals`, `resolveStop` (con `StopNotFoundException`), `parseArrivals` y `parseSchedule` |
+| `mvd_api_service.dart` | `MvdApiService`, la fachada. `proxyUrl` sale de `--dart-define=MVD_PROXY_URL`; `usesProxy` y `source` eligen `ProxySource` o `DirectSource`. Llamadas: `getBoard`, `getBoards` (cada parada una vez, en paralelo), `getStopDetails`, `healPlaceholderStops`, `getSchedule` (guardado 6 h), `getStopCatalog` (guardado un día; uno sin líneas, 15 min, y nunca encima de una copia con líneas), `searchStops`, `getNews`, `getGpsStatus`, `isValidStopId`, `montevideoClock`. Después de un 429 no pide nada hasta `retryAfter`. Quedan por compatibilidad `getNextArrivals`, `resolveStop` (con `StopNotFoundException`), `parseArrivals` y `parseSchedule` |
 | `cache_service.dart` | `CacheService`: las cajas de Hive `settings`, `stops` y `routes`, y la caja diferida `catalog` (el cuerpo del catálogo y `fetched_at_ms`). La migración `cache_schema` = 2 borra el catálogo viejo de `settings` |
 | `nearby_stops_service.dart` | `NearbyStopsService`: `findNearMe`, `nearbyFrom`, `radiusMeters` = 400, `boxHalfSideMeters` = 472; `NearbyStopsError` |
 | `transport_news_service.dart` | `TransportNewsService`: refresco cada 10 min, o 30 s si lo pedís; guarda hasta 30 novedades; `unreadCount`, `markRead` |
 | `bus_status_service.dart` | `BusStatusService`: el GPS por empresa, una consulta por minuto como mucho; `partialWarning` |
-| `background_worker.dart` | `BackgroundWorker`: la tarea de WorkManager cada 15 min (`checkAlerts`), y `sync` para registrarla o cancelarla |
+| `background_worker.dart` | `BackgroundWorker`: la tarea de WorkManager cada 15 min (`checkAlerts`), y `sync` para registrarla o cancelarla y para vaciar el widget cuando no queda ninguna ruta activa |
 | `home_widget_feed.dart` | `WidgetFeed`: escribe las claves del widget de Android (`update`, `clear`) ([10-superficies.md](10-superficies.md#qué-muestra-las-claves)) |
 | `notification_service.dart` | `NotificationService`: el canal `bus_alerts`, `showBusAlert`, `showRouteAlert`, `scheduleWaitReminder` |
 | `bus_wait_service.dart` | `BusWaitService` («Estoy esperando»), `AndroidBusWait` (servicio en primer plano, canal `bus_wait`) y `ScheduledBusWait` (recordatorio en iOS); `WaitStart` |

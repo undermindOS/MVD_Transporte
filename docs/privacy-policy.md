@@ -68,7 +68,8 @@ en ese momento y busca en el teléfono las paradas que están a menos de
 400 m. Para eso usa la lista de todas las paradas de Montevideo, que
 descarga de nuestro servidor intermediario sin mandar tu posición: es la
 misma para todos, queda guardada en el teléfono y se actualiza como mucho
-una vez por día. Tu ubicación no sale del dispositivo: no la
+una vez por día (si llega sin las líneas de cada parada, se vuelve a pedir a
+los 15 minutos). Tu ubicación no sale del dispositivo: no la
 recibimos nosotros ni la Intendencia. Sin el servidor intermediario, la app
 envía al servicio público de mapas de la Intendencia
 (`geoserver.montevideo.gub.uy`) un área de unos 950 m de lado alrededor de

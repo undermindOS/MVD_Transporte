@@ -47,12 +47,12 @@ Hojas:                        Estoy esperando, Ajustes de aviso, detalle de nove
 
 | Dato | Cuándo se pide | Dónde queda | En el código |
 |---|---|---|---|
-| Arribos de una parada (`GET /v1/stops/{id}/arrivals`) | al arrancar la app; cada 30 s mientras Mis paradas está a la vista; al volver a estar a la vista; al deslizar para actualizar; al agregar una parada o una ruta (solo esa parada) | memoria: el último tablero bueno y el último fallo de cada parada (`_BoardView`) | `StopsPage.autoRefreshInterval`, `_refresh` |
+| Arribos de una parada (`GET /v1/stops/{id}/arrivals`) | al arrancar la app; cada 30 s mientras Mis paradas está a la vista; al volver a estar a la vista; al deslizar para actualizar; al agregar una parada o una ruta (solo esa parada) | memoria: el último tablero bueno, cuándo llegó según el reloj del teléfono y el último fallo de cada parada (`_BoardView`) | `StopsPage.autoRefreshInterval`, `_refresh` |
 | Estado del GPS (`GET /v1/status/gps`) | junto con los arribos: al arrancar la app, en cada vuelta de 30 s y al deslizar; como mucho una vez por minuto | memoria; después de un fallo queda el último estado bueno | `BusStatusService.minInterval` |
 | Novedades (`GET /v1/news`) | al arrancar la app, si pasaron 10 min desde la última vez; al deslizar en Novedades, si pasaron 30 s | Hive, hasta 30 novedades | `TransportNewsService.minInterval`, `forcedMinInterval` |
 | Horario (`GET /v1/stops/{id}/schedule/{day}/{H:MM}`) | al abrir Horarios y con cada cambio de día o de hora | memoria, 6 h por parada, día y hora | `MvdApiService._scheduleTtl` |
 | Datos de una parada (`GET /v1/stops/{id}`) | al agregar una parada por número; al buscar la parada en Agregar ruta; al arrancar la app, para las paradas guardadas como «Parada N» | Hive, dentro de la parada o la ruta guardada | `MvdApiService.getStopDetails`, `healPlaceholderStops` |
-| Catálogo de paradas (`GET /v1/catalog/stops`, solo con proxy) | en Agregar parada: con la primera letra en «Buscar por calles» o al tocar «Paradas cercanas» | Hive (caja `catalog`), 1 día; sin red se usa la copia vieja, tenga la edad que tenga | `MvdApiService._catalogTtl`, `getStopCatalog` |
+| Catálogo de paradas (`GET /v1/catalog/stops`, solo con proxy) | en Agregar parada: con la primera letra en «Buscar por calles» o al tocar «Paradas cercanas» | Hive (caja `catalog`), 1 día; uno sin líneas, 15 min, y nunca reemplaza una copia con líneas; sin red se usa la copia vieja, tenga la edad que tenga | `MvdApiService._catalogTtl`, `getStopCatalog` |
 
 «Al arrancar la app» es cuando se arma `StopsPage`: al abrir la app y otra vez después de cada
 desbloqueo (ver «Bloqueo»). El `IndexedStack` la arma aunque la pestaña elegida sea otra.
@@ -89,8 +89,10 @@ terminó mientras tanto.
 
 `MvdApiService.getBoards` pide cada parada una sola vez y todas en paralelo. Si una parada
 guardada es también el origen de una ruta, las dos tarjetas leen el mismo tablero. Si una
-parada ya se está pidiendo, el pedido nuevo espera ese mismo resultado. Deslizar para actualizar
-pide solo las paradas de su subpestaña: las paradas guardadas en Paradas, los orígenes en Rutas.
+parada ya se está pidiendo, el pedido nuevo espera ese mismo resultado. Una parada que falla no
+frena a las demás, tampoco sin proxy cuando su respuesta no se puede convertir. Deslizar para
+actualizar pide solo las paradas de su subpestaña: las paradas guardadas en Paradas, los orígenes
+en Rutas.
 
 ### Demasiados pedidos: `Retry-After`
 
@@ -114,7 +116,7 @@ Lo que se pide con la app cerrada está en [10-superficies.md](10-superficies.md
 - **Avisos de parada y de ruta.** WorkManager cada 15 min o más (`BackgroundWorker`, con red y
   batería no baja), solo mientras haya algún aviso encendido.
 - **Widget.** Lo actualizan la revisión en segundo plano y cada refresco de la app que incluye el
-  origen de la primera ruta encendida.
+  origen de la primera ruta encendida. Se vacía apenas no queda ninguna ruta encendida.
 
 El proxy guarda los arribos 15 s en su caché, así que un tablero puede llegar hasta 15 s más
 viejo que el pedido. Los tiempos de caché de cada ruta están en [contrato-v1.md](contrato-v1.md).
@@ -129,8 +131,10 @@ viejo que el pedido. Los tiempos de caché de cada ruta están en [contrato-v1.m
 - **Vacío.** Un cartel de `TimbreEmptyState` («SIN PARADAS», «SIN RUTAS», «SIN NOVEDADES»,
   «SIN PASADAS») con una frase que dice qué hacer.
 - **Datos viejos.** Solo Mis paradas los marca: después de un fallo deja hasta 5 min las últimas
-  filas como estimados «~H:MM», nunca en ámbar. Novedades muestra lo guardado debajo del panel de
-  error. Horarios, el catálogo y el estado del GPS usan su copia guardada sin decirlo.
+  filas como estimados «~H:MM», nunca en ámbar. Sin fallo, un tablero que llegó hace 1 min o más
+  también pasa a estimados, y desde los 5 min la tarjeta vuelve al indicador de carga. Novedades
+  muestra lo guardado debajo del panel de error. Horarios, el catálogo y el estado del GPS usan su
+  copia guardada sin decirlo.
 
 ## Mis paradas: Paradas
 
@@ -145,16 +149,20 @@ la fila del aviso si está encendido, los próximos ómnibus y «Ver en Cómo Ir
 | Estado | Qué se ve |
 |---|---|
 | Ninguna parada guardada | el cartel «SIN PARADAS» con «Tocá + para agregar una parada y recibir un aviso cuando llegue el ómnibus.»; sin aviso de GPS y sin deslizar para actualizar |
-| Cargando | el encabezado de la tarjeta ya se ve; donde van las filas, un indicador de 18 px. Pasa solo mientras la tarjeta no tiene ningún tablero |
+| Cargando | el encabezado de la tarjeta ya se ve; donde van las filas, un indicador de 18 px. Pasa mientras la tarjeta no tiene ningún tablero y, sin fallo, cuando el último tablero llegó hace 5 min o más o ya no le queda ninguna fila estimada |
 | Con datos | hasta 3 filas `ArrivalRow`; con más, «Ver las N» muestra hasta 6 y «Ver menos» las vuelve a ocultar |
 | Ningún ómnibus | «Sin ómnibus próximos» en `tenue`, con el ícono del ómnibus |
 | Falló y no hay datos de menos de 5 min | nota roja «No se pudo actualizar. Deslizá para reintentar» |
 | Datos viejos: falló y hay un tablero de menos de 5 min | nota roja «No se pudo actualizar. Datos de las 19:52. Deslizá para reintentar.» y debajo las filas estimadas «~H:MM». Las que debían pasar hace más de 1 min no aparecen. No se pueden tocar |
+| Datos viejos sin fallo: el último tablero llegó hace 1 min o más, y menos de 5 | sin nota, las filas estimadas «~H:MM», también sin las que debían pasar hace más de 1 min. No se pueden tocar. Pasa al volver de Horarios, Info o Servicios hasta que llega el tablero nuevo, o mientras el proxy contesta 429 |
 | La parada ya no existe (`notFound`) | nota roja «Esta parada ya no existe. Deslizá la tarjeta para borrarla.», sin filas |
-| Demasiados pedidos (`busy`) | nada cambia; si todavía no había tablero, sigue el indicador |
+| Demasiados pedidos (`busy`) | nada cambia; si todavía no había tablero, sigue el indicador. El tablero que queda envejece: a 1 min pasa a estimados y a 5 min, al indicador |
 | GPS parcial | el panel `avisoNoche` arriba de la lista |
 
-La edad del tablero se mide con `ArrivalsBoard.fetchedAt` contra el reloj del teléfono.
+Después de un fallo, la edad del tablero se mide con `ArrivalsBoard.fetchedAt` contra el reloj del
+teléfono. Sin fallo se mide desde que llegó al teléfono (`_BoardView.receivedAt`, con
+`StopsPage.clock`): `fetchedAt` es la hora del servidor, que puede estar corrida o venir de la
+caché del borde.
 
 | En pantalla | Modelo | De dónde sale |
 |---|---|---|
@@ -252,7 +260,7 @@ Se abre con el reloj de una tarjeta de parada. Muestra el horario teórico de es
 pasadas desde la hora elegida, sin GPS. Es lo mismo que «Elegir horario» de Cómo Ir.
 
 - **Barra:** «HORARIOS» y debajo el nombre de la parada con « · 574» al final. Un nombre largo
-  toma una segunda línea; el número nunca se corta.
+  sigue en las líneas siguientes, hasta cuatro; el número nunca se corta.
 - **Tipo de día:** «Hábiles», «Sábados», «Domingos». Arranca en el de hoy (`DayType.of`, que no
   tiene en cuenta los feriados).
 - **«Desde H:MM»:** arranca en la hora actual redondeada hacia abajo a 5 min. El selector de hora
@@ -327,8 +335,9 @@ de la lista, sin otro pedido, y después se pide su tablero.
 | búsqueda por calles | el catálogo `GET /v1/catalog/stops`, filtrado en el teléfono (`MvdApiService.searchStops`) | no existe: el campo no aparece |
 | paradas cercanas | el mismo catálogo; la distancia se calcula en el teléfono y la ubicación no sale de él | la capa WFS de geoserver, pedida para un cuadrado alrededor de la posición redondeada a 3 decimales (472 m de medio lado) y filtrada en el teléfono con la posición exacta |
 
-Si el proxy contesta el catálogo con `linesAvailable: false`, las filas salen sin líneas. La app
-guarda ese catálogo un día entero, así que pueden seguir sin líneas hasta 24 h.
+Si el proxy contesta el catálogo con `linesAvailable: false`, las filas salen sin líneas. Ese
+catálogo nunca reemplaza una copia guardada que tiene líneas, y si se guarda vence a los 15 min,
+como en el proxy: después se vuelve a pedir.
 
 ## Agregar ruta
 
@@ -497,7 +506,5 @@ Lo anotamos para corregirlo en el código cuando se toque ese archivo:
   `MvdApiService.getSchedule` devuelve `null` para cualquier fallo.
 - **Horarios no dice la edad** de una respuesta guardada (hasta 6 h).
 - **Agregar ruta:** «Guardar» sin número o sin destino no hace nada y no dice por qué.
-- **El catálogo sin líneas** (`linesAvailable: false`) se guarda un día entero; las cercanas y la
-  búsqueda por calles pueden quedar sin líneas hasta 24 h, aunque el proxy lo guarda solo 15 min.
 - **Estoy esperando** muestra los minutos del momento en que tocaste la fila y no se actualiza
   mientras la hoja está abierta.
