@@ -40,6 +40,10 @@ class _InfoPageState extends State<InfoPage> {
   static const _sourceCode = 'github.com/undermindOS/MVD_Transporte';
   static const _contact = 'zhongnanhaii@yahoo.com';
 
+  /// Paragraphs of the cards.
+  static final _reading = TimbreText.subtitle
+      .copyWith(height: 1.45, color: TimbreColors.papel);
+
   Future<void> _onBiometricChanged(bool value) async {
     final result = await widget.onToggleBiometricLock(value);
     if (mounted) setState(() => _biometricLockEnabled = result);
@@ -145,12 +149,9 @@ class _InfoPageState extends State<InfoPage> {
                                   style: TimbreText.cartel(22)
                                       .copyWith(letterSpacing: 1.5)),
                               const SizedBox(height: 10),
-                              const Text(
+                              Text(
                                 _notAffiliated,
-                                style: TextStyle(
-                                    fontSize: 14,
-                                    height: 1.45,
-                                    color: TimbreColors.papel),
+                                style: _reading,
                               ),
                             ],
                           ),
@@ -203,27 +204,25 @@ class _InfoPageState extends State<InfoPage> {
           // name the provider, the license, the dataset and any changes.
           _card(
             padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
-            child: const Column(
+            child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('FUENTE DE DATOS', style: TimbreText.sectionLabel),
-                SizedBox(height: 8),
+                const Text('FUENTE DE DATOS', style: TimbreText.sectionLabel),
+                const SizedBox(height: 8),
                 Text(
                   'Tiempos de arribo, horarios por parada, novedades del '
                   'transporte y estado del GPS: servicios en línea de la '
                   'Intendencia de Montevideo, los mismos que usa Cómo Ir.',
-                  style: TextStyle(
-                      fontSize: 14, height: 1.45, color: TimbreColors.papel),
+                  style: _reading,
                 ),
-                SizedBox(height: 8),
+                const SizedBox(height: 8),
                 Text(
                   'Aire acondicionado y cero emisiones: API de transporte '
                   'público de Montevideo.',
-                  style: TextStyle(
-                      fontSize: 14, height: 1.45, color: TimbreColors.papel),
+                  style: _reading,
                 ),
-                SizedBox(height: 8),
-                Text(
+                const SizedBox(height: 8),
+                const Text(
                   'Los tiempos son estimados. Los que llevan reloj son '
                   'horarios teóricos, sin ubicación GPS del ómnibus.',
                   style: TextStyle(
@@ -313,10 +312,8 @@ class _LinkRow extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(title,
-                      style: const TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w500,
-                          color: TimbreColors.papel)),
+                      style: TimbreText.body
+                          .copyWith(fontWeight: FontWeight.w500)),
                   if (subtitle != null) ...[
                     const SizedBox(height: 2),
                     Text(subtitle!,

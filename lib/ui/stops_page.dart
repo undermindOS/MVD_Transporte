@@ -451,8 +451,7 @@ class _StopsPageState extends State<StopsPage>
                       ? '$stopName · con GPS'
                       : 'Según horario ${trip.etaLabel}, sin GPS todavía · '
                           '$stopName',
-                  style: const TextStyle(
-                      fontSize: 14, color: TimbreColors.etiquetaCartel),
+                  style: TimbreText.subtitle,
                 ),
                 const SizedBox(height: 18),
                 if (waiting)
@@ -462,11 +461,9 @@ class _StopsPageState extends State<StopsPage>
                     label: const Text('Dejar de esperar'),
                   )
                 else ...[
-                  const Text('Avisarme cuando falten',
-                      style: TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w600,
-                          color: TimbreColors.papel)),
+                  Text('Avisarme cuando falten',
+                      style: TimbreText.body
+                          .copyWith(fontWeight: FontWeight.w600)),
                   const SizedBox(height: 8),
                   TimbreSegmented<int>(
                     values: const [3, 5, 10],
@@ -489,10 +486,7 @@ class _StopsPageState extends State<StopsPage>
                             'Avisa cuando el ómnibus tiene GPS.'
                         : 'Te avisamos a la hora estimada. Si abrís la app '
                             'mientras esperás, el aviso se ajusta al GPS.',
-                    style: const TextStyle(
-                        fontSize: 12.5,
-                        height: 1.4,
-                        color: TimbreColors.etiquetaCartel),
+                    style: TimbreText.caption.copyWith(height: 1.4),
                   ),
                 ],
               ],
@@ -754,8 +748,8 @@ class _StopsPageState extends State<StopsPage>
                             if (route.preferredDestinations.isNotEmpty)
                               'Hacia: ${route.preferredDestinations.join(", ")}',
                           ].join(' · '),
-                          style: const TextStyle(
-                              fontSize: 12.5, color: TimbreColors.tenue)),
+                          style: TimbreText.caption
+                              .copyWith(color: TimbreColors.tenue)),
                     ],
                   ],
                 ),
@@ -955,7 +949,7 @@ class _BoardNote extends StatelessWidget {
         PixelIcon(icon, size: 16, color: color),
         const SizedBox(width: 10),
         Expanded(
-          child: Text(text, style: TextStyle(fontSize: 14, color: color)),
+          child: Text(text, style: TimbreText.subtitle.copyWith(color: color)),
         ),
       ]),
     );
@@ -1280,8 +1274,7 @@ class _AddStopDialogState extends State<_AddStopDialog> {
           '${stop.lines.isEmpty ? '' : ' · ${stop.lines.join(', ')}'}',
           maxLines: 2,
           overflow: TextOverflow.ellipsis,
-          style: const TextStyle(
-              fontSize: 12.5, color: TimbreColors.etiquetaCartel),
+          style: TimbreText.caption,
         ),
         onTap: () => Navigator.pop(context, stop.id),
       );
@@ -1296,9 +1289,7 @@ class _AddStopDialogState extends State<_AddStopDialog> {
         title: Text(stop.name,
             style: const TextStyle(
                 fontWeight: FontWeight.w600, color: TimbreColors.papel)),
-        subtitle: Text('#${stop.id}',
-            style: const TextStyle(
-                fontSize: 12.5, color: TimbreColors.etiquetaCartel)),
+        subtitle: Text('#${stop.id}', style: TimbreText.caption),
         onTap: () => Navigator.pop(context, stop.id),
       );
 }
@@ -1600,20 +1591,14 @@ class _AlertSettingsSheetState extends State<_AlertSettingsSheet> {
             Text(widget.title, style: TimbreText.stopName),
             if (defaultTargetPlatform == TargetPlatform.android) ...[
               const SizedBox(height: TimbreSpace.xs),
-              const Text(
+              Text(
                   'Se revisa cada 15 min aprox. y avisa solo por ómnibus '
                   'con GPS.',
-                  style: TextStyle(
-                      fontSize: 12.5,
-                      height: 1.4,
-                      color: TimbreColors.etiquetaCartel)),
+                  style: TimbreText.caption.copyWith(height: 1.4)),
             ],
             const SizedBox(height: 18),
-            const Text('Avisarme cuando falten',
-                style: TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w600,
-                    color: TimbreColors.papel)),
+            Text('Avisarme cuando falten',
+                style: TimbreText.body.copyWith(fontWeight: FontWeight.w600)),
             const SizedBox(height: TimbreSpace.s),
             TimbreSegmented<int>(
               values: const [3, 5, 10],

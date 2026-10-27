@@ -69,11 +69,7 @@ class TimbreEmptyState extends StatelessWidget {
             const SizedBox(height: 14),
             Text(detail!,
                 textAlign: TextAlign.center,
-                style: const TextStyle(
-                    fontFamily: TimbreFonts.fira,
-                    fontSize: 14,
-                    height: 1.4,
-                    color: TimbreColors.etiquetaCartel)),
+                style: TimbreText.subtitle.copyWith(height: 1.4)),
           ],
         ],
       ),

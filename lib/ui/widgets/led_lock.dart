@@ -127,7 +127,7 @@ class _LedLockPainter extends CustomPainter {
   final Animation<double> scan;
   final bool scanning;
 
-  static const _lightAmber = Color(0xFFFFE2A3);
+  static const _lightAmber = TimbreColors.ambarClaro;
 
   @override
   void paint(Canvas canvas, Size size) {

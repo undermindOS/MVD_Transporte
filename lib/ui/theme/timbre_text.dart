@@ -124,4 +124,78 @@ abstract final class TimbreText {
     letterSpacing: 1.44,
     color: TimbreColors.etiquetaCartel,
   );
+
+  // --- Reading: Fira Sans ---
+
+  /// Dialog title ("Agregar parada").
+  static const dialogTitle = TextStyle(
+    fontFamily: TimbreFonts.fira,
+    fontWeight: FontWeight.w700,
+    fontSize: 20,
+    height: 1.2,
+    color: TimbreColors.papel,
+  );
+
+  /// The main button ("Avisarme cuando llegue"): ink on amber, the color
+  /// comes from the button.
+  static const buttonLarge = TextStyle(
+    fontFamily: TimbreFonts.fira,
+    fontWeight: FontWeight.w700,
+    fontSize: 17,
+    height: 1.2,
+  );
+
+  /// Text of dialogs, snack bars and the lock screen.
+  static const body = TextStyle(
+    fontFamily: TimbreFonts.fira,
+    fontWeight: FontWeight.w400,
+    fontSize: 15,
+    height: 1.2,
+    color: TimbreColors.papel,
+  );
+
+  /// Outlined and text buttons ("Ver en Cómo Ir"): amber, from the button.
+  static const button = TextStyle(
+    fontFamily: TimbreFonts.fira,
+    fontWeight: FontWeight.w700,
+    fontSize: 15,
+    height: 1.2,
+  );
+
+  /// Line under the page title ("Sitios oficiales, en tu navegador").
+  static const subtitle = TextStyle(
+    fontFamily: TimbreFonts.fira,
+    fontWeight: FontWeight.w400,
+    fontSize: 14,
+    height: 1.2,
+    color: TimbreColors.etiquetaCartel,
+  );
+
+  /// Sub-tabs ("Paradas"): lit when selected, the color comes from the
+  /// tab bar.
+  static const tabLabel = TextStyle(
+    fontFamily: TimbreFonts.fira,
+    fontWeight: FontWeight.w700,
+    fontSize: 13,
+    height: 1.2,
+  );
+
+  /// Line under a stop in lists ("#5109 · 48 m · 124, 125"); notes take
+  /// `height: 1.4`.
+  static const caption = TextStyle(
+    fontFamily: TimbreFonts.fira,
+    fontWeight: FontWeight.w400,
+    fontSize: 12.5,
+    height: 1.2,
+    color: TimbreColors.etiquetaCartel,
+  );
+
+  /// Bottom navigation ("Mis paradas"): lit when selected, the color comes
+  /// from the navigation bar.
+  static const navLabel = TextStyle(
+    fontFamily: TimbreFonts.fira,
+    fontWeight: FontWeight.w700,
+    fontSize: 12,
+    height: 1.2,
+  );
 }

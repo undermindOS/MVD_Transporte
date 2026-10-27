@@ -245,5 +245,35 @@ void main() {
     expect(theme.colorScheme.onPrimary, TimbreColors.tinta);
     expect(theme.colorScheme.onSurface, TimbreColors.papel);
     expect(theme.textTheme.bodyMedium!.fontFamily, 'FiraSans');
+    // A selected chip is lit: ink letters and check mark on the amber
+    final chipLabel = theme.chipTheme.labelStyle!.color!;
+    expect(
+        WidgetStateProperty.resolveAs<Color?>(
+            chipLabel, {WidgetState.selected}),
+        TimbreColors.tinta);
+    expect(WidgetStateProperty.resolveAs<Color?>(chipLabel, {}),
+        TimbreColors.papel);
+    expect(theme.chipTheme.checkmarkColor, TimbreColors.tinta);
+    // No shadows, no white surface, passive marks in lists
+    expect(theme.snackBarTheme.elevation, 0);
+    expect(theme.colorScheme.inverseSurface, TimbreColors.tintaAlta);
+    expect(theme.listTileTheme.iconColor, TimbreColors.etiquetaCartel);
+  });
+
+  testWidgets('a selected FilterChip has ink letters on the amber',
+      (tester) async {
+    await tester.pumpWidget(_wrap(Row(children: [
+      FilterChip(label: const Text('116'), selected: true, onSelected: (_) {}),
+      FilterChip(label: const Text('121'), onSelected: (_) {}),
+    ])));
+    Color? colorOf(String label) => tester
+        .widget<DefaultTextStyle>(find
+            .ancestor(
+                of: find.text(label), matching: find.byType(DefaultTextStyle))
+            .first)
+        .style
+        .color;
+    expect(colorOf('116'), TimbreColors.tinta);
+    expect(colorOf('121'), TimbreColors.papel);
   });
 }

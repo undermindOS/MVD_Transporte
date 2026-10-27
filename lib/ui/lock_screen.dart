@@ -77,12 +77,10 @@ class _LockScreenState extends State<LockScreen> {
                             ),
                           ),
                           const SizedBox(height: 12),
-                          const Text(
+                          Text(
                             'Tus paradas y rutas guardadas están protegidas',
                             textAlign: TextAlign.center,
-                            style: TextStyle(
-                              fontFamily: TimbreFonts.fira,
-                              fontSize: 15,
+                            style: TimbreText.body.copyWith(
                               height: 1.4,
                               color: TimbreColors.etiquetaCartel,
                             ),

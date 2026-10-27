@@ -82,9 +82,7 @@ class TimbreSegmented<T> extends StatelessWidget {
                   child: Text(
                     label,
                     maxLines: 1,
-                    style: TextStyle(
-                      fontFamily: TimbreFonts.fira,
-                      fontSize: 15,
+                    style: TimbreText.button.copyWith(
                       fontWeight:
                           isSelected ? FontWeight.w700 : FontWeight.w600,
                       color:

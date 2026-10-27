@@ -2,6 +2,8 @@ import 'dart:ui' as ui;
 
 import 'package:flutter/widgets.dart';
 
+import '../theme/timbre_tokens.dart';
+
 part 'pixel_glyphs.dart';
 
 /// A 12 × 12 pixel glyph: 12 strings of 12 cells, '#' lit.
@@ -38,7 +40,7 @@ class PixelIcon extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = IconTheme.of(context);
     final side = size ?? theme.size ?? 24;
-    final ink = color ?? theme.color ?? const Color(0xFFFFB21E);
+    final ink = color ?? theme.color ?? TimbreColors.ambar;
     final icon = SizedBox.square(
       dimension: side,
       child: CustomPaint(painter: _PixelPainter(glyph, ink, glow)),

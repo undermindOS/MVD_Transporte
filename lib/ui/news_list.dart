@@ -86,16 +86,16 @@ class _FailedBanner extends StatelessWidget {
         border: Border.all(color: TimbreColors.ambarTenue),
         borderRadius: BorderRadius.circular(TimbreRadii.control),
       ),
-      child: const Row(
+      child: Row(
         children: [
-          PixelIcon(PixelGlyphs.warning, size: 20, color: TimbreColors.ambar),
-          SizedBox(width: 10),
+          const PixelIcon(PixelGlyphs.warning,
+              size: 20, color: TimbreColors.ambar),
+          const SizedBox(width: 10),
           Expanded(
             child: Text(
               'No se pudo actualizar. Deslizá para reintentar',
-              style: TextStyle(
+              style: TimbreText.subtitle.copyWith(
                 color: TimbreColors.ambar,
-                fontSize: 14,
                 fontWeight: FontWeight.w600,
               ),
             ),
@@ -159,11 +159,7 @@ class _NewsRow extends StatelessWidget {
                       const SizedBox(height: 4),
                       Text(
                         n.summary,
-                        style: const TextStyle(
-                          fontSize: 14,
-                          height: 1.4,
-                          color: TimbreColors.etiquetaCartel,
-                        ),
+                        style: TimbreText.subtitle.copyWith(height: 1.4),
                       ),
                     ],
                   ],
@@ -296,12 +292,7 @@ Future<void> showNewsDetail(BuildContext context, TransportNews n) {
         children: [
           Text(
             n.title,
-            style: const TextStyle(
-              fontSize: 20,
-              height: 1.25,
-              fontWeight: FontWeight.w700,
-              color: TimbreColors.papel,
-            ),
+            style: TimbreText.dialogTitle.copyWith(height: 1.25),
           ),
           const SizedBox(height: 6),
           Text(
@@ -311,11 +302,7 @@ Future<void> showNewsDetail(BuildContext context, TransportNews n) {
           ),
           const SizedBox(height: 14),
           DefaultTextStyle.merge(
-            style: const TextStyle(
-              fontSize: 15,
-              height: 1.5,
-              color: TimbreColors.papel,
-            ),
+            style: TimbreText.body.copyWith(height: 1.5),
             child: SafeHtml(n.body.trim().isNotEmpty ? n.body : n.summary),
           ),
           if (n.link != null) ...[

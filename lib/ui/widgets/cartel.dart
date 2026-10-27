@@ -117,11 +117,7 @@ class LlegandoChip extends StatelessWidget {
           decoration: BoxDecoration(
             color: TimbreColors.ambar,
             borderRadius: BorderRadius.circular(8),
-            boxShadow: [
-              BoxShadow(
-                  color: TimbreColors.ambar.withValues(alpha: 0.35),
-                  blurRadius: 12),
-            ],
+            boxShadow: const [TimbreShadow.ledGlow],
           ),
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),

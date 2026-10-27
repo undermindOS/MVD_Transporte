@@ -10,7 +10,7 @@ import 'timbre_tokens.dart';
 /// something matters (the main action, the selection, live data). Fira for
 /// reading, Doto for signs.
 ThemeData buildTimbreTheme() {
-  const scheme = ColorScheme(
+  final scheme = ColorScheme(
     brightness: Brightness.dark,
     primary: TimbreColors.ambar,
     onPrimary: TimbreColors.tinta,
@@ -34,11 +34,13 @@ ThemeData buildTimbreTheme() {
     surfaceContainerHighest: TimbreColors.tintaAlta,
     outline: TimbreColors.lineaNoche,
     outlineVariant: TimbreColors.lineaNoche,
-    inverseSurface: TimbreColors.papel,
-    onInverseSurface: TimbreColors.tinta,
+    // No white surface anywhere, not even an inverse one
+    inverseSurface: TimbreColors.tintaAlta,
+    onInverseSurface: TimbreColors.papel,
     inversePrimary: TimbreColors.ambarTenue,
-    shadow: Color(0xFF000000),
-    scrim: Color(0xB3000000),
+    // Tokens, not black literals: the board casts no shadow
+    shadow: TimbreColors.noche,
+    scrim: TimbreColors.noche.withValues(alpha: 0.7),
     surfaceTint: Colors.transparent,
   );
 
@@ -51,8 +53,10 @@ ThemeData buildTimbreTheme() {
     scaffoldBackgroundColor: TimbreColors.noche,
     canvasColor: TimbreColors.noche,
     splashFactory: InkRipple.splashFactory,
-    splashColor: TimbreColors.ambar.withValues(alpha: 0.16),
-    highlightColor: TimbreColors.ambar.withValues(alpha: 0.08),
+    splashColor:
+        TimbreColors.ambar.withValues(alpha: TimbreOpacity.pressSplash),
+    highlightColor:
+        TimbreColors.ambar.withValues(alpha: TimbreOpacity.pressHighlight),
   );
 
   final rounded = RoundedRectangleBorder(
@@ -107,9 +111,7 @@ ThemeData buildTimbreTheme() {
       indicatorColor: TimbreColors.tintaAlta,
       labelTextStyle: WidgetStateProperty.resolveWith((states) {
         final selected = states.contains(WidgetState.selected);
-        return TextStyle(
-          fontFamily: TimbreFonts.fira,
-          fontSize: 12,
+        return TimbreText.navLabel.copyWith(
           fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
           color: selected ? TimbreColors.ambar : TimbreColors.tenue,
         );
@@ -127,14 +129,12 @@ ThemeData buildTimbreTheme() {
       unselectedLabelColor: TimbreColors.tenue,
       indicatorColor: TimbreColors.ambar,
       dividerColor: TimbreColors.lineaNoche,
-      labelStyle: TextStyle(
-          fontFamily: TimbreFonts.fira,
-          fontWeight: FontWeight.w700,
-          fontSize: 13),
+      labelStyle: TimbreText.tabLabel,
       unselectedLabelStyle: TextStyle(
           fontFamily: TimbreFonts.fira,
           fontWeight: FontWeight.w500,
-          fontSize: 13),
+          fontSize: 13,
+          height: 1.2),
     ),
     cardTheme: CardThemeData(
       color: TimbreColors.tinta,
@@ -155,7 +155,7 @@ ThemeData buildTimbreTheme() {
         disabledForegroundColor: TimbreColors.tenue,
         minimumSize: const Size(TimbreSpace.touch, 52),
         shape: rounded,
-        textStyle: boldFira.copyWith(fontSize: 17),
+        textStyle: TimbreText.buttonLarge,
       ),
     ),
     elevatedButtonTheme: ElevatedButtonThemeData(
@@ -174,14 +174,14 @@ ThemeData buildTimbreTheme() {
         minimumSize: const Size(TimbreSpace.touch, 48),
         side: const BorderSide(color: TimbreColors.ambarTenue, width: 1.5),
         shape: rounded,
-        textStyle: boldFira.copyWith(fontSize: 15),
+        textStyle: TimbreText.button,
       ),
     ),
     textButtonTheme: TextButtonThemeData(
       style: TextButton.styleFrom(
         foregroundColor: TimbreColors.ambar,
         minimumSize: const Size(TimbreSpace.touch, TimbreSpace.touch),
-        textStyle: boldFira.copyWith(fontSize: 15),
+        textStyle: TimbreText.button,
       ),
     ),
     iconButtonTheme: IconButtonThemeData(
@@ -228,12 +228,17 @@ ThemeData buildTimbreTheme() {
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(999),
       ),
-      labelStyle: const TextStyle(
+      // Text on the lit amber is the ink, never light (1.5:1)
+      labelStyle: TextStyle(
         fontFamily: TimbreFonts.fira,
         fontWeight: FontWeight.w500,
         fontSize: 13,
-        color: TimbreColors.papel,
+        color: WidgetStateColor.resolveWith((states) =>
+            states.contains(WidgetState.selected)
+                ? TimbreColors.tinta
+                : TimbreColors.papel),
       ),
+      checkmarkColor: TimbreColors.tinta,
     ),
     dividerTheme: const DividerThemeData(
       color: TimbreColors.lineaNoche,
@@ -259,17 +264,8 @@ ThemeData buildTimbreTheme() {
         borderRadius: BorderRadius.circular(TimbreRadii.sheet),
         side: const BorderSide(color: TimbreColors.lineaNoche),
       ),
-      titleTextStyle: const TextStyle(
-        fontFamily: TimbreFonts.fira,
-        fontWeight: FontWeight.w700,
-        fontSize: 20,
-        color: TimbreColors.papel,
-      ),
-      contentTextStyle: const TextStyle(
-        fontFamily: TimbreFonts.fira,
-        fontSize: 15,
-        color: TimbreColors.papel,
-      ),
+      titleTextStyle: TimbreText.dialogTitle,
+      contentTextStyle: TimbreText.body,
     ),
     inputDecorationTheme: InputDecorationTheme(
       filled: true,
@@ -298,11 +294,9 @@ ThemeData buildTimbreTheme() {
     ),
     snackBarTheme: const SnackBarThemeData(
       backgroundColor: TimbreColors.tintaAlta,
-      contentTextStyle: TextStyle(
-        fontFamily: TimbreFonts.fira,
-        fontSize: 15,
-        color: TimbreColors.papel,
-      ),
+      // No shadow on the board: the raised panel is enough
+      elevation: 0,
+      contentTextStyle: TimbreText.body,
       actionTextColor: TimbreColors.ambar,
       behavior: SnackBarBehavior.floating,
     ),
@@ -324,8 +318,9 @@ ThemeData buildTimbreTheme() {
       linearTrackColor: TimbreColors.lineaNoche,
       refreshBackgroundColor: TimbreColors.tinta,
     ),
+    // Marks in a list are passive: not lit
     listTileTheme: const ListTileThemeData(
-      iconColor: TimbreColors.ambar,
+      iconColor: TimbreColors.etiquetaCartel,
       textColor: TimbreColors.papel,
     ),
     tooltipTheme: TooltipThemeData(

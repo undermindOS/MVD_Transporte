@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 
 import '../theme/timbre_text.dart';
-import '../theme/timbre_tokens.dart';
 
 /// Big page title under the brand plate on the header board ("MIS
 /// PARADAS", "SERVICIOS", "HORARIOS"), with an optional one-line subtitle.
@@ -36,12 +35,7 @@ class PageTitleBar extends StatelessWidget implements PreferredSizeWidget {
   /// [preferredSize] before this widget builds.
   final TextScaler textScaler;
 
-  static const defaultSubtitleStyle = TextStyle(
-    fontFamily: TimbreFonts.fira,
-    fontSize: 14,
-    height: 1.2,
-    color: TimbreColors.etiquetaCartel,
-  );
+  static const defaultSubtitleStyle = TimbreText.subtitle;
 
   // Breathing room under the plate, then the title, then the bottom edge
   static const _top = 5.0;

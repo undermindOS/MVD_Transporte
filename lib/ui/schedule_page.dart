@@ -39,14 +39,6 @@ class _SchedulePageState extends State<SchedulePage> {
   // Drops answers of superseded requests (fast day/time changes)
   int _request = 0;
 
-  static const _time21 = TextStyle(
-    fontFamily: TimbreFonts.firaCondensed,
-    fontWeight: FontWeight.w700,
-    fontSize: 21,
-    color: TimbreColors.papel,
-    fontFeatures: [FontFeature.tabularFigures()],
-  );
-
   static const _stopLine = TextStyle(
     fontFamily: TimbreFonts.firaCondensed,
     fontWeight: FontWeight.w700,
@@ -147,10 +139,8 @@ class _SchedulePageState extends State<SchedulePage> {
                       side: const BorderSide(
                           color: TimbreColors.ambarTenue, width: 1.5),
                       shape: const StadiumBorder(),
-                      textStyle: const TextStyle(
-                          fontFamily: TimbreFonts.fira,
-                          fontWeight: FontWeight.w600,
-                          fontSize: 15),
+                      textStyle: TimbreText.button
+                          .copyWith(fontWeight: FontWeight.w600),
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -182,11 +172,8 @@ class _SchedulePageState extends State<SchedulePage> {
           const PixelIcon(PixelGlyphs.warning,
               size: 28, color: TimbreColors.ambar),
           const SizedBox(height: 8),
-          const Text('No se pudo cargar el horario',
-              style: TextStyle(
-                  color: TimbreColors.papel,
-                  fontSize: 15,
-                  fontWeight: FontWeight.w600)),
+          Text('No se pudo cargar el horario',
+              style: TimbreText.body.copyWith(fontWeight: FontWeight.w600)),
           const SizedBox(height: 4),
           TextButton(onPressed: _load, child: const Text('Reintentar')),
         ]),
@@ -286,7 +273,7 @@ class _PassRow extends StatelessWidget {
               child: FittedBox(
                   fit: BoxFit.scaleDown,
                   alignment: Alignment.centerLeft,
-                  child: Text(p.time, style: _SchedulePageState._time21))),
+                  child: Text(p.time, style: TimbreText.scheduleTime))),
           const SizedBox(width: 10),
           LineBadge(p.line, live: false, compact: true),
           const SizedBox(width: 10),
@@ -294,11 +281,7 @@ class _PassRow extends StatelessWidget {
             child: Text(p.destination,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                    fontFamily: TimbreFonts.firaCondensed,
-                    fontWeight: FontWeight.w600,
-                    fontSize: 17,
-                    color: TimbreColors.papel)),
+                style: TimbreText.destination.copyWith(fontSize: 17)),
           ),
         ]),
       ),
