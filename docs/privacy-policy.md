@@ -11,7 +11,7 @@
 > servidor intermediario» y la sección de seguridad de los datos de
 > `docs/store-listing.md`.
 
-**Última actualización:** [fecha]
+**Última actualización:** 27 de octubre de 2026
 
 Timbre MVD es una aplicación no oficial, desarrollada por undermindOS /
 Liberon.tech. No es una aplicación de la Intendencia de Montevideo ni de
