@@ -1,8 +1,9 @@
 // "Mis paradas" through the proxy: each stop is asked once, in parallel,
 // only while the page is on screen; a failed refresh keeps the last buses
 // as estimates; a gone stop and a busy proxy are told apart; the waited
-// bus is found by its trip id. HTTP answers are /v1 boards built around
-// the current time, so "a minute ago" is real.
+// bus is found by its trip id; the home widget follows each refresh. HTTP
+// answers are /v1 boards built around the current time, so "a minute
+// ago" is real; the home widget channel is faked.
 //
 // The stops and the route are saved before the first test: in a widget
 // test only the first test of a file can wait for a Hive write.
@@ -12,6 +13,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
@@ -95,6 +97,8 @@ String _board(int stopId, List<_Trip> trips, {DateTime? fetchedAt}) {
 void main() {
   late Directory hiveDir;
   final requests = <String>[];
+  // What the home widget would read
+  final widgetData = <String, Object?>{};
   late Future<http.Response> Function(http.Request request) answer;
 
   // Boards fetched now, unless a test says otherwise
@@ -139,10 +143,23 @@ void main() {
       preferredLines: ['116'],
     ));
     MvdApiService.proxyUrl = 'https://proxy.test';
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(const MethodChannel('home_widget'),
+            (call) async {
+      final args = call.arguments as Map?;
+      switch (call.method) {
+        case 'saveWidgetData':
+          widgetData[args!['id'] as String] = args['data'];
+        case 'getWidgetData':
+          return widgetData[args!['id'] as String] ?? args['defaultValue'];
+      }
+      return true;
+    });
   });
 
   setUp(() {
     requests.clear();
+    widgetData.clear();
     answer = boards;
   });
 
@@ -362,6 +379,37 @@ void main() {
           () => Future<void>.delayed(const Duration(milliseconds: 1100)));
       await tester.pump(StopsPage.autoRefreshInterval);
       expect(arrivalRequests(), hasLength(6));
+    }, () => client);
+  });
+
+  testWidgets('the home widget follows each refresh', (tester) async {
+    final fetchedAt = DateTime.now().toUtc();
+    var failing = false;
+    answer = (request) async => failing
+        ? http.Response('{"error":"upstream_timeout"}', 504)
+        : boards(request, fetchedAt: fetchedAt);
+
+    await http.runWithClient(() async {
+      await tester.pumpWidget(app());
+      await tester.pump();
+      await tester.pump();
+
+      // The route's next bus at its origin: its own destination and time
+      expect(widgetData['route_status'], 'ok');
+      expect(widgetData['route_line'], '116');
+      expect(widgetData['route_dest'], 'POCITOS');
+      expect(widgetData['route_eta_min'], 9);
+      expect(widgetData['route_eta_at'], '20:01');
+      expect(widgetData['route_expected_at_ms'],
+          '${fetchedAt.add(const Duration(minutes: 9)).millisecondsSinceEpoch}');
+
+      // Offline: the row stays while its bus is still due
+      failing = true;
+      await tester.pump(StopsPage.autoRefreshInterval);
+      await tester.pump();
+      await tester.pump();
+      expect(widgetData['route_status'], 'offline');
+      expect(widgetData['route_line'], '116');
     }, () => client);
   });
 

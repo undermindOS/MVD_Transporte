@@ -7,6 +7,8 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:stm_app/services/home_widget_feed.dart';
+
 String _read(String path) => File(path).readAsStringSync();
 
 void main() {
@@ -106,6 +108,18 @@ void main() {
         .toSet()) {
       expect(layout, contains('@+id/$id'), reason: id);
     }
+    // It reads the keys the app writes, and hides the row 2 min after
+    // its bus was due
+    for (final key in [
+      WidgetFeed.keyLine,
+      WidgetFeed.keyDestination,
+      WidgetFeed.keyEtaMinutes,
+      WidgetFeed.keyClockTime,
+      WidgetFeed.keyExpectedAtMs,
+    ]) {
+      expect(provider, contains('"$key"'), reason: key);
+    }
+    expect(provider, contains('EXPIRED_AFTER_MS = 2 * 60 * 1000L'));
   });
 
   test('iOS has light, dark and tinted 1024 px icons', () {

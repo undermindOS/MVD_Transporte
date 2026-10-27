@@ -20,6 +20,7 @@ import '../services/background_worker.dart';
 import '../services/bus_status_service.dart';
 import '../services/bus_wait_service.dart';
 import '../services/cache_service.dart';
+import '../services/home_widget_feed.dart';
 import '../services/mvd_api_service.dart';
 import '../services/nearby_stops_service.dart';
 import '../services/notification_service.dart';
@@ -235,6 +236,16 @@ class _StopsPageState extends State<StopsPage>
       }
     }
     if (busyFor != null) _skipTicksUntil = DateTime.now().add(busyFor);
+
+    // The home widget shows the first enabled route: fresher than the
+    // background check, at least 15 min apart. Not awaited: it catches
+    // its own errors
+    final enabledRoutes = CacheService.getEnabledRoutes();
+    final widgetRoute = enabledRoutes.firstOrNull;
+    if (widgetRoute != null && results.containsKey(widgetRoute.originStopId)) {
+      unawaited(WidgetFeed.update(
+          enabledRoutes: enabledRoutes, boards: results, now: DateTime.now()));
+    }
 
     if (!mounted) return;
     setState(() {
