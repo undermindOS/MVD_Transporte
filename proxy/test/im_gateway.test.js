@@ -867,3 +867,40 @@ describe('GET /stops/{id}/meta', () => {
     );
   });
 });
+
+describe('logs', () => {
+  it('name the IM API and the kind of failure, never a path', async () => {
+    const logs = [];
+    console.error = (...args) => logs.push(args.join(' '));
+
+    // A request that waits for the IM API…
+    mockIm({ '/buses': () => new Response('boom', { status: 500 }) });
+    assert.equal((await gateway().get_('/lines/116/buses')).status, 502);
+    mockIm({ '/buses/linevariants': () => Response.json({ unexpected: true }) });
+    assert.equal((await gateway().get_('/catalog/lines')).status, 502);
+    globalThis.fetch = async () => {
+      throw new DOMException('signal timed out', 'TimeoutError');
+    };
+    assert.equal((await gateway().get_('/lines/116/buses')).status, 504);
+    globalThis.fetch = async () =>
+      Response.json({ error: 'unauthorized_client' }, { status: 401 });
+    assert.equal((await gateway().get_('/lines/116/buses')).status, 502);
+
+    // …or gets the old copy while the refresh fails in the background
+    mockIm({ '/buses': fleet });
+    const g = gateway();
+    await g.get_('/vehicles?ids=50:111');
+    mockIm({ '/buses': () => new Response('boom', { status: 500 }) });
+    g.tick(16 * 1000);
+    await g.get_('/vehicles?ids=50:111');
+    await g.settle();
+
+    assert.deepEqual(logs, [
+      'imApi: HTTP 500',
+      'imApi: unexpected shape',
+      'imApi: TimeoutError',
+      'imApi: token refused',
+      'imApi: HTTP 500',
+    ]);
+  });
+});

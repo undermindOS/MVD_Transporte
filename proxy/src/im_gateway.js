@@ -369,7 +369,9 @@ export class ImGateway {
   /** A failed background load leaves the old copy in place. */
   inBackground(name, pending) {
     const logged = pending.catch((e) =>
-      console.error(`im-gateway ${name}: ${e.message}`),
+      console.error(
+        e instanceof UpstreamError ? `${e.source}: ${e.message}` : `im-gateway: ${e.name}`,
+      ),
     );
     this.state?.waitUntil?.(logged);
   }
@@ -453,7 +455,7 @@ export class ImGateway {
         .catch((e) => {
           // A refused client secret will not get better by retrying at once
           throw e instanceof UnauthorizedError
-            ? new UpstreamError(`token refused: ${e.message}`)
+            ? new UpstreamError('token refused', { source: e.source })
             : e;
         })
         // Kept before the load is forgotten: a call in between would
@@ -508,7 +510,7 @@ function failure(e) {
     });
   }
   if (e instanceof UpstreamError) {
-    console.error(`im-gateway ${e.message}`);
+    console.error(`${e.source}: ${e.message}`);
     return e.timeout
       ? reply({ error: 'upstream_timeout' }, 504)
       : reply({ error: 'upstream_error' }, 502);

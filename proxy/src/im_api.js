@@ -11,6 +11,8 @@ import { UpstreamError } from './transporte_rest.js';
 const TOKEN_URL =
   'https://mvdapi-auth.montevideo.gub.uy/auth/realms/pci/protocol/openid-connect/token';
 const BASE_URL = 'https://api.montevideo.gub.uy/api/transportepublico';
+// Errors name the source and a fixed kind, never the path (see errors.js)
+const SOURCE = 'imApi';
 // GET /buses takes ~4 s for the whole fleet
 const TIMEOUT_MS = 10000;
 
@@ -19,8 +21,8 @@ const COMPANY_IDS = { COETC: 10, COME: 20, CUTCSA: 50, UCOT: 70 };
 
 /** The API answered 429; `retryAfter` is in seconds. */
 export class RateLimitedError extends UpstreamError {
-  constructor(path, retryAfter) {
-    super(`${path}: HTTP 429`);
+  constructor(retryAfter) {
+    super('HTTP 429', { source: SOURCE });
     this.retryAfter = retryAfter;
   }
 }
@@ -35,9 +37,9 @@ export async function fetchToken(clientId, clientSecret, now = Date.now()) {
     client_id: clientId,
     client_secret: clientSecret,
   });
-  const data = await request('token', TOKEN_URL, { method: 'POST', body });
+  const data = await request(TOKEN_URL, { method: 'POST', body });
   if (!isObject(data) || typeof data.access_token !== 'string') {
-    throw new UpstreamError('token: unexpected shape');
+    throw new UpstreamError('unexpected shape', { source: SOURCE });
   }
   const seconds = Number.isFinite(data.expires_in) ? data.expires_in : 300;
   return { token: data.access_token, expiresAt: now + seconds * 1000 };
@@ -45,12 +47,12 @@ export async function fetchToken(clientId, clientSecret, now = Date.now()) {
 
 /** `GET {path}` with a bearer token, parsed JSON. */
 export function getJson(path, token) {
-  return request(path, BASE_URL + path, {
+  return request(BASE_URL + path, {
     headers: { Authorization: `Bearer ${token}` },
   });
 }
 
-async function request(name, url, init) {
+async function request(url, init) {
   let response;
   try {
     response = await fetch(url, {
@@ -59,7 +61,8 @@ async function request(name, url, init) {
       signal: AbortSignal.timeout(TIMEOUT_MS),
     });
   } catch (e) {
-    throw new UpstreamError(`${name}: ${e.name}`, {
+    throw new UpstreamError(e.name, {
+      source: SOURCE,
       timeout: e.name === 'TimeoutError',
     });
   }
@@ -67,17 +70,17 @@ async function request(name, url, init) {
   const body = await response.text();
   if (response.status === 429) {
     const seconds = Number.parseInt(response.headers.get('Retry-After') ?? '', 10);
-    throw new RateLimitedError(name, Number.isFinite(seconds) ? seconds : 60);
+    throw new RateLimitedError(Number.isFinite(seconds) ? seconds : 60);
   }
   if (response.status === 401 || response.status === 403) {
-    throw new UnauthorizedError(`${name}: HTTP ${response.status}`);
+    throw new UnauthorizedError(`HTTP ${response.status}`, { source: SOURCE });
   }
-  if (!response.ok) throw new UpstreamError(`${name}: HTTP ${response.status}`);
+  if (!response.ok) throw new UpstreamError(`HTTP ${response.status}`, { source: SOURCE });
 
   try {
     return JSON.parse(body);
   } catch {
-    throw new UpstreamError(`${name}: invalid JSON`);
+    throw new UpstreamError('invalid JSON', { source: SOURCE });
   }
 }
 
@@ -91,7 +94,7 @@ async function request(name, url, init) {
  * Skips buses of unknown operators: they cannot be matched to arrivals.
  */
 export function toFleet(data) {
-  if (!Array.isArray(data)) throw new UpstreamError('buses: unexpected shape');
+  if (!Array.isArray(data)) throw new UpstreamError('unexpected shape', { source: SOURCE });
 
   const buses = [];
   for (const item of data) {
@@ -139,7 +142,7 @@ function comfort(item) {
  */
 export function toStops(data) {
   if (!Array.isArray(data)) {
-    throw new UpstreamError('busstops: unexpected shape');
+    throw new UpstreamError('unexpected shape', { source: SOURCE });
   }
 
   const stops = [];
@@ -164,7 +167,7 @@ export function toStops(data) {
  */
 export function toLineVariants(data) {
   if (!Array.isArray(data)) {
-    throw new UpstreamError('linevariants: unexpected shape');
+    throw new UpstreamError('unexpected shape', { source: SOURCE });
   }
 
   const variants = [];
