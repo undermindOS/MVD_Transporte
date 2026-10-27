@@ -19,63 +19,7 @@ void callbackDispatcher() {
       await CacheService.init();
       await NotificationService.init();
 
-      // Check individual stop alerts
-      final stops = CacheService.getStopsWithNotificationsEnabled();
-      for (final stop in stops) {
-        final arrivals =
-            await MvdApiService.getNextArrivals(stop.id) ?? const [];
-        // Only GPS-tracked buses: a timetable estimate is not "arriving"
-        final imminent = arrivals.where(
-            (a) => a.isRealTime && a.etaMinutes <= stop.etaAlertMinutes);
-        for (final bus in imminent) {
-          await NotificationService.showBusAlert(
-            line: bus.line,
-            stopName: stop.name,
-            etaMinutes: bus.etaMinutes,
-          );
-        }
-      }
-
-      // Check route alerts (A → B)
-      final routes = CacheService.getEnabledRoutes();
-      bool widgetRouteUpdated = false;
-      for (final route in routes) {
-        final arrivals =
-            await MvdApiService.getNextArrivals(route.originStopId) ??
-                const [];
-
-        // Filter by preferred lines if specified
-        final relevant =
-            arrivals.where((a) => route.acceptsLine(a.line)).toList();
-
-        // Push soonest bus for the first enabled route to the home widget.
-        // Own try: a widget failure (e.g. iOS without App Group) must not
-        // swallow the notifications below.
-        if (!widgetRouteUpdated) {
-          widgetRouteUpdated = true;
-          try {
-            await _updateWidgetRoute(
-              relevant.isEmpty ? null : relevant.first.line,
-              relevant.isEmpty ? null : relevant.first.etaMinutes,
-              route.destinationName,
-            );
-          } catch (e) {
-            debugPrint('⚠️ Widget update error: $e');
-          }
-        }
-
-        final imminent = relevant
-            .where((a) => a.isRealTime && a.etaMinutes <= route.alertMinutes);
-
-        for (final bus in imminent) {
-          await NotificationService.showRouteAlert(
-            line: bus.line,
-            originName: route.originName,
-            destinationName: route.destinationName,
-            etaMinutes: bus.etaMinutes,
-          );
-        }
-      }
+      await BackgroundWorker.checkAlerts(DateTime.now());
     } catch (e) {
       debugPrint('❌ Background task error: $e');
     }
@@ -125,6 +69,72 @@ class BackgroundWorker {
       existingWorkPolicy: ExistingPeriodicWorkPolicy.keep,
     );
     debugPrint('✅ WorkManager tarea registrada');
+  }
+
+  /// One background pass: notifies about GPS-tracked buses within each
+  /// alert's threshold, only inside the alert's schedule.
+  static Future<void> checkAlerts(DateTime now) async {
+    // Check individual stop alerts
+    final stops = CacheService.getStopsWithNotificationsEnabled()
+        .where((s) => s.schedule.allows(now));
+    for (final stop in stops) {
+      final arrivals =
+          await MvdApiService.getNextArrivals(stop.id) ?? const [];
+      // Only GPS-tracked buses: a timetable estimate is not "arriving"
+      final imminent = arrivals.where(
+          (a) => a.isRealTime && a.etaMinutes <= stop.etaAlertMinutes);
+      for (final bus in imminent) {
+        await NotificationService.showBusAlert(
+          line: bus.line,
+          stopName: stop.name,
+          etaMinutes: bus.etaMinutes,
+        );
+      }
+    }
+
+    // Check route alerts (A → B)
+    final routes = CacheService.getEnabledRoutes();
+    bool widgetRouteUpdated = false;
+    for (final route in routes) {
+      final scheduled = route.schedule.allows(now);
+      // The home widget shows the first route at any hour
+      if (!scheduled && widgetRouteUpdated) continue;
+      final arrivals =
+          await MvdApiService.getNextArrivals(route.originStopId) ??
+              const [];
+
+      // Filter by preferred lines and direction if specified
+      final relevant = arrivals.where(route.accepts).toList();
+
+      // Push soonest bus for the first enabled route to the home widget.
+      // Own try: a widget failure (e.g. iOS without App Group) must not
+      // swallow the notifications below.
+      if (!widgetRouteUpdated) {
+        widgetRouteUpdated = true;
+        try {
+          await _updateWidgetRoute(
+            relevant.isEmpty ? null : relevant.first.line,
+            relevant.isEmpty ? null : relevant.first.etaMinutes,
+            route.destinationName,
+          );
+        } catch (e) {
+          debugPrint('⚠️ Widget update error: $e');
+        }
+      }
+      if (!scheduled) continue;
+
+      final imminent = relevant
+          .where((a) => a.isRealTime && a.etaMinutes <= route.alertMinutes);
+
+      for (final bus in imminent) {
+        await NotificationService.showRouteAlert(
+          line: bus.line,
+          originName: route.originName,
+          destinationName: route.destinationName,
+          etaMinutes: bus.etaMinutes,
+        );
+      }
+    }
   }
 
   /// True if any stop or route alert is enabled.

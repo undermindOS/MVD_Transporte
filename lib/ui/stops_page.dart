@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import '../models/alert_schedule.dart';
 import '../models/bus_arrival.dart';
 import '../models/bus_stop.dart';
 import '../models/bus_wait.dart';
@@ -162,9 +163,8 @@ class _StopsPageState extends State<StopsPage>
       }
       for (final r in _routes) {
         if (!results.containsKey(r.originStopId)) continue;
-        _routeArrivals[r.id] = results[r.originStopId]
-            ?.where((a) => r.acceptsLine(a.line))
-            .toList();
+        _routeArrivals[r.id] =
+            results[r.originStopId]?.where(r.accepts).toList();
       }
     });
   }
@@ -266,6 +266,17 @@ class _StopsPageState extends State<StopsPage>
     await _syncAlerts(enabling: stop.notificationsEnabled);
   }
 
+  Future<void> _editStopAlert(BusStop stop) async {
+    final settings = await _showAlertSettings(
+        stop.name, stop.etaAlertMinutes, stop.schedule);
+    if (settings == null || !mounted) return;
+    final (minutes, schedule) = settings;
+    setState(() => stop
+      ..etaAlertMinutes = minutes
+      ..schedule = schedule);
+    await stop.save();
+  }
+
   void _deleteStop(BusStop stop) {
     // Dismissible requires the item to leave the list synchronously
     setState(() {
@@ -288,7 +299,7 @@ class _StopsPageState extends State<StopsPage>
     setState(() => _routeLoading[route.id] = true);
     final all = await MvdApiService.getNextArrivals(route.originStopId);
     BusWaitService.onArrivals(route.originStopId, all);
-    final filtered = all?.where((a) => route.acceptsLine(a.line)).toList();
+    final filtered = all?.where(route.accepts).toList();
 
     if (mounted) {
       setState(() {
@@ -303,14 +314,16 @@ class _StopsPageState extends State<StopsPage>
     if (result == null || !mounted) return;
 
     final snack = ScaffoldMessenger.of(context);
-    snack.showSnackBar(const SnackBar(content: Text('Buscando parada…')));
-
-    final BusStop? resolved;
-    try {
-      resolved = await MvdApiService.resolveStop(result.originStopId);
-    } on StopNotFoundException {
-      _showError('No existe la parada ${result.originStopId}');
-      return;
+    // Already resolved if the dialog listed the stop's lines
+    var resolved = result.origin;
+    if (resolved == null) {
+      snack.showSnackBar(const SnackBar(content: Text('Buscando parada…')));
+      try {
+        resolved = await MvdApiService.resolveStop(result.originStopId);
+      } on StopNotFoundException {
+        _showError('No existe la parada ${result.originStopId}');
+        return;
+      }
     }
     final id = CacheService.nextRouteId();
     final route = RouteAlert(
@@ -319,6 +332,7 @@ class _StopsPageState extends State<StopsPage>
       originName: resolved?.name ?? 'Parada ${result.originStopId}',
       destinationName: result.destinationName,
       preferredLines: result.preferredLines,
+      preferredDestinations: result.preferredDestinations,
     );
     await CacheService.saveRoute(route);
 
@@ -329,76 +343,10 @@ class _StopsPageState extends State<StopsPage>
     }
   }
 
-  Future<_RouteFormData?> _showAddRouteDialog() async {
-    final stopCtrl = TextEditingController();
-    final destCtrl = TextEditingController();
-    final lineCtrl = TextEditingController();
-    return showDialog<_RouteFormData>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Agregar ruta'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: stopCtrl,
-              keyboardType: TextInputType.number,
-              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-              decoration: const InputDecoration(
-                labelText: 'Parada de origen *',
-                hintText: 'Ej: 1234',
-                prefixIcon: _FieldIcon(PixelGlyphs.stop),
-              ),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: destCtrl,
-              decoration: const InputDecoration(
-                labelText: 'Destino *',
-                hintText: 'Ej: Centro',
-                prefixIcon: _FieldIcon(PixelGlyphs.route),
-              ),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: lineCtrl,
-              decoration: const InputDecoration(
-                labelText: 'Líneas preferidas (opcional)',
-                hintText: 'Ej: 183, 64D',
-                prefixIcon: _FieldIcon(PixelGlyphs.bus),
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text('Cancelar')),
-          FilledButton(
-            onPressed: () {
-              final stopId = int.tryParse(stopCtrl.text);
-              if (stopId == null || destCtrl.text.trim().isEmpty) return;
-              final lines = lineCtrl.text
-                  .split(RegExp(r'[,\s]+'))
-                  // API line names are upper case ("64D", "G8")
-                  .map((s) => s.trim().toUpperCase())
-                  .where((s) => s.isNotEmpty)
-                  .toList();
-              Navigator.pop(
-                ctx,
-                _RouteFormData(
-                  originStopId: stopId,
-                  destinationName: destCtrl.text.trim(),
-                  preferredLines: lines,
-                ),
-              );
-            },
-            child: const Text('Guardar'),
-          ),
-        ],
-      ),
-    );
-  }
+  Future<_RouteFormData?> _showAddRouteDialog() => showDialog<_RouteFormData>(
+        context: context,
+        builder: (_) => const _AddRouteDialog(),
+      );
 
   Future<void> _toggleRouteEnabled(RouteAlert route) async {
     route.enabled = !route.enabled;
@@ -406,6 +354,31 @@ class _StopsPageState extends State<StopsPage>
     setState(() {});
     await _syncAlerts(enabling: route.enabled);
   }
+
+  Future<void> _editRouteAlert(RouteAlert route) async {
+    final settings = await _showAlertSettings(
+        '${route.originName} → ${route.destinationName}',
+        route.alertMinutes,
+        route.schedule);
+    if (settings == null || !mounted) return;
+    final (minutes, schedule) = settings;
+    setState(() => route
+      ..alertMinutes = minutes
+      ..schedule = schedule);
+    await route.save();
+  }
+
+  // ------------------------------------------------------- Alert settings --
+
+  /// Threshold and schedule of a stop or route alert.
+  Future<(int, AlertSchedule)?> _showAlertSettings(
+          String title, int minutes, AlertSchedule schedule) =>
+      showModalBottomSheet<(int, AlertSchedule)>(
+        context: context,
+        isScrollControlled: true,
+        builder: (_) => _AlertSettingsSheet(
+            title: title, minutes: minutes, schedule: schedule),
+      );
 
   void _deleteRoute(RouteAlert route) {
     // Dismissible requires the item to leave the list synchronously
@@ -688,6 +661,9 @@ class _StopsPageState extends State<StopsPage>
               ),
             ]),
           ),
+          if (stop.notificationsEnabled)
+            _buildAlertSettingsRow(stop.etaAlertMinutes, stop.schedule,
+                () => _editStopAlert(stop)),
           const Divider(),
           _buildArrivals('s${stop.id}', arrivals, isLoading, failed, stop.id,
               stop.name),
@@ -768,9 +744,16 @@ class _StopsPageState extends State<StopsPage>
                     const SizedBox(height: 4),
                     Text('→ ${route.destinationName}',
                         style: TimbreText.stopName),
-                    if (route.preferredLines.isNotEmpty) ...[
+                    if (route.preferredLines.isNotEmpty ||
+                        route.preferredDestinations.isNotEmpty) ...[
                       const SizedBox(height: 3),
-                      Text('Líneas: ${route.preferredLines.join(", ")}',
+                      Text(
+                          [
+                            if (route.preferredLines.isNotEmpty)
+                              'Líneas: ${route.preferredLines.join(", ")}',
+                            if (route.preferredDestinations.isNotEmpty)
+                              'Hacia: ${route.preferredDestinations.join(", ")}',
+                          ].join(' · '),
                           style: const TextStyle(
                               fontSize: 12.5, color: TimbreColors.tenue)),
                     ],
@@ -783,6 +766,9 @@ class _StopsPageState extends State<StopsPage>
               ),
             ]),
           ),
+          if (route.enabled)
+            _buildAlertSettingsRow(route.alertMinutes, route.schedule,
+                () => _editRouteAlert(route)),
           const Divider(),
           _buildArrivals('r${route.id}', arrivals, isLoading, failed,
               route.originStopId, route.originName),
@@ -817,6 +803,35 @@ class _StopsPageState extends State<StopsPage>
                     fontSize: 13, height: 1.4, color: TimbreColors.papel)),
           ),
         ],
+      ),
+    );
+  }
+
+  /// Under an enabled alert: "Aviso 5 min antes · Lun a Vie 7:30–8:30".
+  /// Opens the threshold and schedule settings.
+  Widget _buildAlertSettingsRow(
+      int minutes, AlertSchedule schedule, VoidCallback onTap) {
+    return InkWell(
+      onTap: onTap,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(minHeight: TimbreSpace.touch),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(14, 0, 14, 4),
+          child: Row(children: [
+            const PixelIcon(PixelGlyphs.bellRing,
+                size: 14, color: TimbreColors.ambar),
+            const SizedBox(width: TimbreSpace.s),
+            Expanded(
+              child: Text('Aviso $minutes min antes · ${schedule.label}',
+                  style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      color: TimbreColors.ambar)),
+            ),
+            const PixelIcon(PixelGlyphs.chevronRight,
+                size: 14, color: TimbreColors.etiquetaCartel),
+          ]),
+        ),
       ),
     );
   }
@@ -1288,15 +1303,378 @@ class _AddStopDialogState extends State<_AddStopDialog> {
       );
 }
 
+/// Add-route dialog: origin stop and destination label. Once the stop is
+/// looked up, its lines (`transporteRest/lineas`) and the directions of its
+/// upcoming buses (`destino`) are picked as chips; none picked = all.
+class _AddRouteDialog extends StatefulWidget {
+  const _AddRouteDialog();
+
+  @override
+  State<_AddRouteDialog> createState() => _AddRouteDialogState();
+}
+
+class _AddRouteDialogState extends State<_AddRouteDialog> {
+  final _stopCtrl = TextEditingController();
+  final _destCtrl = TextEditingController();
+  bool _loading = false;
+  String? _error;
+  // Looked-up stop with its lines (null = not looked up yet)
+  BusStop? _stop;
+  // Upcoming buses of the stop: where each line is heading
+  List<BusArrival> _arrivals = const [];
+  final _lines = <String>{};
+  final _directions = <String>{};
+
+  @override
+  void dispose() {
+    _stopCtrl.dispose();
+    _destCtrl.dispose();
+    super.dispose();
+  }
+
+  /// Another stop number: the chips belonged to the previous one.
+  void _reset() {
+    if (_stop == null && _error == null) return;
+    setState(() {
+      _stop = null;
+      _error = null;
+      _arrivals = const [];
+      _lines.clear();
+      _directions.clear();
+    });
+  }
+
+  Future<void> _lookUp() async {
+    final stopId = int.tryParse(_stopCtrl.text);
+    if (stopId == null || _loading) return;
+    FocusScope.of(context).unfocus();
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    final arrivals = MvdApiService.getNextArrivals(stopId);
+    BusStop? stop;
+    String? error;
+    try {
+      stop = await MvdApiService.resolveStop(stopId);
+      if (stop == null) {
+        error = 'No se pudieron cargar las líneas. Revisá la conexión.';
+      }
+    } on StopNotFoundException {
+      error = 'No existe la parada $stopId';
+    }
+    final upcoming = await arrivals;
+    if (!mounted) return;
+    setState(() {
+      _loading = false;
+      // The number was edited meanwhile
+      if (int.tryParse(_stopCtrl.text) != stopId) return;
+      _stop = stop;
+      _error = error;
+      _arrivals = upcoming ?? const [];
+    });
+  }
+
+  /// Directions of the upcoming buses of the picked lines (or of all).
+  List<String> get _visibleDirections => {
+        for (final a in _arrivals)
+          if (a.destination.isNotEmpty &&
+              (_lines.isEmpty || _lines.contains(a.line)))
+            a.destination,
+      }.toList()
+        ..sort();
+
+  void _save() {
+    final stopId = int.tryParse(_stopCtrl.text);
+    if (stopId == null || _destCtrl.text.trim().isEmpty) return;
+    final stop = _stop;
+    final directions = _visibleDirections;
+    Navigator.pop(
+      context,
+      _RouteFormData(
+        originStopId: stopId,
+        destinationName: _destCtrl.text.trim(),
+        origin: stop,
+        // In the API order, as the chips
+        preferredLines: [
+          for (final l in stop?.lines ?? const <String>[])
+            if (_lines.contains(l)) l,
+        ],
+        preferredDestinations: [
+          for (final d in directions)
+            if (_directions.contains(d)) d,
+        ],
+      ),
+    );
+  }
+
+  Widget _chips(List<String> labels, Set<String> picked) => Wrap(
+        spacing: TimbreSpace.s,
+        runSpacing: TimbreSpace.xs,
+        children: [
+          for (final label in labels)
+            FilterChip(
+              label: Text(label),
+              selected: picked.contains(label),
+              onSelected: (on) => setState(
+                  () => on ? picked.add(label) : picked.remove(label)),
+            ),
+        ],
+      );
+
+  @override
+  Widget build(BuildContext context) {
+    const hint = TextStyle(color: TimbreColors.etiquetaCartel, fontSize: 13);
+    const label = TimbreText.sectionLabel;
+    final stop = _stop;
+    final error = _error;
+    final directions = _visibleDirections;
+
+    return AlertDialog(
+      title: const Text('Agregar ruta'),
+      content: SizedBox(
+        width: double.maxFinite,
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              TextField(
+                controller: _stopCtrl,
+                keyboardType: TextInputType.number,
+                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                textInputAction: TextInputAction.search,
+                onChanged: (_) => _reset(),
+                onSubmitted: (_) => _lookUp(),
+                decoration: InputDecoration(
+                  labelText: 'Parada de origen *',
+                  hintText: 'Ej: 1234',
+                  prefixIcon: const _FieldIcon(PixelGlyphs.stop),
+                  suffixIcon: IconButton(
+                    onPressed: _loading ? null : _lookUp,
+                    tooltip: 'Ver líneas',
+                    icon: const PixelIcon(PixelGlyphs.search, size: 20),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: _destCtrl,
+                decoration: const InputDecoration(
+                  labelText: 'Destino *',
+                  hintText: 'Ej: Centro',
+                  prefixIcon: _FieldIcon(PixelGlyphs.route),
+                ),
+              ),
+              const SizedBox(height: 16),
+              if (_loading)
+                const Center(child: CircularProgressIndicator())
+              else if (error != null)
+                Text(error,
+                    style: const TextStyle(
+                        color: TimbreColors.rojoLed, fontSize: 13))
+              else if (stop == null)
+                const Text('Buscá la parada para elegir sus líneas',
+                    style: hint)
+              else ...[
+                Text(stop.name, style: TimbreText.stopName),
+                const SizedBox(height: TimbreSpace.m),
+                const Text('LÍNEAS', style: label),
+                const SizedBox(height: TimbreSpace.xs),
+                _chips(stop.lines, _lines),
+                if (directions.isNotEmpty) ...[
+                  const SizedBox(height: TimbreSpace.m),
+                  const Text('HACIA', style: label),
+                  const SizedBox(height: TimbreSpace.xs),
+                  _chips(directions, _directions),
+                ],
+                const SizedBox(height: 4),
+                const Text('Si no elegís ninguna, se incluyen todas.',
+                    style: hint),
+              ],
+            ],
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancelar')),
+        FilledButton(onPressed: _save, child: const Text('Guardar')),
+      ],
+    );
+  }
+}
+
 /// Internal form data for the add-route dialog.
 class _RouteFormData {
   final int originStopId;
   final String destinationName;
+  // Resolved by the dialog (null = not looked up)
+  final BusStop? origin;
   final List<String> preferredLines;
+  final List<String> preferredDestinations;
 
   const _RouteFormData({
     required this.originStopId,
     required this.destinationName,
+    this.origin,
     required this.preferredLines,
+    required this.preferredDestinations,
   });
+}
+
+/// Threshold and schedule of a stop or route alert, e.g. 5 min before,
+/// Monday to Friday 7:30–8:30. Pops with the chosen values.
+class _AlertSettingsSheet extends StatefulWidget {
+  final String title;
+  final int minutes;
+  final AlertSchedule schedule;
+
+  const _AlertSettingsSheet(
+      {required this.title, required this.minutes, required this.schedule});
+
+  @override
+  State<_AlertSettingsSheet> createState() => _AlertSettingsSheetState();
+}
+
+class _AlertSettingsSheetState extends State<_AlertSettingsSheet> {
+  static const _dayChips = ['Lu', 'Ma', 'Mi', 'Ju', 'Vi', 'Sá', 'Do'];
+  // Offered when "Todo el día" is turned off
+  static const _defaultFrom = 7 * 60, _defaultTo = 9 * 60;
+
+  late int _minutes = widget.minutes;
+  late final Set<int> _days = {...widget.schedule.days};
+  late bool _allDay = widget.schedule.isAllDay;
+  late int _from =
+      widget.schedule.isAllDay ? _defaultFrom : widget.schedule.fromMinute;
+  late int _to =
+      widget.schedule.isAllDay ? _defaultTo : widget.schedule.toMinute;
+
+  String? get _problem {
+    if (_days.isEmpty) return 'Elegí al menos un día';
+    if (!_allDay && _from == _to) return 'Elegí horas distintas';
+    return null;
+  }
+
+  Future<void> _pickTime({required bool from}) async {
+    final current = from ? _from : _to;
+    final picked = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay(hour: current ~/ 60, minute: current % 60),
+      helpText: from ? 'Desde' : 'Hasta',
+    );
+    if (picked == null || !mounted) return;
+    setState(() {
+      final minute = picked.hour * 60 + picked.minute;
+      if (from) {
+        _from = minute;
+      } else {
+        _to = minute;
+      }
+    });
+  }
+
+  void _save() => Navigator.pop(
+        context,
+        (
+          _minutes,
+          AlertSchedule(
+            days: _days.toList()..sort(),
+            fromMinute: _allDay ? 0 : _from,
+            toMinute: _allDay ? AlertSchedule.dayMinutes : _to,
+          ),
+        ),
+      );
+
+  @override
+  Widget build(BuildContext context) {
+    final problem = _problem;
+    return SafeArea(
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(widget.title, style: TimbreText.stopName),
+            if (defaultTargetPlatform == TargetPlatform.android) ...[
+              const SizedBox(height: TimbreSpace.xs),
+              const Text(
+                  'Se revisa cada 15 min aprox. y avisa solo por ómnibus '
+                  'con GPS.',
+                  style: TextStyle(
+                      fontSize: 12.5,
+                      height: 1.4,
+                      color: TimbreColors.etiquetaCartel)),
+            ],
+            const SizedBox(height: 18),
+            const Text('Avisarme cuando falten',
+                style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                    color: TimbreColors.papel)),
+            const SizedBox(height: TimbreSpace.s),
+            TimbreSegmented<int>(
+              values: const [3, 5, 10],
+              selected: _minutes,
+              labelOf: (m) => '$m min',
+              semanticLabel: 'Minutos antes de que llegue',
+              onChanged: (m) => setState(() => _minutes = m),
+            ),
+            const SizedBox(height: 18),
+            const Text('DÍAS', style: TimbreText.sectionLabel),
+            const SizedBox(height: TimbreSpace.xs),
+            Wrap(
+              spacing: TimbreSpace.s,
+              runSpacing: TimbreSpace.xs,
+              children: [
+                for (var day = DateTime.monday; day <= DateTime.sunday; day++)
+                  FilterChip(
+                    label: Text(_dayChips[day - 1]),
+                    showCheckmark: false,
+                    selected: _days.contains(day),
+                    onSelected: (on) => setState(
+                        () => on ? _days.add(day) : _days.remove(day)),
+                  ),
+              ],
+            ),
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              title: const Text('Todo el día'),
+              value: _allDay,
+              onChanged: (on) => setState(() => _allDay = on),
+            ),
+            if (!_allDay)
+              Row(children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: () => _pickTime(from: true),
+                    child: Text('Desde ${AlertSchedule.time(_from)}'),
+                  ),
+                ),
+                const SizedBox(width: TimbreSpace.m),
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: () => _pickTime(from: false),
+                    child: Text('Hasta ${AlertSchedule.time(_to)}'),
+                  ),
+                ),
+              ]),
+            if (problem != null) ...[
+              const SizedBox(height: TimbreSpace.s),
+              Text(problem,
+                  style: const TextStyle(
+                      color: TimbreColors.rojoLed, fontSize: 13)),
+            ],
+            const SizedBox(height: TimbreSpace.l),
+            FilledButton(
+              onPressed: problem == null ? _save : null,
+              child: const Text('Guardar'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
