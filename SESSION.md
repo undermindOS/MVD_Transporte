@@ -229,3 +229,28 @@
   поэтому бюджет и комфорт в его хранилище; найдено по трассам `wrangler dev` (новый токен каждые ~25 с).
 - Показывается только подтверждённое «да»: «Sin datos» ≠ «нет кондиционера».
 - `MVD_PROXY_URL` с прямым режимом по умолчанию — чтобы сборки не ломались до деплоя прокси.
+
+## 2026-10-26 — документация и GitHub на испанском (ветка docs/es)
+
+### What was done
+- Ветка `docs/es` от `feat/live-eta-waiting` (PR #3), worktree `.claude/worktrees/docs-es/MVD_Transporte`.
+- На риоплатский испанский переведены README, CHANGELOG, docs/REVIEW.md (с русского) и LOGO_SETUP.md,
+  STM_APP_SETUP.md, assets/README.md (с английского). docs/carta-imm, privacy-policy, store-listing уже были на испанском.
+- GitHub: описание репозитория и topics на испанском; заголовки и описания PR #1–#3 переведены
+  (оригиналы сохранены в scratchpad сессии, не в репо).
+- Скрипт-сверка с HEAD: `code`, URL, блоки кода, число заголовков/строк таблиц/пунктов списков совпадают.
+
+### Current state
+- What works: переводы закоммичены, PR открыт с базой `feat/live-eta-waiting`.
+- What's broken/pending: в основной рабочей копии есть незакоммиченная правка docs/REVIEW.md (3 строки
+  про `upcomingbuses`/`linevariants/{id}`, на русском, из другой сессии) — в перевод не вошла; при коммите
+  будет конфликт с docs/es.
+
+### Next steps
+- После слияния PR #3 — сменить базу PR docs/es на `main`.
+- Новые записи CHANGELOG, тексты PR и документацию писать на испанском.
+
+### Key decisions made
+- SESSION.md и шаблонный README в ios/ не переводятся; сообщения коммитов остаются на английском.
+- В CHANGELOG заголовок `[Unreleased]` оставлен на английском (его ищут инструменты релиза), разделы — Agregado/Cambiado/Corregido/Eliminado.
+- STM_APP_SETUP.md переведён как есть, хотя описывает старую версию с WebView.
