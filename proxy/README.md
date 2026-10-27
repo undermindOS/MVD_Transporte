@@ -30,6 +30,8 @@ Solo `GET`, sin query string. Todas las respuestas son JSON (`application/json; 
 Este README no repite las formas: el contrato está en [contract/v1/](contract/v1/README.md). Ahí
 están los cuerpos esperados de cada ruta (`responses/`), las capturas de las fuentes y los casos
 que corren las pruebas del proxy y las de la app.
+El texto para leer (formas, reglas, errores, caché y orden de despliegue) está en
+[docs/design/contrato-v1.md](../docs/design/contrato-v1.md).
 
 | Ruta | Qué devuelve | Caché |
 |---|---|---|
