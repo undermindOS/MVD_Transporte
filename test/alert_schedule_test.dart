@@ -59,10 +59,12 @@ void main() {
 
   group('direction filter', () {
     BusArrival bus(String line, String destination) => BusArrival(
+        tripId: 'bus-50-1',
         line: line,
-        companyCode: 50,
+        state: ArrivalState.live,
         etaMinutes: 5,
-        etaSeconds: 300,
+        expectedAt: DateTime.utc(2026, 10, 19, 11, 5),
+        clockTime: '8:05',
         destination: destination);
 
     test('accepts only the picked directions of the picked lines', () {

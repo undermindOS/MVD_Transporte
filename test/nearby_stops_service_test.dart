@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:stm_app/services/api/direct/wfs_adapter.dart';
 import 'package:stm_app/services/nearby_stops_service.dart';
 
 // Live WFS response captured on 2026-10-17: imm:v_uptu_paradas, 200 m box
@@ -102,6 +103,40 @@ void main() {
         ],
       }, lat: _lat, lng: _lng);
       expect(stops.map((s) => s.name), containsAll(['RAMBLA', 'Parada 2']));
+    });
+  });
+
+  group('WfsAdapter.featuresToCatalogItems', () {
+    test('groups the variants by stop into /v1 catalog items', () {
+      final items = WfsAdapter.featuresToCatalogItems(
+          jsonDecode(File(_fixture).readAsStringSync()))!;
+      // Every stop of the box, before any distance filter
+      expect(items, hasLength(10));
+      expect(items.singleWhere((s) => s['id'] == 574), {
+        'id': 574,
+        'name': 'SAN JOSE y ANDES',
+        'location': {'lat': -34.90739436, 'lng': -56.198255},
+        'lines': ['116', '117', '121', '141', '142', '144', '538'],
+      });
+    });
+
+    test('a stop without street names has no name; non-collections fail',
+        () {
+      final items = WfsAdapter.featuresToCatalogItems({
+        'features': [
+          {
+            'geometry': {
+              'coordinates': [_lng, _lat]
+            },
+            'properties': {'cod_ubic_parada': 2, 'calle': ' ', 'esquina': ''},
+          },
+          'garbage',
+        ],
+      })!;
+      expect(items.single['name'], isNull);
+      expect(items.single['lines'], isEmpty);
+      expect(WfsAdapter.featuresToCatalogItems([]), isNull);
+      expect(WfsAdapter.featuresToCatalogItems({'features': null}), isNull);
     });
   });
 

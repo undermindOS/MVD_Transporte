@@ -80,6 +80,36 @@ void main() {
     });
   });
 
+  group('TransportNews.fromV1', () {
+    test('reads a /v1 item, the date in local time like the cache', () {
+      final n = TransportNews.fromV1({
+        'id': 182,
+        'title': 'Traslado definitivo de cuatro paradas',
+        'summary': 'Sobre Av. Rondeau, Paraguay y Gral. Aguilar',
+        'body': '<p>Por obras viales…</p>',
+        'link': 'https://montevideo.gub.uy/node/99018',
+        'publishedAt': '2026-10-26T18:28:02.591Z',
+      })!;
+      expect(n.id, 182);
+      expect(n.link, 'https://montevideo.gub.uy/node/99018');
+      expect(n.date, DateTime.fromMillisecondsSinceEpoch(1793039282591));
+      expect(n.date.isUtc, isFalse);
+      // The cache keeps the API shape
+      final copy = TransportNews.fromJson(n.toJson())!;
+      expect((copy.id, copy.body, copy.date), (n.id, n.body, n.date));
+    });
+
+    test('needs an id and a date; no link is null', () {
+      expect(TransportNews.fromV1({'id': 1}), isNull);
+      expect(TransportNews.fromV1({'publishedAt': '2026-10-26T18:28:02Z'}),
+          isNull);
+      expect(TransportNews.fromV1('garbage'), isNull);
+      final n = TransportNews.fromV1(
+          {'id': 1, 'publishedAt': '2026-10-26T18:28:02Z', 'link': null})!;
+      expect((n.title, n.link), ('', null));
+    });
+  });
+
   group('fetchNewest', () {
     test('climbs to the newest full page in 4 requests', () async {
       final requested = <int>[];

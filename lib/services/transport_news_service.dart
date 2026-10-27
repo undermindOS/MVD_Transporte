@@ -2,15 +2,20 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import '../models/transport_news.dart';
+import 'api/direct/news_adapter.dart';
 import 'cache_service.dart';
 
 /// One response of `GET /notificacion/mensajes`.
-class NewsPage {
+class NewsPage implements NewsPaging {
   /// Number of messages with an id above the requested `fromIdMessage`.
+  @override
   final int count;
   final List<TransportNews> messages;
 
   const NewsPage(this.count, this.messages);
+
+  @override
+  int get size => messages.length;
 }
 
 /// Official transport news — the open endpoint Cómo Ir reads
@@ -19,14 +24,9 @@ class NewsPage {
 /// Fetched only while the app is open, at most every [minInterval]
 /// (pull-to-refresh: every [forcedMinInterval]), and cached in Hive.
 class TransportNewsService {
-  static const _url = 'https://api.montevideo.gub.uy/notificacion/mensajes';
-  // Cómo Ir's application id on the notification backend
-  static const _idApp = 1;
-
   static const minInterval = Duration(minutes: 10);
   static const forcedMinInterval = Duration(seconds: 30);
   static const _maxCached = 30;
-  static const _maxRequests = 8;
 
   static const _timeout = Duration(seconds: 10);
   static const _headers = {'Accept': 'application/json'};
@@ -89,7 +89,7 @@ class TransportNewsService {
 
   static Future<NewsPage?> _fetchPage(int fromId) async {
     try {
-      final uri = Uri.parse('$_url?idApp=$_idApp&fromIdMessage=$fromId');
+      final uri = Uri.parse(NewsAdapter.pageUrl(fromId));
       final response =
           await http.get(uri, headers: _headers).timeout(_timeout);
       if (response.statusCode != 200) {
@@ -103,39 +103,25 @@ class TransportNewsService {
     }
   }
 
-  /// Parses `{"count":144,"messages":[{"idMensaje":"28", …}, …]}`.
+  /// Parses `{"count":144,"messages":[{"idMensaje":"28", …}, …]}` through
+  /// the direct-mode adapter and [TransportNews.fromV1].
   @visibleForTesting
   static NewsPage? parsePage(dynamic data) {
-    if (data is! Map || data['messages'] is! List) return null;
-    final messages = (data['messages'] as List)
-        .map(TransportNews.fromJson)
-        .whereType<TransportNews>()
-        .toList();
-    final count = data['count'];
-    return NewsPage(count is num ? count.toInt() : messages.length, messages);
+    final page = NewsAdapter.pageToV1(data);
+    if (page == null) return null;
+    return NewsPage(
+        page.count, page.news.map(TransportNews.fromV1).nonNulls.toList());
   }
 
-  /// Finds the newest messages starting from id [from].
-  ///
-  /// The endpoint returns at most 10 of the messages with an id above
-  /// `fromIdMessage`, in storage order (e.g. 43…50, 134, 51), plus `count`
-  /// of all of them. Paging by the highest id received — what Cómo Ir does —
-  /// therefore skips messages. Instead `from` moves up until everything
-  /// above it fits in one page. Ids are near-sequential (the i-th id above
-  /// `from` is at least `from + i`), so the jump never overshoots the
-  /// newest full page.
+  /// Finds the newest messages starting from id [from]: see
+  /// [NewsAdapter.fetchNewest].
   @visibleForTesting
   static Future<({List<TransportNews> messages, int from})?> fetchNewest(
       int from, Future<NewsPage?> Function(int from) getPage) async {
-    for (var i = 0; i < _maxRequests; i++) {
-      final page = await getPage(from);
-      if (page == null) return null;
-      if (page.count <= page.messages.length || i == _maxRequests - 1) {
-        return (messages: page.messages, from: from);
-      }
-      from += page.count - page.messages.length;
-    }
-    return null;
+    final result = await NewsAdapter.fetchNewest(from, getPage);
+    return result == null
+        ? null
+        : (messages: result.page.messages, from: result.from);
   }
 
   /// Union by id, newest first, capped at [_maxCached].
