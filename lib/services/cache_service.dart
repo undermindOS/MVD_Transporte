@@ -6,6 +6,11 @@ class CacheService {
   static const String _settingsBox = 'settings';
   static const String _stopsBox = 'stops';
   static const String _routesBox = 'routes';
+  // The stop catalog (~660 KB) has a lazy box of its own: read from disk
+  // only when the catalog is needed, never kept in memory with the settings
+  static const String _catalogBox = 'catalog';
+  static const String _catalogBodyKey = 'body';
+  static const String _catalogFetchedAtKey = 'fetched_at_ms';
 
   static const String keyBiometricEnabled = 'biometric_lock_enabled';
   // Transport news: cached messages (JSON string), paging start, last
@@ -14,10 +19,20 @@ class CacheService {
   static const String keyNewsFromId = 'news_from_id';
   static const String keyNewsFetchedAt = 'news_fetched_at';
   static const String keyNewsLastReadId = 'news_last_read_id';
-  // Stop catalog for the search by streets: {"stops":[{"id","name"}]}
-  // (JSON string) and the last fetch (ms since epoch)
+  // Stop catalog for the search by streets and the nearby stops: the
+  // /v1/catalog/stops body (JSON string) and the last fetch (ms since
+  // epoch). Both live in the catalog box ([catalogBody], [saveCatalog]);
+  // [remove] with either name removes the copy.
   static const String keyStopCatalog = 'stop_catalog';
   static const String keyStopCatalogFetchedAt = 'stop_catalog_fetched_at';
+
+  // What the settings box holds: 2 moved the catalog out of it
+  static const String _keyCacheSchema = 'cache_schema';
+  static const int _cacheSchema = 2;
+
+  // When the catalog copy was fetched, null = no copy. Kept in memory so
+  // that [remove] drops the copy at once, before the delete reaches the disk
+  static int? _catalogFetchedAtMs;
 
   /// [path] overrides the storage directory (tests run without path_provider).
   static Future<void> init({String? path}) async {
@@ -32,6 +47,19 @@ class CacheService {
     await Hive.openBox(_settingsBox);
     await Hive.openBox<BusStop>(_stopsBox);
     await Hive.openBox<RouteAlert>(_routesBox);
+    final catalog = await Hive.openLazyBox(_catalogBox);
+    _catalogFetchedAtMs = await catalog.get(_catalogFetchedAtKey) as int?;
+    await _migrate();
+  }
+
+  /// One-time changes to what an older version of the app saved.
+  static Future<void> _migrate() async {
+    final schema = _settings.get(_keyCacheSchema) as int? ?? 1;
+    if (schema >= _cacheSchema) return;
+    // Up to 1 the catalog was in the settings box, decoded at every start;
+    // it is downloaded again into its own box
+    await _settings.deleteAll([keyStopCatalog, keyStopCatalogFetchedAt]);
+    await _settings.put(_keyCacheSchema, _cacheSchema);
   }
 
   // --- Generic settings ---
@@ -43,7 +71,36 @@ class CacheService {
   static Future<void> set<T>(String key, T value) =>
       _settings.put(key, value);
 
-  static Future<void> remove(String key) => _settings.delete(key);
+  /// Removes a setting; [keyStopCatalog] or [keyStopCatalogFetchedAt]
+  /// removes the catalog copy.
+  static Future<void> remove(String key) {
+    if (key == keyStopCatalog || key == keyStopCatalogFetchedAt) {
+      _catalogFetchedAtMs = null;
+      return _catalog.deleteAll([_catalogBodyKey, _catalogFetchedAtKey]);
+    }
+    return _settings.delete(key);
+  }
+
+  // --- Stop catalog ---
+
+  static LazyBox get _catalog => Hive.lazyBox(_catalogBox);
+
+  /// When the catalog copy on the device was fetched (ms since epoch);
+  /// null when there is no copy.
+  static int? get catalogFetchedAtMs => _catalogFetchedAtMs;
+
+  /// The /v1/catalog/stops body kept on the device, or null.
+  static Future<String?> catalogBody() async {
+    if (_catalogFetchedAtMs == null) return null;
+    return await _catalog.get(_catalogBodyKey) as String?;
+  }
+
+  /// Keeps [body], fetched at [fetchedAtMs], as the catalog copy.
+  static Future<void> saveCatalog(String body, int fetchedAtMs) {
+    _catalogFetchedAtMs = fetchedAtMs;
+    return _catalog.putAll(
+        {_catalogBodyKey: body, _catalogFetchedAtKey: fetchedAtMs});
+  }
 
   // --- Bus stops ---
 

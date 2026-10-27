@@ -46,6 +46,12 @@ class RouteAlert extends HiveObject {
   @HiveField(10, defaultValue: <String>[])
   List<String> preferredDestinations;
 
+  /// Direction filter by transporteRest `variante`, picked together with
+  /// [preferredDestinations]: a bus of one of these variants matches even
+  /// when its destination label reads differently.
+  @HiveField(11, defaultValue: <int>[])
+  List<int> preferredVariantIds;
+
   AlertSchedule get schedule => AlertSchedule(
       days: alertDays, fromMinute: alertFromMinute, toMinute: alertToMinute);
 
@@ -62,10 +68,12 @@ class RouteAlert extends HiveObject {
         preferredLines.any((l) => l.toUpperCase() == wanted);
   }
 
-  /// Preferred line and direction.
+  /// Preferred line and direction (by variant or by destination label).
   bool accepts(BusArrival bus) =>
       acceptsLine(bus.line) &&
-      (preferredDestinations.isEmpty ||
+      ((preferredDestinations.isEmpty && preferredVariantIds.isEmpty) ||
+          (bus.variantId != null &&
+              preferredVariantIds.contains(bus.variantId)) ||
           preferredDestinations.contains(bus.destination));
 
   RouteAlert({
@@ -80,5 +88,6 @@ class RouteAlert extends HiveObject {
     this.alertFromMinute = 0,
     this.alertToMinute = AlertSchedule.dayMinutes,
     this.preferredDestinations = const [],
+    this.preferredVariantIds = const [],
   });
 }

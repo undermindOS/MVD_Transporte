@@ -68,7 +68,9 @@ class NotificationService {
     required String stopName,
     required int etaMinutes,
   }) async {
-    final title = 'Línea $line — $etaMinutes min';
+    final title = etaMinutes <= 0
+        ? 'Línea $line — llegando'
+        : 'Línea $line — $etaMinutes min';
     final body = etaMinutes <= 1
         ? 'Tu ómnibus está llegando a $stopName'
         : 'Tu ómnibus llega en $etaMinutes min a $stopName';

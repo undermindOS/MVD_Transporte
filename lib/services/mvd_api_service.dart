@@ -1,10 +1,19 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
-import 'package:http/http.dart' as http;
+import '../models/arrivals_board.dart';
 import '../models/bus_arrival.dart';
 import '../models/bus_stop.dart';
 import '../models/catalog_stop.dart';
+import '../models/gps_status.dart';
 import '../models/scheduled_pass.dart';
+import '../models/stop_details.dart';
+import 'api/api_result.dart';
+import 'api/contract_rules.dart';
+import 'api/direct/transporte_rest_adapter.dart';
+import 'api/direct_source.dart';
+import 'api/proxy_source.dart';
+import 'api/v1_parser.dart';
+import 'api/v1_source.dart';
 import 'cache_service.dart';
 
 /// The stop code does not exist in the STM network.
@@ -16,7 +25,8 @@ class StopNotFoundException implements Exception {
   String toString() => 'StopNotFoundException($stopId)';
 }
 
-/// Arrivals, timetables and stop names.
+/// Arrivals, timetables, stop names, the stop catalog, transport news and
+/// the GPS status.
 ///
 /// With `--dart-define=MVD_PROXY_URL=https://…` every call goes to the
 /// project's proxy (`proxy/`, routes `/v1`). The proxy holds the secret of the
@@ -26,135 +36,186 @@ class StopNotFoundException implements Exception {
 /// Without it the app calls the public endpoints of the official Cómo Ir web
 /// app (https://m.montevideo.gub.uy/comoir/) directly: no credentials, no
 /// comfort data. Kept until the proxy is deployed — see docs/REVIEW.md.
+///
+/// Either way the answer is /v1 JSON ([V1Source]) read by [V1Parser]
+/// (docs/design/contrato-v1.md).
 class MvdApiService {
   /// From `--dart-define=MVD_PROXY_URL=…`; empty = transporteRest directly.
   @visibleForTesting
   static String proxyUrl = const String.fromEnvironment('MVD_PROXY_URL');
   static bool get usesProxy => proxyUrl.isNotEmpty;
 
-  static const _baseUrl = 'https://api.montevideo.gub.uy/transporteRest';
-  static const _nextBusesPath = '/siguientesParada';
-  static const _stopLinesPath = '/lineas';
-
-  static const _timeout = Duration(seconds: 10);
-  static const _headers = {'Accept': 'application/json'};
+  /// Where /v1 JSON comes from, decided on each call.
+  static V1Source get source =>
+      usesProxy ? ProxySource(proxyUrl) : const DirectSource();
 
   // Timetables change rarely: keep each answer for the app session
   static const _scheduleTtl = Duration(hours: 6);
   static final Map<String, (DateTime, List<ScheduledPass>)> _scheduleCache =
       {};
 
-  // The stop catalog (~520 KB from the proxy) is kept on the device for a
+  // The stop catalog (~660 KB from the proxy) is kept on the device for a
   // day, and decoded once per app session
   static const _catalogTtl = Duration(days: 1);
-  static const _catalogTimeout = Duration(seconds: 30);
   static List<CatalogStop>? _catalog;
+
+  // After a 429 nothing is requested until then, in this isolate
+  static DateTime? _busyUntil;
+
+  // Boards being fetched by getBoards, so a stop is requested once at a time
+  static final Map<int, Future<ApiResult<ArrivalsBoard>>> _boardsInFlight =
+      {};
+
+  /// Stop numbers that can exist; others are never requested.
+  static bool isValidStopId(int id) => ContractRules.isValidStopId(id);
+
+  /// [utc] on the Montevideo clock (UTC−3 all year), "H:MM".
+  static String montevideoClock(DateTime utc) =>
+      ContractRules.montevideoClock(utc);
+
+  /// Upcoming buses of a stop, soonest first.
+  static Future<ApiResult<ArrivalsBoard>> getBoard(int stopId) =>
+      _call(stopId, () => source.arrivals(stopId),
+          (json) => V1Parser.arrivals(json, stopId));
+
+  /// The boards of several stops: each stop once, all in parallel. A stop
+  /// already being fetched by another call shares that request.
+  static Future<Map<int, ApiResult<ArrivalsBoard>>> getBoards(
+      Iterable<int> stopIds) async {
+    final ids = stopIds.toSet().toList();
+    final results = await Future.wait([
+      for (final id in ids)
+        // A block: returning the removed future would make it wait for itself
+        _boardsInFlight[id] ??= getBoard(id).whenComplete(() {
+          _boardsInFlight.remove(id);
+        }),
+    ]);
+    return {for (var i = 0; i < ids.length; i++) ids[i]: results[i]};
+  }
+
+  /// Name, lines and directions of a stop.
+  static Future<ApiResult<StopDetails>> getStopDetails(int stopId) =>
+      _call(stopId, () => source.stop(stopId),
+          (json) => V1Parser.stop(json, stopId));
+
+  /// Saved stops still named "Parada N" with no lines (saved while offline)
+  /// get their name and lines. Returns how many were updated.
+  static Future<int> healPlaceholderStops() async {
+    var healed = 0;
+    final placeholders = CacheService.getAllStops()
+        .where((s) => s.name == 'Parada ${s.id}' && s.lines.isEmpty)
+        .toList();
+    for (final stop in placeholders) {
+      final details = (await getStopDetails(stop.id)).valueOrNull;
+      if (details == null ||
+          (details.name == null && details.lines.isEmpty)) {
+        continue;
+      }
+      stop
+        ..name = details.displayName
+        ..lines = [...details.lines];
+      await CacheService.saveStop(stop);
+      healed++;
+    }
+    return healed;
+  }
+
+  /// One /v1 request: the stop id checked first, nothing sent while busy,
+  /// the answer read by [parse] (null = wrong shape).
+  static Future<ApiResult<T>> _call<T>(
+      int stopId,
+      Future<SourceAnswer> Function() request,
+      T? Function(Object? json) parse) async {
+    if (!isValidStopId(stopId)) return const ApiError(ApiFailure.notFound);
+    return _request(request, parse);
+  }
+
+  /// [request] after the busy check. With [backOff] a busy answer stops
+  /// every request for its `retryAfter`: on every route but the catalog it
+  /// can only be the proxy's 429, its limit per phone, which covers every
+  /// route. The catalog's 503 upstream_busy is about the catalog alone.
+  static Future<ApiResult<T>> _request<T>(
+      Future<SourceAnswer> Function() request,
+      T? Function(Object? json) parse,
+      {bool backOff = true}) async {
+    final busyUntil = _busyUntil;
+    if (busyUntil != null) {
+      final wait = busyUntil.difference(DateTime.now());
+      if (wait > Duration.zero) {
+        return ApiError(ApiFailure.busy, retryAfter: wait);
+      }
+      _busyUntil = null;
+    }
+
+    final answer = await request();
+    final failure = answer.failure;
+    if (failure != null) {
+      if (backOff && failure == ApiFailure.busy && answer.retryAfter != null) {
+        _busyUntil ??= DateTime.now().add(answer.retryAfter!);
+      }
+      return ApiError(failure, retryAfter: answer.retryAfter);
+    }
+    final value = parse(answer.json);
+    if (value == null) {
+      debugPrint('⚠️ Unexpected /v1 answer');
+      return const ApiError(ApiFailure.failed);
+    }
+    return ApiOk(value);
+  }
+
+  /// Forgets a 429: the next call is sent.
+  @visibleForTesting
+  static void resetBusy() => _busyUntil = null;
 
   /// Returns upcoming buses for a stop, soonest first.
   /// Returns null on network/server error so callers can tell
   /// "no buses" apart from "could not check".
-  static Future<List<BusArrival>?> getNextArrivals(int stopId) async {
-    try {
-      final uri = Uri.parse(usesProxy
-          ? '$proxyUrl/v1/stops/$stopId/arrivals'
-          : '$_baseUrl$_nextBusesPath/$stopId');
-      final response =
-          await http.get(uri, headers: _headers).timeout(_timeout);
-
-      if (response.statusCode != 200) {
-        debugPrint('❌ ETA API ${response.statusCode}: ${response.body}');
-        return null;
-      }
-
-      final data = jsonDecode(utf8.decode(response.bodyBytes));
-      return usesProxy ? parseProxyArrivals(data) : parseArrivals(data);
-    } catch (e) {
-      debugPrint('❌ ETA API error: $e');
-      return null;
-    }
-  }
+  static Future<List<BusArrival>?> getNextArrivals(int stopId) async =>
+      (await getBoard(stopId)).valueOrNull?.arrivals;
 
   /// Theoretical timetable of a stop: about 50 passes from [hour]:[minute]
   /// on, for the given day type, wrapping past midnight.
   /// Returns null on network/server error.
   static Future<List<ScheduledPass>?> getSchedule(
       int stopId, DayType day, int hour, int minute) async {
-    final time = '$hour:${minute.toString().padLeft(2, '0')}';
-    final key = '$stopId/${day.apiValue}/$time';
+    final key =
+        '$stopId/${day.apiValue}/$hour:${minute.toString().padLeft(2, '0')}';
     final hit = _scheduleCache[key];
     if (hit != null && DateTime.now().difference(hit.$1) < _scheduleTtl) {
       return hit.$2;
     }
 
-    try {
-      final uri = Uri.parse(usesProxy
-          ? '$proxyUrl/v1/stops/$stopId/schedule/${day.proxyValue}/$time'
-          : '$_baseUrl$_nextBusesPath/$key');
-      final response =
-          await http.get(uri, headers: _headers).timeout(_timeout);
-
-      if (response.statusCode != 200) {
-        debugPrint('❌ Schedule API ${response.statusCode}: ${response.body}');
-        return null;
-      }
-
-      final data = jsonDecode(utf8.decode(response.bodyBytes));
-      final passes =
-          usesProxy ? parseProxySchedule(data) : parseSchedule(data);
-      _scheduleCache[key] = (DateTime.now(), passes);
-      return passes;
-    } catch (e) {
-      debugPrint('❌ Schedule API error: $e');
-      return null;
-    }
+    final result = await _call(stopId,
+        () => source.schedule(stopId, day, hour, minute), V1Parser.schedule);
+    final passes = result.valueOrNull;
+    if (passes != null) _scheduleCache[key] = (DateTime.now(), passes);
+    return passes;
   }
 
   /// Resolves stop name and lines from a stop ID.
   /// Returns null on network error; throws [StopNotFoundException]
   /// if the server reports that the stop does not exist.
   static Future<BusStop?> resolveStop(int stopId) async {
-    final http.Response response;
-    try {
-      final uri = Uri.parse(usesProxy
-          ? '$proxyUrl/v1/stops/$stopId'
-          : '$_baseUrl$_stopLinesPath/$stopId');
-      response = await http.get(uri, headers: _headers).timeout(_timeout);
-    } catch (e) {
-      debugPrint('❌ Lineas API error: $e');
-      return null;
-    }
-
-    final body = utf8.decode(response.bodyBytes);
-    if (response.statusCode != 200) {
-      // transporteRest answers 500 "No existe la ubicación de parada con
-      // código 'N'.", the proxy 404 {"error":"stop_not_found"}
-      if (body.contains('No existe') || body.contains('"stop_not_found"')) {
+    switch (await getStopDetails(stopId)) {
+      case ApiOk(:final value):
+        return value.toBusStop();
+      case ApiError(failure: ApiFailure.notFound):
         throw StopNotFoundException(stopId);
-      }
-      debugPrint('❌ Lineas API ${response.statusCode}: $body');
-      return null;
-    }
-
-    try {
-      final data = jsonDecode(body);
-      return usesProxy
-          ? parseProxyStop(stopId, data)
-          : parseStop(stopId, data);
-    } catch (e) {
-      debugPrint('⚠️ Parse stop error: $e');
-      return null;
+      case ApiError():
+        return null;
     }
   }
 
-  /// Every stop with its street names, for the search by streets — only
-  /// through the proxy (`/v1/catalog/stops`), null without it.
+  /// Every stop with its street names, lines and location, for the search
+  /// by streets and the nearby stops — only through the proxy
+  /// (`/v1/catalog/stops`), null without it.
   /// Downloaded at most once a day; when the proxy cannot be reached an
   /// older copy is used. Returns null when there is neither.
   static Future<List<CatalogStop>?> getStopCatalog() async {
     if (!usesProxy) return null;
 
-    final cached = _cachedCatalog();
-    final lastMs = CacheService.get<int>(CacheService.keyStopCatalogFetchedAt);
+    final cached = await _cachedCatalog();
+    final lastMs = CacheService.catalogFetchedAtMs;
     if (cached != null &&
         lastMs != null &&
         DateTime.now()
@@ -163,43 +224,28 @@ class MvdApiService {
       return cached;
     }
 
-    final List<CatalogStop> fresh;
-    try {
-      final response = await http
-          .get(Uri.parse('$proxyUrl/v1/catalog/stops'), headers: _headers)
-          .timeout(_catalogTimeout);
-      if (response.statusCode != 200) {
-        debugPrint('❌ Catalog API ${response.statusCode}: ${response.body}');
-        return cached;
-      }
-      fresh = parseStopCatalog(jsonDecode(utf8.decode(response.bodyBytes)));
-    } catch (e) {
-      debugPrint('❌ Catalog API error: $e');
-      return cached;
-    }
-    if (fresh.isEmpty) return cached;
+    Object? body;
+    final result = await _request(source.catalogStops, (json) {
+      body = json;
+      return V1Parser.catalog(json);
+    }, backOff: false);
+    final fresh = result.valueOrNull?.stops;
+    if (fresh == null || fresh.isEmpty) return cached;
 
     _catalog = fresh;
-    // Only what the search needs: ~270 KB of the proxy's ~520 KB
-    await CacheService.set(
-        CacheService.keyStopCatalog,
-        jsonEncode({
-          'stops': [
-            for (final s in fresh) {'id': s.id, 'name': s.name},
-          ],
-        }));
-    await CacheService.set(CacheService.keyStopCatalogFetchedAt,
-        DateTime.now().millisecondsSinceEpoch);
+    // The /v1 body as it came, read again by V1Parser
+    await CacheService.saveCatalog(
+        jsonEncode(body), DateTime.now().millisecondsSinceEpoch);
     return fresh;
   }
 
-  static List<CatalogStop>? _cachedCatalog() {
+  static Future<List<CatalogStop>?> _cachedCatalog() async {
     if (_catalog != null) return _catalog;
-    final raw = CacheService.get<String>(CacheService.keyStopCatalog);
+    final raw = await CacheService.catalogBody();
     if (raw == null) return null;
     try {
-      final stops = parseStopCatalog(jsonDecode(raw));
-      return _catalog = stops.isEmpty ? null : stops;
+      final stops = V1Parser.catalog(jsonDecode(raw))?.stops;
+      return _catalog = stops == null || stops.isEmpty ? null : stops;
     } catch (e) {
       debugPrint('⚠️ Catalog cache error: $e');
       return null;
@@ -209,6 +255,16 @@ class MvdApiService {
   /// Forgets the decoded catalog; the copy in Hive stays.
   @visibleForTesting
   static void clearCatalogMemory() => _catalog = null;
+
+  /// The newest transport news, newest first: the last page of the
+  /// notification backend (`/v1/news`, or the jump paging from id 0
+  /// without the proxy).
+  static Future<ApiResult<NewsList>> getNews() =>
+      _request(source.news, V1Parser.news);
+
+  /// The share of each operator's buses whose GPS data arrives.
+  static Future<ApiResult<List<OperatorGpsStatus>>> getGpsStatus() =>
+      _request(source.gpsStatus, V1Parser.gpsStatus);
 
   /// Stops whose name contains every word of [query], in any order,
   /// ignoring case, accents and punctuation: "18 de julio ejido" finds
@@ -247,246 +303,25 @@ class MvdApiService {
     return [for (final h in hits.take(limit)) h.$1];
   }
 
-  static const _plainLetters = {
-    'á': 'a', 'à': 'a', 'â': 'a', 'ä': 'a', 'ã': 'a', //
-    'é': 'e', 'è': 'e', 'ê': 'e', 'ë': 'e', //
-    'í': 'i', 'ì': 'i', 'î': 'i', 'ï': 'i', //
-    'ó': 'o', 'ò': 'o', 'ô': 'o', 'ö': 'o', 'õ': 'o', //
-    'ú': 'u', 'ù': 'u', 'û': 'u', 'ü': 'u', //
-    'ñ': 'n', 'ç': 'c',
-    // The catalog writes ORDOÑEZ as "ORDOÐEZ" (stops 5340–5346)
-    'ð': 'n',
-  };
-  static final _accented = RegExp('[${_plainLetters.keys.join()}]');
-  static final _combiningMarks = RegExp('[\u0300-\u036f]');
-  // "O´HIGGINS" = "ohiggins", whichever apostrophe the user types
-  static final _apostrophes = RegExp('[´\'’‘`]');
-  static final _separators = RegExp('[^a-z0-9]+');
-
   /// Lower case, no accents, apostrophes dropped, any other punctuation
   /// ("Nº", "S/N", parentheses) turned into single spaces.
   @visibleForTesting
-  static String foldForSearch(String text) => text
-      .toLowerCase()
-      .replaceAll(_combiningMarks, '')
-      .replaceAllMapped(_accented, (m) => _plainLetters[m[0]]!)
-      .replaceAll(_apostrophes, '')
-      .replaceAll(_separators, ' ')
-      .trim();
+  static String foldForSearch(String text) => CatalogStop.fold(text);
 
-  /// Parses the proxy's `GET /v1/catalog/stops` (and the copy kept in Hive):
-  /// `{"fetchedAt":"…","stops":[{"id":574,"name":"SAN JOSE y ANDES",
-  ///   "location":{"lat":-34.9,"lng":-56.2}}]}`
-  /// Stops without a name cannot be found by streets and are left out.
+  /// A raw `GET /transporteRest/siguientesParada/{id}` answer through the
+  /// direct-mode adapter and [V1Parser], soonest first; [now] is when it
+  /// came. Empty when malformed.
   @visibleForTesting
-  static List<CatalogStop> parseStopCatalog(dynamic data) {
-    final list = data is Map ? data['stops'] : null;
-    if (list is! List) return [];
-    return [
-      for (final item in list)
-        if (item is Map &&
-            item['id'] is int &&
-            item['name'] is String &&
-            (item['name'] as String).trim().isNotEmpty)
-          CatalogStop(
-            id: item['id'] as int,
-            name: (item['name'] as String).trim(),
-            searchKey: foldForSearch(item['name'] as String),
-          ),
-    ];
+  static List<BusArrival> parseArrivals(dynamic data, {DateTime? now}) {
+    final v1 = TransporteRestAdapter.arrivalsToV1(data, 0,
+        fetchedAt: now ?? DateTime.now());
+    return V1Parser.arrivals(v1, 0)?.arrivals ?? [];
   }
 
-  /// Parses `GET /transporteRest/siguientesParada/{id}`:
-  /// `[{"linea":"145","minutos":5,"real":true,"destino":"PLAZA ESPAÑA",
-  ///    "idEmpresa":50,"horaDesc":"7:39","coordinates":[lng,lat],
-  ///    "accesibilidad":true,"tipoAccesibilidad":2, ...}]`
+  /// A raw `GET /transporteRest/siguientesParada/{id}/{tipoDia}/{H:MM}`
+  /// answer through the direct-mode adapter and [V1Parser], in the API
+  /// order (chronological, wrapping past midnight). Empty when malformed.
   @visibleForTesting
-  static List<BusArrival> parseArrivals(dynamic data) {
-    final arrivals = <BusArrival>[];
-    if (data is! List) return arrivals;
-
-    for (final item in data) {
-      try {
-        if (item is! Map) continue;
-        final line = item['linea']?.toString() ?? '';
-        final rawMinutes = item['minutos'];
-        if (line.isEmpty || rawMinutes == null) continue;
-
-        final etaMinutes = _safeInt(rawMinutes);
-
-        double? lat, lng;
-        final coords = item['coordinates'];
-        if (coords is List && coords.length >= 2) {
-          lng = (coords[0] as num?)?.toDouble();
-          lat = (coords[1] as num?)?.toDouble();
-        }
-
-        arrivals.add(BusArrival(
-          line: line,
-          companyCode: _safeInt(item['idEmpresa']),
-          etaMinutes: etaMinutes,
-          etaSeconds: etaMinutes * 60,
-          busLatitude: lat,
-          busLongitude: lng,
-          destination: item['destino']?.toString() ?? '',
-          isRealTime: item['real'] == true,
-          scheduledTime: item['horaDesc']?.toString(),
-          accessible: item['accesibilidad'] == true,
-          accessibilityType: item['tipoAccesibilidad'] == null
-              ? null
-              : _safeInt(item['tipoAccesibilidad']),
-        ));
-      } catch (e) {
-        debugPrint('⚠️ Parse arrival error: $e');
-      }
-    }
-
-    arrivals.sort((a, b) => a.etaSeconds.compareTo(b.etaSeconds));
-    return arrivals;
-  }
-
-  /// Parses `GET /transporteRest/siguientesParada/{id}/{tipoDia}/{H:MM}` —
-  /// the same items as [parseArrivals], with `minutos: null`, `real: false`:
-  /// `[{"linea":"145","destino":"PLAZA ESPAÑA","hora":803,"horaDesc":"8:03"}]`
-  /// Keeps the API order (chronological, wrapping past midnight).
-  @visibleForTesting
-  static List<ScheduledPass> parseSchedule(dynamic data) {
-    final passes = <ScheduledPass>[];
-    if (data is! List) return passes;
-
-    for (final item in data) {
-      if (item is! Map) continue;
-      final line = item['linea']?.toString() ?? '';
-      final time = item['horaDesc']?.toString() ?? '';
-      if (line.isEmpty || time.isEmpty) continue;
-      passes.add(ScheduledPass(
-        line: line,
-        destination: item['destino']?.toString() ?? '',
-        time: time,
-        hhmm: _safeInt(item['hora']),
-      ));
-    }
-    return passes;
-  }
-
-  /// Parses `GET /transporteRest/lineas/{id}`:
-  /// `{"descripcion":"AV RAMON ANADOR y TIBURCIO GOMEZ",
-  ///   "lineas":[{"descripcion":"140","codigo":56}, ...]}`
-  @visibleForTesting
-  static BusStop? parseStop(int stopId, dynamic data) {
-    if (data is! Map) return null;
-
-    final lines = <String>[];
-    final list = data['lineas'];
-    if (list is List) {
-      for (final l in list) {
-        final name = l is Map ? l['descripcion']?.toString() : null;
-        if (name != null && name.isNotEmpty && !lines.contains(name)) {
-          lines.add(name);
-        }
-      }
-    }
-
-    final description = data['descripcion']?.toString().trim() ?? '';
-    return BusStop(
-      id: stopId,
-      name: description.isNotEmpty ? description : 'Parada $stopId',
-      lines: lines,
-    );
-  }
-
-  /// Parses the proxy's `GET /v1/stops/{id}/arrivals`:
-  /// `{"fetchedAt":"…","arrivals":[{"line":"117","destination":"PUNTA CARRETAS",
-  ///   "etaMinutes":4,"realTime":true,"scheduledTime":"19:56","companyId":50,
-  ///   "location":{"lat":-34.9,"lng":-56.2},"accessible":true,
-  ///   "accessibilityType":2,
-  ///   "vehicle":{"airConditioning":true,"zeroEmission":false}}]}`
-  /// `vehicle` is null for timetable estimates and unknown buses.
-  @visibleForTesting
-  static List<BusArrival> parseProxyArrivals(dynamic data) {
-    final arrivals = <BusArrival>[];
-    final list = data is Map ? data['arrivals'] : null;
-    if (list is! List) return arrivals;
-
-    for (final item in list) {
-      if (item is! Map) continue;
-      final line = item['line']?.toString() ?? '';
-      final minutes = item['etaMinutes'];
-      if (line.isEmpty || minutes is! num) continue;
-
-      final location = item['location'];
-      final vehicle = item['vehicle'];
-      arrivals.add(BusArrival(
-        line: line,
-        companyCode: _safeInt(item['companyId']),
-        etaMinutes: minutes.toInt(),
-        etaSeconds: minutes.toInt() * 60,
-        busLatitude: location is Map ? (location['lat'] as num?)?.toDouble() : null,
-        busLongitude:
-            location is Map ? (location['lng'] as num?)?.toDouble() : null,
-        destination: item['destination']?.toString() ?? '',
-        isRealTime: item['realTime'] == true,
-        scheduledTime: item['scheduledTime']?.toString(),
-        accessible: item['accessible'] == true,
-        accessibilityType: item['accessibilityType'] is num
-            ? (item['accessibilityType'] as num).toInt()
-            : null,
-        airConditioning: vehicle is Map ? _bool(vehicle['airConditioning']) : null,
-        zeroEmission: vehicle is Map ? _bool(vehicle['zeroEmission']) : null,
-      ));
-    }
-
-    arrivals.sort((a, b) => a.etaSeconds.compareTo(b.etaSeconds));
-    return arrivals;
-  }
-
-  /// Parses the proxy's `GET /v1/stops/{id}/schedule/{day}/{H:MM}`:
-  /// `{"passes":[{"line":"143","destination":"CIUDADELA","time":"8:09","hhmm":809}]}`
-  @visibleForTesting
-  static List<ScheduledPass> parseProxySchedule(dynamic data) {
-    final passes = <ScheduledPass>[];
-    final list = data is Map ? data['passes'] : null;
-    if (list is! List) return passes;
-
-    for (final item in list) {
-      if (item is! Map) continue;
-      final line = item['line']?.toString() ?? '';
-      final time = item['time']?.toString() ?? '';
-      if (line.isEmpty || time.isEmpty) continue;
-      passes.add(ScheduledPass(
-        line: line,
-        destination: item['destination']?.toString() ?? '',
-        time: time,
-        hhmm: _safeInt(item['hhmm']),
-      ));
-    }
-    return passes;
-  }
-
-  /// Parses the proxy's `GET /v1/stops/{id}`:
-  /// `{"id":574,"name":"SAN JOSE y ANDES","lines":["116","117"]}`
-  @visibleForTesting
-  static BusStop? parseProxyStop(int stopId, dynamic data) {
-    if (data is! Map) return null;
-    final lines = <String>[
-      for (final l in data['lines'] is List ? data['lines'] as List : const [])
-        if (l is String && l.isNotEmpty) l,
-    ];
-    final name = data['name']?.toString().trim() ?? '';
-    return BusStop(
-      id: stopId,
-      name: name.isNotEmpty ? name : 'Parada $stopId',
-      lines: lines,
-    );
-  }
-
-  static bool? _bool(dynamic value) => value is bool ? value : null;
-
-  /// Safely parse an int from a dynamic value (may be int, String, or null).
-  static int _safeInt(dynamic value) {
-    if (value is int) return value;
-    if (value is num) return value.toInt();
-    if (value is String) return int.tryParse(value) ?? 0;
-    return 0;
-  }
+  static List<ScheduledPass> parseSchedule(dynamic data) =>
+      V1Parser.schedule(TransporteRestAdapter.scheduleToV1(data)) ?? [];
 }

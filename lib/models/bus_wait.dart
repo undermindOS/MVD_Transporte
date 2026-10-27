@@ -16,14 +16,22 @@ class WaitCheck {
 
 /// "Estoy esperando": one trip the user waits for at a stop.
 ///
-/// The API has no trip id (timetable trips have no bus yet), so a trip is
-/// followed by line, destination and expected time: each check takes the
-/// matching bus closest to [expectedAt] and moves [expectedAt] to it.
+/// A trip is followed by its [tripId]. A timetable trip gets a new id once
+/// its bus is tracked (`sched-…` → `bus-…`), so when the id is not listed
+/// each check takes the bus of the same variant (or, without one, of the
+/// same line and destination) closest to [expectedAt], and adopts its id
+/// and time.
 class BusWait {
   final int stopId;
   final String stopName;
   final String line;
   final String destination;
+
+  /// The followed trip; null in a wait saved before trip ids existed.
+  String? tripId;
+
+  /// transporteRest `variante` of the trip, null when unknown.
+  final int? variantId;
 
   /// Notify when the GPS-tracked bus is at most this many minutes away.
   final int alertMinutes;
@@ -44,6 +52,8 @@ class BusWait {
     required this.stopName,
     required this.line,
     required this.destination,
+    this.tripId,
+    this.variantId,
     required this.alertMinutes,
     required this.startedAt,
     required this.expectedAt,
@@ -61,9 +71,11 @@ class BusWait {
         stopName: stopName,
         line: trip.line,
         destination: trip.destination,
+        tripId: trip.tripId,
+        variantId: trip.variantId,
         alertMinutes: alertMinutes,
         startedAt: now,
-        expectedAt: now.add(Duration(minutes: trip.etaMinutes)),
+        expectedAt: trip.expectedAt,
       );
 
   String get title => destination.isEmpty
@@ -72,18 +84,32 @@ class BusWait {
 
   /// The followed trip in [arrivals], or null when it is not listed.
   BusArrival? findTrip(List<BusArrival> arrivals, DateTime now) {
+    final id = tripId;
+    if (id != null) {
+      final same = _closest(arrivals.where((a) => a.tripId == id));
+      if (same != null) return same;
+    }
+    return _closest(arrivals.where(_sameRoute), within: sameTripTolerance);
+  }
+
+  /// Whether [arrival], one of [all], is the followed trip.
+  bool follows(BusArrival arrival, List<BusArrival> all, DateTime now) =>
+      identical(findTrip(all, now), arrival);
+
+  // The variant when both sides know it, otherwise line and destination
+  bool _sameRoute(BusArrival a) {
+    final variant = variantId;
+    if (variant != null && a.variantId != null) return a.variantId == variant;
+    return a.line.toUpperCase() == line.toUpperCase() &&
+        a.destination == destination;
+  }
+
+  BusArrival? _closest(Iterable<BusArrival> candidates, {Duration? within}) {
     BusArrival? best;
     Duration? bestDiff;
-    for (final a in arrivals) {
-      if (a.line.toUpperCase() != line.toUpperCase() ||
-          a.destination != destination) {
-        continue;
-      }
-      final diff = now
-          .add(Duration(minutes: a.etaMinutes))
-          .difference(expectedAt)
-          .abs();
-      if (diff > sameTripTolerance) continue;
+    for (final a in candidates) {
+      final diff = a.expectedAt.difference(expectedAt).abs();
+      if (within != null && diff > within) continue;
       if (bestDiff == null || diff < bestDiff) {
         best = a;
         bestDiff = diff;
@@ -107,7 +133,8 @@ class BusWait {
           ? WaitOutcome.over
           : WaitOutcome.waiting);
     }
-    expectedAt = now.add(Duration(minutes: trip.etaMinutes));
+    tripId = trip.tripId;
+    expectedAt = trip.expectedAt;
     // Like the periodic alerts: only a GPS-tracked bus is "arriving"
     final arriving = trip.isRealTime && trip.etaMinutes <= alertMinutes;
     return WaitCheck(arriving ? WaitOutcome.alert : WaitOutcome.waiting,
@@ -132,11 +159,13 @@ class BusWait {
     return '$status · $stopName';
   }
 
-  Map<String, Object> toJson() => {
+  Map<String, Object?> toJson() => {
         'stopId': stopId,
         'stopName': stopName,
         'line': line,
         'destination': destination,
+        'tripId': tripId,
+        'variantId': variantId,
         'alertMinutes': alertMinutes,
         'startedAt': startedAt.millisecondsSinceEpoch,
         'expectedAt': expectedAt.millisecondsSinceEpoch,
@@ -147,6 +176,8 @@ class BusWait {
         stopName: json['stopName'] as String,
         line: json['line'] as String,
         destination: json['destination'] as String,
+        tripId: json['tripId'] as String?,
+        variantId: json['variantId'] as int?,
         alertMinutes: json['alertMinutes'] as int,
         startedAt:
             DateTime.fromMillisecondsSinceEpoch(json['startedAt'] as int),
