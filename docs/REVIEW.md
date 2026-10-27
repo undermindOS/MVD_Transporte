@@ -6,6 +6,11 @@ Todas las afirmaciones sobre la API se verificaron con solicitudes en vivo el 17
 y la licencia, en las fuentes primarias, con los enlaces al final. Parte de los puntos se volvió a verificar en
 una sesión de revisión paralela; los hallazgos coincidentes están marcados con ✔︎.
 
+**Actualización 2026-10-27** (rama `feat/timbre-bff`): el mapa de la API (§2) y las propuestas de §6 (1, 2 y 9,
+y la paginación de las novedades) describen ahora el proxy `/v1`, un Backend-for-Frontend: de qué fuente sale
+cada ruta, el presupuesto de la API oficial y el índice de paradas (§2.5). El resto del documento es la revisión
+del 17/10. El contrato completo está en [design/contrato-v1.md](design/contrato-v1.md).
+
 ---
 
 ## 1. Qué es esta aplicación
@@ -39,8 +44,11 @@ los dos endpoints que usaba están muertos (ver §2).
 
 ### 2.2 Endpoints abiertos de Cómo Ir (sin autorización)
 
-Se encontraron en la configuración de `m.montevideo.gub.uy/comoir/build/main.js`. Ahora la aplicación usa los dos primeros,
-el WFS `imm:v_uptu_paradas` («Paradas cercanas») y el deep link `/comoir/parada` («Ver en Cómo Ir»).
+Se encontraron en la configuración de `m.montevideo.gub.uy/comoir/build/main.js`. Hoy se usan `siguientesParada`
+(arribos y horarios), `lineas`, `notificacion/mensajes`, `pci…/buses/control`, el WFS `imm:v_uptu_paradas` y el
+deep link `/comoir/parada` («Ver en Cómo Ir»). Con `MVD_PROXY_URL` los pide el proxy (§2.5) y la app solo abre el
+deep link en el navegador; sin él, los pide la app (`lib/services/api/direct_source.dart` y `direct/`; el WFS,
+`lib/services/nearby_stops_service.dart`; las novedades, `lib/services/transport_news_service.dart`).
 
 | Endpoint | Propósito |
 |---|---|
@@ -63,7 +71,8 @@ Formato de `siguientesParada` (respuesta real, parada 3140):
  "horaDesc":"7:39","accesibilidad":true,"parada_actual":"BV JOSE BATLLE Y ORDOÑEZ y LUCIANO ROMERO"}
 ```
 
-WFS de paradas (se usa en «Paradas cercanas», `lib/services/nearby_stops_service.dart`):
+WFS de paradas (la app lo usa en «Paradas cercanas» solo sin proxy: `NearbyStopsService.buildUri` en
+`lib/services/nearby_stops_service.dart`; con proxy, las cercanas salen del catálogo en el teléfono, §2.5):
 
 ```
 GET geoserver.montevideo.gub.uy/geoserver/ows?service=wfs&version=2.0.0&request=GetFeature
@@ -78,6 +87,13 @@ GET geoserver.montevideo.gub.uy/geoserver/ows?service=wfs&version=2.0.0&request=
   Las coordenadas de la respuesta vienen como `[lon, lat]`.
 - Centro, radio de 400 m: ~1 070 registros / 39 paradas en el bbox, 287 KB de JSON, 8 KB con gzip (el servidor comprime).
 - Fixture para los tests: `test/fixtures/wfs_paradas_18_de_julio.json` (respuesta en vivo del 2026-10-17).
+- La app no manda la posición exacta: el centro del bbox es la posición redondeada a 3 decimales (unos 110 m) y
+  el medio lado es 472 m (`boxHalfSideMeters`: los 400 m del radio más 72 m, la media diagonal de una celda de
+  0,001°), así el bbox siempre contiene el círculo de 400 m alrededor de la posición real. Después filtra en el
+  teléfono con la posición exacta.
+- El proxy usa la misma capa entera, sin bbox ni token, como CSV para el índice de paradas (§2.5):
+  `outputFormat=csv&propertyName=cod_ubic_parada,desc_linea,cod_variante` (`proxy/src/geoserver.js`). El
+  2026-10-27: 2,57 MB, 4 972 paradas, 16 438 pares parada × línea y 42 672 pares parada × variante.
 
 `real:false`: horario sin GPS (`coordinates:null`, `minutos` puede ser 945).
 `idEmpresa`: 10 COETC, 20 COME, 50 CUTCSA, 70 UCOT. Parada inexistente → `500 "No existe…"`.
@@ -113,8 +129,12 @@ GET geoserver.montevideo.gub.uy/geoserver/ows?service=wfs&version=2.0.0&request=
 
 - **La API oficial hoy no da ETA**: los tiempos de arribo siguen saliendo de `transporteRest` (§2.2).
 - **Cruce con `transporteRest`**: `idEmpresa` (10 COETC, 20 COME, 50 CUTCSA, 70 UCOT) + `idBus` =
-  `company` + `busId`; `variante` = `lineVariantId`. Los 18 ómnibus con GPS probados aparecieron en la
-  instantánea de la flota. Así se agregan al ETA el aire acondicionado y «cero emisiones».
+  `company` + `busId`. Los 18 ómnibus con GPS probados aparecieron en la instantánea de la flota. Así se
+  agregan al ETA el aire acondicionado y «cero emisiones». `variante` = `lineVariantId` vale solo en parte:
+  en las capturas del contrato el ómnibus 139 de CUTCSA está en la variante 628 en la flota de la IM
+  (`im_buses.json`) y en la 630 en `transporteRest` (`arrivals_574.json`). Por eso el proxy cruza el confort
+  solo por empresa y ómnibus, nunca por variante, y las variantes de la IM se usan solo para buscar el destino
+  de una variante del WFS (§2.5).
 - **El confort es una propiedad del vehículo**: en 842 ómnibus que aparecieron en dos instantáneas con 15 min
   de diferencia no cambió ni `thermalConfort`, ni `emissions`, ni `access`. En la instantánea de las 19:52:
   aire acondicionado en 409 de 979, «Cero emisiones» en 151, «PISO BAJO» en 441, «PLATAFORMA ELEVADORA» en 87.
@@ -130,6 +150,105 @@ GET geoserver.montevideo.gub.uy/geoserver/ows?service=wfs&version=2.0.0&request=
 - «Horarios de ómnibus urbanos por parada STM» — `datos-abiertos.montevideo.gub.uy/uptu_pasada_variante.zip`
 - «Transporte colectivo: paradas, puntos de control y recorridos de ómnibus» — shapefiles
 - «Viajes realizados en los ómnibus del STM» — actualizado el 2026-09-19
+
+### 2.5 El proxy `/v1` (Backend-for-Frontend)
+
+Con `--dart-define=MVD_PROXY_URL=…` la app le habla solo al Worker de Cloudflare de `proxy/`
+(`proxy/src/index.js`): rutas fijas, solo `GET` y sin query string, y cada respuesta es JSON con la forma que
+necesita una pantalla. Las formas, los errores y las reglas de derivación están en
+[design/contrato-v1.md](design/contrato-v1.md); los casos y las respuestas esperadas, en `proxy/contract/v1/`, que
+corren tanto las pruebas del proxy como las de la app. Sin desplegar todavía.
+
+| Ruta | Fuentes | Caché en el borde | Unidades de la API oficial |
+|---|---|---|---|
+| `/v1/stops/{id}` | `transporteRest/lineas/{id}` (nombre y líneas) + `ImGateway` `/stops/{id}/meta` (destinos, del índice de paradas), esperado como mucho 2 s | 24 h; 5 min si los destinos fallaron, tardaron o están incompletos | 0 |
+| `/v1/stops/{id}/arrivals` | `transporteRest/siguientesParada/{id}` + `ImGateway` `/vehicles` (confort por empresa y ómnibus, de la flota), esperado como mucho 2 s | 15 s | 0 por pedido (la flota, abajo) |
+| `/v1/stops/{id}/schedule/{day}/{H:MM}` | `transporteRest/siguientesParada/{id}/{HABIL\|SABADO\|DOMINGO}/{H:MM}` | 6 h | 0 |
+| `/v1/catalog/stops` | `ImGateway` `/catalog/stops`: `GET /buses/busstops` + las líneas del índice de paradas | 24 h; 15 min sin líneas (`linesAvailable:false`) | 1 (paradas), salvo que `ImGateway` tenga la copia en memoria |
+| `/v1/news` | `notificacion/mensajes?idApp=1&fromIdMessage=N`, con el salto desde 0 de §6 (como mucho 8 pedidos) | 5 min | 0 |
+| `/v1/status/gps` | `pci.montevideo.gub.uy/buses/control` | 1 min | 0 |
+
+- `/v1/lines/{line}/buses` y `/v1/catalog/lines` ya no son rutas públicas (404 `not_found`): la app nunca las
+  usó. `ImGateway` las conserva como rutas internas.
+- Plazos de las fuentes: transporteRest 8 s, notificacion 5 s por página, pci 5 s, API oficial 10 s, geoserver
+  20 s. Un error de una fuente nunca llega como lista vacía: es 502 `upstream_error` o 504 `upstream_timeout`.
+- La caché del borde (Workers Caching) es la misma para todos: mil personas en la misma parada dan un pedido a
+  `transporteRest` cada 15 s por centro de datos. Por eso no hay ruta batch: una URL por parada, y la app pide
+  las paradas en paralelo.
+- Límite por IP: 300 pedidos por minuto por ubicación de Cloudflare, contados solo cuando no hay caché
+  (`IP_LIMITER` en `proxy/wrangler.jsonc`). Pasado el límite, 429 `rate_limited` con `Retry-After: 60`.
+
+**Qué pide la app y cuándo** (build con proxy):
+
+- «Mis paradas»: `MvdApiService.getBoards` pide `/arrivals` de cada parada una sola vez, todas en paralelo; cada
+  30 s solo mientras «Mis paradas» está en pantalla (la pestaña elegida y ninguna página encima, `StopsPage.active`),
+  y una vez al volver a ella o a la app. Una tarjeta de ruta usa el tablero de su parada de origen
+  (`RouteAlert.accepts`) y no pide nada propio. Al abrir, las paradas guardadas sin conexión, que quedaron como
+  «Parada N» sin líneas, piden `/v1/stops/{id}` una vez (`MvdApiService.healPlaceholderStops`).
+- Segundo plano: `BackgroundWorker` (WorkManager, cada ≥15 min) hace un solo `getBoards` con las paradas de los
+  avisos y los orígenes de las rutas dentro de su horario, más el origen de la ruta del widget. «Estoy
+  esperando» en Android: `/arrivals` de esa parada cada 30 s.
+- «Agregar parada» con un número escrito: `/v1/stops/{id}`. Una parada elegida del catálogo o de las cercanas se
+  guarda sin pedir nada. «Agregar ruta»: `/v1/stops/{id}` y `/arrivals` en paralelo; `directions` da los chips
+  HACIA y los arribos son el respaldo de una línea sin destinos conocidos.
+- «Paradas cercanas» y «Buscar por calles»: `/v1/catalog/stops`, como mucho una vez por día (unos 660 KB, en la
+  caja Hive `catalog`). Las cercanas (400 m) se calculan en el teléfono (`NearbyStopsService.nearbyFrom`):
+  ninguna coordenada sale del dispositivo.
+- «Horarios»: `/schedule/…`, con caché en memoria de 6 h.
+- «Novedades»: `/v1/news` como mucho cada 10 min (cada 30 s con pull-to-refresh), mezclado en la caché Hive de
+  30 novedades.
+- «Datos GPS parciales»: `/v1/status/gps` como mucho una vez por minuto.
+- Después de un 429 del proxy la app no pide nada hasta que pasa el `Retry-After` (`ApiFailure.busy`).
+
+**Presupuesto de la API oficial** (`ImGateway`, `proxy/src/im_gateway.js`):
+
+- 12 pedidos por minuto de los 14 de la clave (`BUDGET_PER_MINUTE`), con la ventana fija desde :00 como la de la
+  IM; quedan 2 para que el dueño pruebe a mano con la misma clave. El contador se guarda en el almacenamiento
+  del Durable Object. Los pedidos de token no cuentan.
+- La flota (`GET /buses`) se considera fresca 15 s. Los arribos no la esperan: el confort ya conocido (de hasta
+  24 h, guardado también en el almacenamiento, porque el objeto hiberna a los 10 s sin pedidos y pierde la
+  memoria) se contesta en el momento, y una flota más vieja se recarga en segundo plano. Son unas 4 cargas por
+  minuto como mucho, y solo mientras llegan pedidos de arribos.
+- Las paradas (`GET /buses/busstops`) y las variantes (`GET /buses/linevariants`) duran 24 h, pero solo en
+  memoria: una copia más vieja, de hasta 7 días, se sirve mientras se carga otra, y si esa carga falla se sigue
+  sirviendo. Las paradas cuestan 1 unidad cada vez que el catálogo no está en la caché del borde y el objeto
+  ya no tiene la copia en memoria; las variantes, 1 por armado del índice de paradas (abajo).
+- Lo esperado en el peor minuto: 4 (flota) + 1 (paradas) + 1 (variantes) = 6 unidades, debajo de las 12.
+- Sin presupuesto, o después de un 429 de la IM, el catálogo sin copia en memoria contesta 503 `upstream_busy`
+  con `Retry-After`. Los arribos nunca fallan por eso: salen con el confort en `null`.
+- geoserver no pasa por la clave: no usa token ni gasta presupuesto.
+
+**Índice de paradas** (`ImGateway` y `proxy/src/geoserver.js`):
+
+- Sale del CSV de la capa WFS entera (§2.2): las líneas (`desc_linea`) y las variantes (`cod_variante`) de cada
+  parada. Con las variantes de la API oficial (1 unidad) arma `directions`: un elemento por línea y destino, con
+  sus `variantIds`. Las variantes que la IM no conoce o que no tienen destino quedan afuera; las `special`,
+  adentro.
+- Se arma como mucho una vez por día, una sola vez aunque lleguen muchos pedidos juntos; se sirve hasta 7 días
+  y, pasadas 24 h, se rearma en segundo plano. Si el armado falla, o si fallaron solo las variantes (el índice
+  queda incompleto, sin `directions`), se reintenta a los 15 min.
+- Se guarda en 64 partes (`stopmeta:{id % 64}`) más `stopmeta:info`: unas 65 escrituras por armado. Después de
+  hibernar, los datos de una parada son como mucho dos lecturas del almacenamiento (`stopmeta:info` y la parte de
+  esa parada), sin pedidos.
+- En `/v1/stops/{id}`, `directions` se queda solo con las líneas que lista transporteRest. `/v1/catalog/stops`
+  espera hasta 20 s el primer armado; si no hay índice, contesta `linesAvailable:false` con `lines: []` en cada
+  parada, y el Worker lo guarda 15 min.
+- Los ids de variante coinciden solo en parte entre fuentes: en la parada 574, 5 de las 6 variantes de
+  transporteRest estaban en el WFS, y el cruce con la flota también falla (§2.3). Por eso una ruta guarda
+  destinos y variantes (`preferredVariantIds`) y coincide por cualquiera de los dos.
+
+**Modo directo** (sin `MVD_PROXY_URL`). La app pide transporteRest, notificacion, pci y el WFS (con la posición
+redondeada, §2.2) y convierte las respuestas a JSON `/v1` en el teléfono (`DirectSource` y
+`lib/services/api/direct/`), así las lee el mismo `V1Parser`. No hay confort, ni `directions`, ni catálogo, ni
+búsqueda por calles. El modo se elige al compilar: no hay paso automático de uno al otro. Queda hasta que el
+proxy esté desplegado.
+
+**Privacidad y logs.** Una build con proxy no contacta ningún host de la ciudad ni manda coordenadas
+(`test/proxy_privacy_test.dart`, `test/proxy_bff_test.dart`). Los logs de Workers están apagados: `wrangler.jsonc`
+no tiene bloque `observability`. Lo que escribe el Worker son textos fijos `<fuente>: <tipo>`, sin la URL que
+pidió la app, sin número de parada y sin IP; algunas líneas viejas de `ImGateway` todavía nombran el recurso de
+la IM (`im-gateway /buses: HTTP 500`). Ningún encabezado de las fuentes llega al cliente. Detalle en
+[proxy/README.md](../proxy/README.md).
 
 ---
 
@@ -210,7 +329,7 @@ bloqueo biométrico activado.
 | ~~`ComoIrScraper` en la práctica no funciona~~ ✔︎ | — | **resuelto:** eliminado (en el navegador no se puede inyectar JS); en su lugar, el deep link «Ver en Cómo Ir», §5.1 |
 | Política de privacidad en la aplicación | Google Play exige el enlace tanto en la consola como dentro de la aplicación | el texto está listo (`docs/privacy-policy.md`); publicarlo (GitHub Pages) y agregar el enlace en Info (`url_launcher` ya está) |
 | Licencia del repositorio | el repositorio es público pero no tiene `LICENSE`: eso es «código visible», no open source | elegir una licencia (MIT/Apache-2.0/GPL) o dejar explícito «todos los derechos reservados» |
-| Hive abierto a la vez en el isolate de la UI y en el de WorkManager ✔︎ | migración del almacenamiento | Hive 2.x no es multi-isolate → `hive_ce` con `IsolatedHive` o `shared_preferences` para los datos en segundo plano |
+| Hive abierto a la vez en el isolate de la UI y en el de WorkManager ✔︎ (desde el proxy `/v1`, también la caja del catálogo `catalog`) | migración del almacenamiento | Hive 2.x no es multi-isolate → `hive_ce` con `IsolatedHive` o `shared_preferences` para los datos en segundo plano |
 | iOS: segundo plano y widget sin configurar ✔︎ | hacen falta Xcode, App Group, BGTask | `BGTaskSchedulerPermittedIdentifiers`, `UIBackgroundModes`, registro en AppDelegate, App Group para home_widget |
 | WorkManager ≥ 15 min | limitación de Android | el umbral de alerta de 5 min muchas veces se saltea: ver «modo espera» en §6 |
 | ~~Un solo `WebViewController` para 4 pestañas~~ ✔︎ | — | **resuelto:** no hay WebView, dos pestañas nativas en `IndexedStack`, §5.1 |
@@ -291,17 +410,24 @@ y saldo en un dispositivo real.
 1. **API oficial a través de un proxy propio.** Registrarse en `api.montevideo.gub.uy`,
    guardar el `client_secret` en un backend pequeño (Cloudflare Worker o similar) con caché del token
    y de las respuestas. Es el canal legal con condiciones explícitas y una protección contra roturas como la de `stmonlineRest`.
-   🟡 Hecho en la rama `feat/official-api`, sin desplegar: `proxy/` (Durable Object `ImGateway`: token,
-   presupuesto de 12 de las 14 solicitudes por minuto, una instantánea compartida de la flota cada ≥15 s). El ETA
-   sigue saliendo de `transporteRest` (`upcomingbuses` está vacío, §2.3); se le agregan el aire acondicionado y
-   «cero emisiones». El catálogo de paradas `/v1/catalog/stops` es la base del punto 2. `/v1/lines/{line}/buses`
-   y `/v1/catalog/lines` ya no son rutas públicas, porque la app no las usaba; el Durable Object las conserva
-   para uso interno (base posible del punto 9).
-   La aplicación usa el proxy si se compila con `--dart-define=MVD_PROXY_URL=…`.
+   🟡 Hecho, sin desplegar. Empezó en la rama `feat/official-api` y en `feat/timbre-bff` pasó a ser el
+   Backend-for-Frontend `/v1` (§2.5): la app pide todo al proxy —arribos, paradas con sus destinos, horarios,
+   catálogo, novedades y estado del GPS— y el proxy decide de qué fuente sale cada dato. El Durable Object
+   `ImGateway` guarda el token, el presupuesto de 12 de las 14 solicitudes por minuto, una instantánea
+   compartida de la flota cada ≥15 s y el índice de paradas. El ETA sigue saliendo de `transporteRest`
+   (`upcomingbuses` está vacío, §2.3); se le agregan el aire acondicionado y «cero emisiones». El catálogo de
+   paradas `/v1/catalog/stops` es la base del punto 2. `/v1/lines/{line}/buses` y `/v1/catalog/lines` ya no son
+   rutas públicas, porque la app no las usaba; el Durable Object las conserva para uso interno (base posible del
+   punto 9). La aplicación usa el proxy si se compila con `--dart-define=MVD_PROXY_URL=…`.
+   Orden de despliegue: primero el proxy y `node scripts/smoke.js <url>` contra el Worker desplegado; recién
+   después las builds con `MVD_PROXY_URL`. La prueba de humo es lo que muestra si un F5/BigIP delante de
+   geoserver, notificacion o pci bloquea las IP de Cloudflare: en ese caso las novedades y el GPS dan 502, el
+   catálogo sale sin líneas y las paradas sin `directions`.
 2. **Búsqueda de paradas sin el número.** WFS `imm:v_uptu_paradas` (`srsName=EPSG:4326`) o
    `/buses/busstops` → «paradas cercanas» por geolocalización y búsqueda por calle.
-   ✅ Las paradas cercanas ya están hechas con WFS («Paradas cercanas», §2.2). 🟡 La búsqueda por calles
-   («Buscar por calles») usa el catálogo `/v1/catalog/stops`, solo en la build con proxy.
+   ✅ «Paradas cercanas» está hecho: con proxy se calcula en el teléfono con el catálogo `/v1/catalog/stops`, sin
+   mandar coordenadas (§2.5); sin proxy, con el WFS y la posición redondeada (§2.2). 🟡 La búsqueda por calles
+   («Buscar por calles») usa el mismo catálogo, solo en la build con proxy.
 3. **«Ver en Cómo Ir»** en la ficha de la parada — deep link `/comoir/parada?numero={id}`:
    integración oficial sin scraping. ✅ Hecho.
 4. ✅ **Noticias del transporte.** `notificacion/mensajes`: los desvíos y cambios de líneas que
@@ -319,6 +445,8 @@ y saldo en un dispositivo real.
    iOS: un recordatorio para la hora prevista, que se reprograma con cada actualización dentro de la aplicación.
    Hace falta la declaración del tipo y un video en Play Console (`docs/store-listing.md`).
 9. **Mapa del ómnibus.** Con `real:true` vienen `coordinates`: mostrar dónde está el ómnibus ahora.
+   Los arribos de `/v1` no llevan esa posición (se sacó `location` de las formas: el diseño no usa mapas); haría
+   falta agregarla al contrato como campo nuevo.
 
 **Hecho en la rama `feat/open-data-features` (4, 5, 6 y horarios por tipo de día):**
 pestaña «Novedades» en «Mis paradas» (badge de no leídas, texto HTML sin WebView/JS, el enlace se abre
@@ -328,8 +456,10 @@ Solo en primer plano, sin consultas en segundo plano: noticias como mucho una ve
 estado del GPS una vez por minuto, horarios con caché de 6 h. Hallazgo: paginar `notificacion/mensajes`
 por el id máximo (como hace Cómo Ir) pierde mensajes: el 17/10/2026, después del id 148 llegó una página
 que incluía el 171, y los 161…170 no se mostraban; la aplicación sube `fromIdMessage` según `count` hasta que lo restante
-entre en una sola página (desde cero, 4 solicitudes; después, 1). Verificado: tests con respuestas en vivo guardadas
-(`test/fixtures/`), simulador de iOS con la API en vivo (noticias, detalle, «Ver más» → Safari,
+entre en una sola página (desde cero, 4 solicitudes; después, 1). Con el proxy, ese salto lo hace
+`proxy/src/notificacion.js` (`fetchNewest`) desde 0 cada vez que arma la respuesta, como mucho 8 solicitudes, y
+la app hace un solo pedido a `/v1/news`, que se guarda 5 min en la caché del borde. Verificado: tests con
+respuestas en vivo guardadas (`test/fixtures/`), simulador de iOS con la API en vivo (noticias, detalle, «Ver más» → Safari,
 horarios y cambio de día, ♿ en la parada 4018; el banner de GPS, con un estado simulado: ahora
 todas las empresas están al 100 %).
 
