@@ -1,0 +1,22 @@
+{
+  "rule": "trimText",
+  "notes": [
+    "Quita /^[\\s\\u0085]+|[\\s\\u0085]+$/g. U+0085 se agrega porque el trim de JS lo deja y el de Dart lo saca.",
+    "Los espacios del medio no se tocan. U+200B no es espacio para \\s y se queda."
+  ],
+  "cases": [
+    {"in": "  hola  ", "out": "hola"},
+    {"in": "Traslado definitivo de cuatro paradas ", "out": "Traslado definitivo de cuatro paradas"},
+    {"in": "Sábados 12 y 19, domingos 13 y 20 de setiembre \n", "out": "Sábados 12 y 19, domingos 13 y 20 de setiembre"},
+    {"in": "\u0085Texto\u0085", "out": "Texto"},
+    {"in": " \u0085 ", "out": ""},
+    {"in": " Texto ", "out": "Texto"},
+    {"in": "﻿Texto", "out": "Texto"},
+    {"in": "　Texto　", "out": "Texto"},
+    {"in": "\t\r\nTexto\r\n", "out": "Texto"},
+    {"in": "a  b", "out": "a  b"},
+    {"in": "Texto​", "out": "Texto​"},
+    {"in": "", "out": ""},
+    {"in": "   ", "out": ""}
+  ]
+}

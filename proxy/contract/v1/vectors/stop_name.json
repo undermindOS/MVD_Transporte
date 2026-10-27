@@ -1,0 +1,20 @@
+{
+  "rule": "stopName",
+  "notes": [
+    "in es [calle, esquina]. Cada parte se recorta con trimText, las vacías se descartan y el resto se une con \" y \". Sin ninguna parte: null."
+  ],
+  "cases": [
+    {"in": ["SAN JOSE", "ANDES"], "out": "SAN JOSE y ANDES"},
+    {"in": ["MATAOJO", null], "out": "MATAOJO"},
+    {"in": [null, "ANDES"], "out": "ANDES"},
+    {"in": [null, null], "out": null},
+    {"in": ["", ""], "out": null},
+    {"in": ["   ", "\t"], "out": null},
+    {"in": ["  CORUÑA ", " GRAL JULIO AMADEO ROLETTI\n"], "out": "CORUÑA y GRAL JULIO AMADEO ROLETTI"},
+    {"in": ["AV 18 DE JULIO", "\u0085"], "out": "AV 18 DE JULIO"},
+    {
+      "in": ["AV 18 DE JULIO", "CIRCUNVALACION DR ENRIQUE TARIGO"],
+      "out": "AV 18 DE JULIO y CIRCUNVALACION DR ENRIQUE TARIGO"
+    }
+  ]
+}

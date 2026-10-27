@@ -1,157 +1,224 @@
-# MVD Transporte proxy
+# Proxy de MVD Transporte
 
-Cloudflare Worker между приложением и API Intendencia de Montevideo. Приложение знает только
-маршруты `/v1`; откуда берутся данные, решает прокси. Если источник умрёт (как умер
-`stmonlineRest`), чинится сервер, а не выпускается новая версия в сторы.
+Worker de Cloudflare entre la app y las fuentes de la Intendencia de Montevideo. La app solo
+conoce las rutas `/v1`; de dónde sale cada dato lo decide el proxy. Si una fuente se muere (como
+pasó con `stmonlineRest`), se arregla el servidor y no hace falta sacar otra versión en las
+tiendas.
 
-Источников два:
+## Fuentes
 
-- `api.montevideo.gub.uy/transporteRest` — открытый бэкенд Cómo Ir, без авторизации: время
-  прибытия, остановки, расписания.
-- Официальный API `api.montevideo.gub.uy/api/transportepublico` (OAuth2, ключ владельца на
-  портале, см. [docs/REVIEW.md](../docs/REVIEW.md) §2.3): снимок всего парка — кондиционер и
-  «cero emisiones» к прибывающим автобусам, позиции автобусов линии, каталоги остановок и линий.
-  ETA он сейчас не даёт (`upcomingbuses` всегда пуст), поэтому они остаются из `transporteRest`.
+- `api.montevideo.gub.uy/transporteRest`: el backend abierto de Cómo Ir, sin credenciales.
+  Arribos, nombre y líneas de cada parada, horarios.
+- La API oficial `api.montevideo.gub.uy/api/transportepublico` (OAuth2, con la clave del dueño en
+  el portal, ver [docs/REVIEW.md](../docs/REVIEW.md) §2.3): la flota entera (aire acondicionado y
+  «cero emisiones» de cada ómnibus), el catálogo de paradas y las variantes de línea. Hoy no da
+  tiempos de llegada (`upcomingbuses` viene siempre vacío), por eso salen de transporteRest.
+- geoserver, capa WFS `imm:v_uptu_paradas`, sin credenciales: las líneas y variantes de cada
+  parada, en un CSV de toda la capa (~2,5 MB) una vez por día.
+- `api.montevideo.gub.uy/notificacion`: las novedades que muestra Cómo Ir.
+- `pci.montevideo.gub.uy/buses/control`: qué parte de los ómnibus de cada empresa manda GPS.
 
-Ключ официального API общий на всех пользователей и разрешает **14 запросов в минуту**. Поэтому в
-API ходит только один объект — Durable Object `ImGateway` ([src/im_gateway.js](src/im_gateway.js)),
-один на весь прокси, из какой бы локации Cloudflare ни пришёл запрос.
+La clave de la API oficial es una sola para todos los usuarios y permite **14 pedidos por
+minuto**. Por eso la usa un solo objeto: el Durable Object `ImGateway`
+([src/im_gateway.js](src/im_gateway.js)), uno para todo el proxy, venga de donde venga el pedido.
+A geoserver también lo llama `ImGateway`, pero sin la clave y sin gastar ese presupuesto.
 
-## Маршруты
+## Rutas
 
-Только `GET`, без query string. Ответы — JSON.
+Solo `GET`, sin query string. Todas las respuestas son JSON (`application/json; charset=utf-8`).
 
-| Маршрут | Ответ | Кэш |
+Este README no repite las formas: el contrato está en [contract/v1/](contract/v1/README.md). Ahí
+están los cuerpos esperados de cada ruta (`responses/`), las capturas de las fuentes y los casos
+que corren las pruebas del proxy y las de la app.
+
+| Ruta | Qué devuelve | Caché |
 |---|---|---|
-| `/v1/stops/{id}` | `{"id":574,"name":"SAN JOSE y ANDES","lines":["116","117"]}` | 24 ч |
-| `/v1/stops/{id}/arrivals` | `{"fetchedAt":"<ISO>","arrivals":[…]}` — ближайшие первыми | 15 с |
-| `/v1/stops/{id}/schedule/{day}/{H:MM}` | `{"passes":[{"line":"143","destination":"CIUDADELA","time":"8:09","hhmm":809}]}` | 6 ч |
-| `/v1/lines/{line}/buses` | `{"fetchedAt":"<ISO>","buses":[…]}` — автобусы линии с GPS | 15 с |
-| `/v1/catalog/stops` | `{"fetchedAt":"<ISO>","stops":[{"id":574,"name":"SAN JOSE y ANDES","location":{"lat":…,"lng":…}}]}` — 4 972 остановки, ~520 КБ | 24 ч |
-| `/v1/catalog/lines` | `{"fetchedAt":"<ISO>","variants":[{"id":8,"line":"402","origin":"PLAYA MALVÍN","destination":"URUGUAY Y FLORIDA","subline":"CIUDAD VIEJA - MALVIN","special":false}]}` — ~310 КБ | 24 ч |
+| `/v1/stops/{id}` | nombre, líneas y a dónde va cada una (`directions`) | 24 h; 5 min si todavía no se sabe a dónde van |
+| `/v1/stops/{id}/arrivals` | los próximos ómnibus, el más cercano primero: `tripId`, `state`, `expectedAt`, `clockTime`, confort | 15 s |
+| `/v1/stops/{id}/schedule/{day}/{H:MM}` | ~50 pasadas del horario teórico desde esa hora | 6 h |
+| `/v1/catalog/stops` | todas las paradas (~4 970) con ubicación y líneas, y `linesAvailable` | 24 h; 15 min sin líneas |
+| `/v1/news` | las 10 novedades más nuevas | 5 min |
+| `/v1/status/gps` | el porcentaje de ómnibus con GPS de cada empresa; `partial` debajo de 70 % | 1 min |
 
-- `{id}` — код остановки STM, целое без ведущих нулей, до 7 цифр.
-- `{day}` — `weekday`, `saturday` или `sunday`; `{H:MM}` — время, с которого нужно ~50 рейсов
-  (расписание идёт через полночь).
-- `{line}` — как пишет официальный API: `121`, `D10`, `CE1` (цифры и заглавные латинские, до 6).
-- Рейс в `arrivals`:
+- `{id}`: el código de parada STM, entero sin ceros adelante, de 1 a 9 999 999.
+- `{day}`: `weekday`, `saturday` o `sunday`. `{H:MM}`: la hora canónica, `8:05` (no `08:05` ni
+  `8:5`), así cada minuto es una sola clave de caché. El horario sigue después de medianoche.
+- `fetchedAt` es el reloj del Worker cuando contestó la fuente. Desde la caché puede tener la
+  antigüedad del TTL.
+- `/v1/lines/{line}/buses` y `/v1/catalog/lines` ya no son públicas (responden 404): la app nunca
+  las usó. `ImGateway` las mantiene como rutas internas.
 
-  ```json
-  {"line":"121","destination":"PUNTA CARRETAS","etaMinutes":1,"realTime":true,
-   "scheduledTime":"20:14","companyId":50,"location":{"lat":-34.907887,"lng":-56.203384},
-   "accessible":true,"accessibilityType":2,
-   "vehicle":{"airConditioning":true,"zeroEmission":true}}
-  ```
+Los errores son `{"error":"<código>"}`:
 
-  Без GPS (`realTime:false`) — `location:null`, `companyId:null`, `vehicle:null`. `fetchedAt` —
-  когда прокси получил данные; из кэша ответ может быть старше на 15 с.
-- `vehicle` — комфорт автобуса из официального API. `true` — подтверждено; `null` — нет данных
-  («Sin datos»); `zeroEmission:false` — известен класс выбросов (Euro III/V, «Bajas emisiones»).
-  `vehicle:null` у автобуса с GPS — комфорт неизвестен: ключ не настроен, лимит исчерпан,
-  координатор не ответил за 2 с или автобуса ещё нет в снимке. ETA при этом отдаются всегда.
-- Автобус в `buses`:
-
-  ```json
-  {"companyId":50,"busId":111,"variantId":2779,"destination":"PUNTA CARRETAS",
-   "location":{"lat":-34.909443,"lng":-56.207848},"speedKmh":21,
-   "updatedAt":"2026-10-19T22:51:57.000Z","airConditioning":true,"zeroEmission":false}
-  ```
-
-  `companyId` — те же коды, что в `arrivals` (10 COETC, 20 COME, 50 CUTCSA, 70 UCOT);
-  `variantId` — `lineVariantId` официального API и `shape_id` в GTFS.
-
-Ошибки — `{"error":"<code>"}`:
-
-| Статус | `error` | Когда | Кэш |
+| Status | `error` | Cuándo | Caché |
 |---|---|---|---|
-| 400 | `bad_request` | query string, неизвестный `day`, время вне 0:00–23:59 | нет |
-| 404 | `not_found` | неизвестный маршрут или некорректный `{id}`/`{line}` | нет |
-| 404 | `stop_not_found` | остановки нет в сети STM | 1 ч |
-| 405 | `method_not_allowed` | не `GET` | нет |
-| 429 | `rate_limited` | превышен лимит по IP, `Retry-After: 60` | нет |
-| 502 | `upstream_error` | источник ответил ошибкой или непонятным телом, официальный API отверг секрет | нет |
-| 503 | `upstream_busy` | бюджет официального API на эту минуту исчерпан или он ответил 429, `Retry-After` | нет |
-| 503 | `not_configured` | нет секретов `IM_CLIENT_ID`/`IM_CLIENT_SECRET` | нет |
-| 504 | `upstream_timeout` | `transporteRest` не ответил за 8 с, официальный API — за 10 с | нет |
+| 400 | `bad_request` | query string, `day` desconocido, hora mayor que 23 | no |
+| 404 | `not_found` | ruta desconocida, `{id}` inválido, hora no canónica | no |
+| 404 | `stop_not_found` | la parada no existe en la red STM | 1 h |
+| 405 | `method_not_allowed` | no es `GET` (`Allow: GET`) | no |
+| 429 | `rate_limited` | se pasó el límite por IP; `Retry-After: 60` | no |
+| 500 | `internal_error` | un error inesperado del proxy | no |
+| 502 | `upstream_error` | la fuente contestó un error o algo que no se entiende (también pci con una lista vacía), o la API oficial rechazó el secreto | no |
+| 503 | `upstream_busy` | se terminó el presupuesto de la API oficial en este minuto, o contestó 429; `Retry-After` | no |
+| 503 | `not_configured` | faltan los secretos `IM_CLIENT_ID`/`IM_CLIENT_SECRET` o el binding `IM_GATEWAY` | no |
+| 504 | `upstream_timeout` | la fuente no contestó a tiempo: transporteRest 8 s, notificacion 5 s por página, pci 5 s, API oficial 10 s | no |
 
-## ImGateway: ключ на всех
+Un error de una fuente nunca se devuelve como una lista vacía.
 
-- **Сон.** Без таймеров и сокетов объект засыпает через 10 с без запросов и теряет память
-  (документация Cloudflare, «Durable Object Lifecycle»). Поэтому всё, что должно пережить сон, —
-  в его хранилище (SQLite).
-- **Бюджет** — 12 запросов в минуту, окно с :00, как у IM; 2 оставлены владельцу для ручных
-  проверок тем же ключом. Сверх бюджета или после `429` объект не ходит в API до конца окна.
-  Счётчик хранится в хранилище (одна запись на запрос к API), иначе после сна он начинался бы с нуля.
-- **Токен** живёт 5 минут и переиспользуется; на `401`/`403` берётся новый один раз.
-- **Снимок парка** (`GET /buses`, ~4 с) — один на всех. Свежим считается 15 с; старше —
-  отдаётся сразу, а новый грузится в фоне. Несколько одновременных запросов вызывают одну загрузку.
-  Поэтому к API уходит не больше 4 снимков в минуту и только пока есть запросы.
-- **Комфорт** (кондиционер, «cero emisiones») — свойство машины: у 842 автобусов между двумя
-  снимками он не менялся. Объект накапливает его по всем снимкам и раз в 5 минут сохраняет в
-  хранилище (≤ 288 записей в сутки). После сна первый запрос отвечается из хранилища, а снимок
-  догружается в фоне (проверено: после 12–25 с простоя ответ < 1 с, комфорт у всех автобусов с
-  GPS). Без комфорта остаётся только самый первый запрос после деплоя.
-- **Каталоги** — раз в сутки, при ошибке отдаётся копия до 7 дней.
+## ImGateway: una clave para todos
 
-## Кэш и лимит
+- **Hibernación.** Sin timers ni sockets, el objeto se duerme a los 10 s sin pedidos y pierde la
+  memoria (documentación de Cloudflare, «Durable Object Lifecycle»). Todo lo que tiene que
+  sobrevivir va a su almacenamiento (SQLite).
+- **Presupuesto.** 12 pedidos por minuto, con la ventana desde :00 como la de la IM; quedan 2 para
+  que el dueño pruebe a mano con la misma clave. Pasado el presupuesto, o después de un `429`, el
+  objeto no llama a la API hasta que termine la ventana. El contador se guarda (una escritura por
+  pedido a la API); si no, después de dormirse empezaría de cero.
+- **Token.** Vive 5 minutos y se reutiliza; ante un `401`/`403` se pide uno nuevo, una sola vez.
+  Los pedidos que lo necesitan a la vez comparten uno.
+- **Flota** (`GET /buses`, ~4 s). Una para todos. Se considera fresca 15 s; más vieja se sirve en
+  el momento y se carga otra en segundo plano. Varios pedidos a la vez disparan una sola carga.
+  Así a la API llegan como mucho 4 flotas por minuto, y solo mientras hay pedidos.
+- **Confort** (aire acondicionado, «cero emisiones»). Es del vehículo: en 842 ómnibus no cambió
+  entre dos fotos de la flota. El objeto lo junta de todas las flotas y lo guarda cada 5 minutos
+  (≤ 288 escrituras por día). Después de dormirse, el primer pedido sale del almacenamiento y la
+  flota se carga en segundo plano (verificado: tras 12–25 s sin pedidos, respuesta en menos de 1 s
+  con el confort de todos los ómnibus con GPS). Solo el primer pedido después de un deploy llega
+  sin confort.
+- **Catálogos** (paradas y variantes de línea). Una vez por día; si falla la carga, se sirve una
+  copia de hasta 7 días.
+- **Índice de paradas.**
+  - Sale del CSV de geoserver: las líneas de cada parada y sus variantes (`cod_variante`, que es
+    el `lineVariantId` de la API oficial). Con las variantes de línea de la API oficial (1 pedido)
+    arma `directions`: una por línea y destino, con sus `variantIds`.
+  - El pedido a geoserver no pasa por la clave: no usa token, no gasta presupuesto y anda aunque
+    la API esté bloqueada.
+  - Se arma como mucho una vez por día, una sola vez aunque lleguen muchos pedidos juntos. Se sirve
+    hasta 7 días y, pasadas 24 h, se rearma en segundo plano. Si el armado falla, se reintenta a
+    los 15 minutos. Si fallaron solo las variantes, queda guardado como incompleto (sin
+    `directions`) y también se reintenta a los 15 minutos.
+  - Se guarda en 64 partes (`stopmeta:{id % 64}`) más `stopmeta:info`: unas 65 escrituras por
+    armado. Después de dormirse, la metadata de una parada se lee de una parte, sin ningún pedido.
+  - `/v1/catalog/stops` espera hasta 20 s el primer armado. Si no hay índice, contesta
+    `linesAvailable: false` con `lines: []` en cada parada, y el Worker lo guarda 15 minutos en
+    vez de un día.
+  - `/v1/stops/{id}` pide la metadata en paralelo con transporteRest y la espera como mucho 2 s.
+    Si falla, tarda o está incompleta, contesta `directions: []` con 5 minutos de caché, y la app
+    arma los destinos con los arribos, como antes.
 
-- **Workers Caching** (`"cache": {"enabled": true}` в `wrangler.jsonc`): Cloudflare проверяет
-  кэш до запуска Worker и хранит ответ столько, сколько сказано в его `Cache-Control`.
-  Одновременные промахи по одному URL выполняют Worker один раз — тысяча человек на одной
-  остановке дают один запрос к IMM раз в 15 с на дата-центр. Кэш свой у каждой версии Worker:
-  после деплоя он пустой.
-- **Лимит по IP** — 300 запросов в минуту (`ratelimits` в `wrangler.jsonc`), считается в
-  каждой локации Cloudflare отдельно и **только на промахах кэша**: попадания отдаются без
-  запуска Worker и до IMM не доходят. Лимит защищает источники, а не тариф Cloudflare: запрос,
-  получивший 429, тоже оплачивается.
-- Документация Cloudflare не рекомендует ключ по IP: мобильные операторы сажают много абонентов
-  на один адрес (CGNAT). Отсюда щедрый лимит: одному пользователю нужно ~2 запроса в минуту на
-  остановку (обновление раз в 30 с), 300 — запас на десятки абонентов за одним IP. Если
-  пользователи начнут получать 429 — поднять `limit`.
+En el peor caso se gastan 4 (flota) + 1 (paradas) + 1 (variantes) = 6 unidades por minuto, debajo
+de las 12 del presupuesto.
 
-## Запуск
+## Caché y límite
 
-Нужен Node.js 22+.
+- **Workers Caching** (`"cache": {"enabled": true}` en `wrangler.jsonc`): Cloudflare mira la
+  caché antes de correr el Worker y guarda cada respuesta lo que diga su `Cache-Control`. Varios
+  pedidos a la misma URL que no están en caché corren el Worker una sola vez: mil personas en la
+  misma parada dan un pedido a la IM cada 15 s por centro de datos. Cada versión del Worker tiene
+  su propia caché: después de un deploy arranca vacía.
+- **Límite por IP**: 300 pedidos por minuto (`ratelimits` en `wrangler.jsonc`), contado en cada
+  ubicación de Cloudflare por separado y **solo cuando no hay caché**: los aciertos se contestan
+  sin correr el Worker y no llegan a la IM. El límite protege a las fuentes, no el plan de
+  Cloudflare: un pedido que recibe 429 también se cobra.
+- La documentación de Cloudflare no recomienda usar la IP como clave: las compañías de celular
+  ponen a muchos clientes detrás de una misma dirección (CGNAT). Por eso el límite es generoso: un
+  usuario necesita ~2 pedidos por minuto por parada (actualiza cada 30 s), y 300 alcanzan para
+  decenas detrás de una misma IP. Si los usuarios empiezan a recibir 429, subí `limit`.
 
-```bash
-npm install
-```
+## Privacidad: logs apagados
+
+- **Regla: los logs del Worker están apagados.** `wrangler.jsonc` no tiene bloque
+  `observability`, y no hay que agregarlo: Workers Logs guardaría cada pedido, con la ruta (que
+  lleva el número de parada) y la IP. Antes de prender cualquier registro, fijate qué guarda.
+- Lo único que se escribe (`console.error`) son textos fijos `<fuente>: <tipo>`, por ejemplo
+  `transporteRest: HTTP 500`, `geoserver: TimeoutError` o `internal: TypeError`: sin URL, sin ruta
+  y sin IP.
+- El proxy ve la IP del cliente y los números de parada. La IP solo sirve de clave para el límite
+  y no se guarda. A `ImGateway` no llega: ahí van solo números de ómnibus y de parada.
+- Ningún encabezado de las fuentes llega al cliente (por ejemplo, las cookies de F5).
+- Las versiones de la app con proxy no mandan coordenadas a ningún lado: «Paradas cercanas» se
+  calcula en el teléfono con el catálogo.
+- La política de privacidad y la sección Data safety de las tiendas:
+  [docs/privacy-policy.md](../docs/privacy-policy.md), [docs/store-listing.md](../docs/store-listing.md).
+
+## Pruebas
+
+Hace falta Node.js 22 o más nuevo. Las pruebas no tienen dependencias:
 
 ```bash
 npm test
 ```
 
-Для локального сервера положите ключ портала в `proxy/.dev.vars` (файл в `.gitignore`):
+- `test/contract.test.js` corre los casos compartidos con la app (`contract/v1/cases.json`):
+  status y `Cache-Control` exactos, cuerpo igual al esperado y URLs pedidas a las fuentes.
+- `test/rules.test.js` corre los vectores de cada regla de derivación (`contract/v1/vectors/`),
+  los mismos que corre la app.
+- Para cambiar el contrato, seguí la lista de [contract/v1/README.md](contract/v1/README.md).
+
+## Correrlo en tu máquina
+
+```bash
+npm install
+```
+
+Para la API oficial, poné la clave del portal en `proxy/.dev.vars` (el archivo está en
+`.gitignore`):
 
 ```
 IM_CLIENT_ID=<ID de cliente>
 IM_CLIENT_SECRET=<Secreto del Cliente>
 ```
 
-Без него всё работает, кроме данных официального API (`vehicle:null`, `503 not_configured`).
-Локальный сервер на `http://127.0.0.1:8787` ходит в настоящие источники и тратит тот же бюджет
-14 запросов в минуту. Лимит и Durable Object работают локально, кэш — нет (`wrangler dev` не отдаёт
-`Cf-Cache-Status`): кэш проверяется после деплоя.
+Sin la clave anda todo menos lo de la API oficial: el confort viene en `null`, el catálogo da
+`503 not_configured` y las paradas salen sin `directions` (5 minutos de caché). El servidor local
+en `http://127.0.0.1:8787` usa las fuentes de verdad y gasta el mismo presupuesto de 14 pedidos
+por minuto. El límite y el Durable Object funcionan en local; la caché no (`wrangler dev` no
+manda `Cf-Cache-Status`), así que la caché se prueba después del deploy.
 
 ```bash
 npm run dev
 ```
 
-Приложение на симуляторе iOS ходит в него так:
+La app en el simulador de iOS lo usa así:
 
 ```bash
 flutter run --dart-define=MVD_PROXY_URL=http://127.0.0.1:8787
 ```
 
-## Деплой
+## Prueba de humo
 
-Один раз — вход в аккаунт Cloudflare (откроется браузер):
+`scripts/smoke.js` pide cada ruta de los casos del contrato que contestan 200 y verifica el status,
+el `Cache-Control`, el `Content-Type` y las claves del cuerpo contra los esperados. Los valores no
+los compara, porque son datos en vivo. No necesita dependencias:
+
+```bash
+node scripts/smoke.js http://127.0.0.1:8787
+```
+
+Al lado de cada ruta muestra con qué caso coincidió. `stop.574.degraded` o `catalog.nolines`
+quieren decir que el proxy anda, pero sin `directions` o sin líneas. Contra `wrangler dev` las
+fuentes ven tu IP, así que no prueba nada sobre F5/BigIP: lo que importa es correrlo contra el
+Worker desplegado.
+
+## Deploy
+
+### Orden: proxy primero
+
+1. Desplegá el proxy (pasos abajo).
+2. Corré `node scripts/smoke.js https://mvd-transporte-proxy.<subdominio>.workers.dev`. Si delante
+   de geoserver, notificacion o pci hay un F5/BigIP que bloquea las IP de Cloudflare, acá se ve:
+   las novedades y el GPS dan 502, el catálogo sale sin líneas y las paradas sin `directions`.
+3. Recién después, las versiones de la app con `MVD_PROXY_URL` apuntando a ese Worker.
+
+### Pasos
+
+Una sola vez, entrá a la cuenta de Cloudflare (se abre el navegador):
 
 ```bash
 npx wrangler login
 ```
 
-Один раз — ключ портала в секреты Worker (Wrangler спросит значение):
+Una sola vez, guardá la clave del portal en los secretos del Worker (Wrangler pide el valor):
 
 ```bash
 npx wrangler secret put IM_CLIENT_ID
@@ -165,42 +232,41 @@ npx wrangler secret put IM_CLIENT_SECRET
 npm run deploy
 ```
 
-Wrangler напечатает адрес вида `https://mvd-transporte-proxy.<subdomain>.workers.dev`.
-Первый деплой создаёт Durable Object `ImGateway` (миграция `v1` в `wrangler.jsonc`).
-Проверка кэша — два запроса подряд, во втором `cf-cache-status: HIT`:
+Wrangler muestra una dirección del tipo `https://mvd-transporte-proxy.<subdominio>.workers.dev`.
+El primer deploy crea el Durable Object `ImGateway` (migración `v1` en `wrangler.jsonc`). Para
+probar la caché, pedí dos veces seguidas; la segunda tiene que traer `cf-cache-status: HIT`:
 
 ```bash
-curl -sI https://mvd-transporte-proxy.<subdomain>.workers.dev/v1/stops/3140/arrivals
+curl -sI https://mvd-transporte-proxy.<subdominio>.workers.dev/v1/stops/3140/arrivals
 ```
 
-Проверка официального API — у автобусов с GPS появляется `vehicle` (первый запрос после деплоя
-может прийти без него):
+Para probar la API oficial, los ómnibus con GPS tienen que traer `airConditioning` y
+`zeroEmission` (el primer pedido después del deploy puede venir sin ellos):
 
 ```bash
-curl -s https://mvd-transporte-proxy.<subdomain>.workers.dev/v1/lines/117/buses
+curl -s https://mvd-transporte-proxy.<subdominio>.workers.dev/v1/stops/574/arrivals
 ```
 
-Сборки приложения для сторов — с этим адресом:
+Las versiones para las tiendas se compilan con esa dirección:
 
 ```bash
-flutter build appbundle --dart-define=MVD_PROXY_URL=https://mvd-transporte-proxy.<subdomain>.workers.dev
+flutter build appbundle --dart-define=MVD_PROXY_URL=https://mvd-transporte-proxy.<subdominio>.workers.dev
 ```
 
-Если секрет перевыпущен на портале («Regenerar»), повторить `wrangler secret put IM_CLIENT_SECRET`:
-до этого прокси отвечает без комфорта, а `/v1/lines`, `/v1/catalog` — `502`.
+Si regenerás el secreto en el portal («Regenerar»), repetí `wrangler secret put IM_CLIENT_SECRET`.
+Mientras tanto el proxy contesta sin confort y el catálogo da `502`; desde el próximo armado del
+índice, las paradas salen sin `directions`.
 
-Бесплатный тариф Workers — 100 000 запросов в сутки (сброс в 00:00 UTC), сверх лимита
-Cloudflare отвечает ошибкой 1027, и приложение покажет «не удалось проверить». С включённым
-кэшем попадания тоже считаются запросами, но не тратят CPU. Durable Objects на бесплатном тарифе —
-только с SQLite-хранилищем (так и настроено), 100 000 записанных строк в сутки: `ImGateway` пишет
-не больше 12 в минуту (≤ 17 280 в сутки при непрерывной нагрузке). Запрос к `ImGateway` идёт на
-каждом промахе кэша `arrivals` с автобусами с GPS и на `/v1/lines`, `/v1/catalog`.
+### Límites del plan gratis
 
-## Приватность
-
-Прокси видит IP клиента и номера остановок. В коде IP используется только как ключ лимита и
-нигде не сохраняется; в `ImGateway` IP не попадает вовсе — туда идут только номера автобусов.
-В лог (`console.error`) пишутся только путь к источнику и текст ошибки. Workers Logs в
-`wrangler.jsonc` не включены — прежде чем включать, проверить, что они записывают о запросах.
-Политика конфиденциальности и раздел Data safety обновлены под прокси:
-[docs/privacy-policy.md](../docs/privacy-policy.md), [docs/store-listing.md](../docs/store-listing.md).
+- Workers: 100 000 pedidos por día (se reinicia a las 00:00 UTC). Pasado eso, Cloudflare contesta
+  el error 1027 y la app muestra su error genérico. Con la caché prendida, los aciertos también
+  cuentan como pedidos, pero no gastan CPU.
+- Durable Objects: en el plan gratis solo con almacenamiento SQLite (así está configurado) y
+  100 000 filas escritas por día. `ImGateway` escribe una por pedido a la API (≤ 12 por minuto,
+  ≤ 17 280 por día con carga continua), ≤ 288 por día de confort y ~65 por armado del índice de
+  paradas.
+- Se llama a `ImGateway` en cada pedido sin caché de arribos con ómnibus con GPS, de
+  `/v1/stops/{id}` y de `/v1/catalog/stops`.
+- El CSV de geoserver se lee dentro del Durable Object: ~50 ms de CPU en Node la primera vez
+  (2026-10-27). Medilo después del deploy.

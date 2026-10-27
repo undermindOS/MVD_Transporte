@@ -5,6 +5,7 @@
 // Only the ImGateway Durable Object calls it: the key allows 14 requests a
 // minute for everybody (measured 2026-10-19, see ../../docs/REVIEW.md §2.3).
 
+import { USER_AGENT } from './http.js';
 import { UpstreamError } from './transporte_rest.js';
 
 const TOKEN_URL =
@@ -12,8 +13,6 @@ const TOKEN_URL =
 const BASE_URL = 'https://api.montevideo.gub.uy/api/transportepublico';
 // GET /buses takes ~4 s for the whole fleet
 const TIMEOUT_MS = 10000;
-const USER_AGENT =
-  'MVD-Transporte-proxy/0.2 (+https://github.com/undermindOS/MVD_Transporte)';
 
 // Operator names in the official API → ids used by transporteRest
 const COMPANY_IDS = { COETC: 10, COME: 20, CUTCSA: 50, UCOT: 70 };
