@@ -127,13 +127,14 @@ void main() {
           () => Future<void>.delayed(const Duration(milliseconds: 100)));
       await tester.pumpAndSettle();
 
-      // Saved through resolveStop (transporteRest/lineas)
+      // Saved as listed, with the lines geoserver gives: no lookup
       expect(requests.map((u) => u.path),
-          contains('/transporteRest/lineas/574'));
+          isNot(contains('/transporteRest/lineas/574')));
       final saved = CacheService.getStop(574);
       expect(saved, isNotNull);
       expect(saved!.name, 'SAN JOSE y ANDES');
-      expect(saved.lines, ['116', '117', '121']);
+      expect(saved.lines, ['116', '117', '121', '141', '142', '144', '538']);
+      expect(find.text('Buscando parada…'), findsNothing);
       expect(find.text('#574'), findsOneWidget);
     }, () => client);
   });
@@ -443,11 +444,11 @@ void main() {
       if (request.url.path == '/transporteRest/siguientesParada/574') {
         return http.Response(
             '[{"linea":"121","destino":"CENTRO","minutos":2,"real":true,'
-            '"idEmpresa":50,"horaDesc":"8:00"},'
+            '"idEmpresa":50,"horaDesc":"8:00","variante":7884},'
             '{"linea":"116","destino":"POCITOS","minutos":9,"real":true,'
-            '"idEmpresa":50,"horaDesc":"8:07"},'
+            '"idEmpresa":50,"horaDesc":"8:07","variante":630},'
             '{"linea":"116","destino":"CIUDAD VIEJA","minutos":14,'
-            '"real":true,"idEmpresa":50,"horaDesc":"8:12"}]',
+            '"real":true,"idEmpresa":50,"horaDesc":"8:12","variante":631}]',
             200);
       }
       return http.Response('[]', 200);
@@ -484,7 +485,8 @@ void main() {
       for (final line in ['116', '117', '121']) {
         expect(chip(line), findsOneWidget);
       }
-      // Directions of the upcoming buses, narrowed to the picked lines
+      // Without the proxy the stop has no directions: those of the
+      // upcoming buses, narrowed to the picked lines
       expect(chip('CENTRO'), findsOneWidget);
       await tester.tap(chip('116'));
       await tester.pumpAndSettle();
@@ -510,6 +512,8 @@ void main() {
           (574, 'SAN JOSE y ANDES', 'Trabajo'));
       expect(route.preferredLines, ['116', '121']);
       expect(route.preferredDestinations, ['POCITOS']);
+      // The variant of the picked direction's bus, too
+      expect(route.preferredVariantIds, [630]);
       // The dialog already resolved the stop
       expect(requests.map((u) => u.path),
           isNot(contains('/transporteRest/lineas/574')));

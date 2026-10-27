@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:collection';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -12,6 +13,7 @@ import '../models/bus_wait.dart';
 import '../models/catalog_stop.dart';
 import '../models/nearby_stop.dart';
 import '../models/route_alert.dart';
+import '../models/stop_details.dart';
 import '../models/transport_news.dart';
 import '../services/api/api_result.dart';
 import '../services/background_worker.dart';
@@ -256,6 +258,11 @@ class _StopsPageState extends State<StopsPage>
     _refresh(_shownStopIds, spinner: true);
     _loadNews();
     _loadGpsStatus();
+    // Stops saved offline as "Parada N" get their name and lines; not
+    // awaited, the cards show at once
+    MvdApiService.healPlaceholderStops().then((healed) {
+      if (healed > 0 && mounted) _loadStops();
+    });
   }
 
   /// Rate-limited inside the service (once a minute at most).
@@ -290,9 +297,15 @@ class _StopsPageState extends State<StopsPage>
   void _loadStops() => setState(() => _stops = CacheService.getAllStops());
 
   Future<void> _addStop() async {
-    final stopId = await _showAddStopDialog();
-    if (stopId == null || !mounted) return;
+    final choice = await _showAddStopDialog();
+    if (choice == null || !mounted) return;
+    final stopId = choice.id;
 
+    // 0 or more than 7 digits: no request, it cannot exist
+    if (!MvdApiService.isValidStopId(stopId)) {
+      _showError('No existe la parada $stopId. Revisá el número.');
+      return;
+    }
     // Re-adding would overwrite the saved alert settings
     if (CacheService.getStop(stopId) != null) {
       _showError('La parada $stopId ya está guardada');
@@ -300,17 +313,21 @@ class _StopsPageState extends State<StopsPage>
     }
 
     final snack = ScaffoldMessenger.of(context);
-    snack.showSnackBar(const SnackBar(content: Text('Buscando parada…')));
-
-    final BusStop? resolved;
-    try {
-      resolved = await MvdApiService.resolveStop(stopId);
-    } on StopNotFoundException {
-      _showError('No existe la parada $stopId. Revisá el número.');
-      return;
+    // Picked from the catalog or the nearby stops: already known
+    var stop = choice.stop;
+    if (stop == null) {
+      snack.showSnackBar(const SnackBar(content: Text('Buscando parada…')));
+      switch (await MvdApiService.getStopDetails(stopId)) {
+        case ApiOk(:final value):
+          stop = value.toBusStop();
+        case ApiError(failure: ApiFailure.notFound):
+          _showError('No existe la parada $stopId. Revisá el número.');
+          return;
+        case ApiError():
+          // Offline: kept with a placeholder name, healed on a later start
+          stop = BusStop(id: stopId, name: 'Parada $stopId');
+      }
     }
-    // Offline: keep the stop with a placeholder name
-    final stop = resolved ?? BusStop(id: stopId, name: 'Parada $stopId');
     await CacheService.saveStop(stop);
 
     if (mounted) {
@@ -320,7 +337,7 @@ class _StopsPageState extends State<StopsPage>
     }
   }
 
-  Future<int?> _showAddStopDialog() => showDialog<int>(
+  Future<_StopChoice?> _showAddStopDialog() => showDialog<_StopChoice>(
         context: context,
         builder: (_) => const _AddStopDialog(),
       );
@@ -366,26 +383,30 @@ class _StopsPageState extends State<StopsPage>
     if (result == null || !mounted) return;
 
     final snack = ScaffoldMessenger.of(context);
-    // Already resolved if the dialog listed the stop's lines
-    var resolved = result.origin;
-    if (resolved == null) {
+    // Already looked up if the dialog listed the stop's lines
+    var origin = result.origin;
+    if (origin == null) {
       snack.showSnackBar(const SnackBar(content: Text('Buscando parada…')));
-      try {
-        resolved = await MvdApiService.resolveStop(result.originStopId);
-      } on StopNotFoundException {
-        _showError(
-            'No existe la parada ${result.originStopId}. Revisá el número.');
-        return;
+      switch (await MvdApiService.getStopDetails(result.originStopId)) {
+        case ApiOk(:final value):
+          origin = value;
+        case ApiError(failure: ApiFailure.notFound):
+          _showError(
+              'No existe la parada ${result.originStopId}. Revisá el número.');
+          return;
+        case ApiError():
+          break; // offline: a placeholder name
       }
     }
     final id = CacheService.nextRouteId();
     final route = RouteAlert(
       id: id,
       originStopId: result.originStopId,
-      originName: resolved?.name ?? 'Parada ${result.originStopId}',
+      originName: origin?.displayName ?? 'Parada ${result.originStopId}',
       destinationName: result.destinationName,
       preferredLines: result.preferredLines,
       preferredDestinations: result.preferredDestinations,
+      preferredVariantIds: result.preferredVariantIds,
     );
     await CacheService.saveRoute(route);
 
@@ -1191,9 +1212,13 @@ class _FieldIcon extends StatelessWidget {
       );
 }
 
+/// What the add-stop dialog pops: a typed number to look up, or a stop
+/// picked from the catalog or the nearby stops, saved as it is.
+typedef _StopChoice = ({int id, BusStop? stop});
+
 /// Add-stop dialog: type the stop number, search by street names (through
 /// the proxy only) or pick one of the stops around the user ("Paradas
-/// cercanas"). Pops with the chosen stop ID.
+/// cercanas"). Pops with a [_StopChoice].
 class _AddStopDialog extends StatefulWidget {
   const _AddStopDialog();
 
@@ -1311,7 +1336,11 @@ class _AddStopDialogState extends State<_AddStopDialog> {
             TextField(
               controller: _controller,
               keyboardType: TextInputType.number,
-              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+              // Stop numbers have at most 7 digits
+              inputFormatters: [
+                FilteringTextInputFormatter.digitsOnly,
+                LengthLimitingTextInputFormatter(7),
+              ],
               decoration: const InputDecoration(
                 labelText: 'Número de parada',
                 hintText: 'Ej: 1234',
@@ -1425,19 +1454,28 @@ class _AddStopDialogState extends State<_AddStopDialog> {
             onPressed: () => Navigator.pop(context),
             child: const Text('Cancelar')),
         FilledButton(
-          onPressed: () =>
-              Navigator.pop(context, int.tryParse(_controller.text)),
+          onPressed: () {
+            final id = int.tryParse(_controller.text);
+            Navigator.pop<_StopChoice>(
+                context, id == null ? null : (id: id, stop: null));
+          },
           child: const Text('Agregar'),
         ),
       ],
     );
   }
 
+  /// A listed stop is saved with the name and lines it is listed with:
+  /// nothing more to look up.
+  void _pick(int id, String name, List<String> lines) =>
+      Navigator.pop<_StopChoice>(context,
+          (id: id, stop: BusStop(id: id, name: name, lines: [...lines])));
+
   /// A stop around the user. Without lines (the catalog could not get
   /// them) the line ends at the distance.
   Widget _buildNearbyTile(NearbyStop stop) {
     final meters = stop.distanceMeters.round();
-    void pick() => Navigator.pop(context, stop.id);
+    void pick() => _pick(stop.id, stop.name, stop.lines);
     return Semantics(
       button: true,
       label: '${_stopPhrase(stop.id, stop.name)}, a $meters metros'
@@ -1469,7 +1507,7 @@ class _AddStopDialogState extends State<_AddStopDialog> {
   /// A stop found by its streets: the same tile as a nearby one, with
   /// the number under the name.
   Widget _buildMatchTile(CatalogStop stop) {
-    void pick() => Navigator.pop(context, stop.id);
+    void pick() => _pick(stop.id, stop.name, stop.lines);
     return Semantics(
       button: true,
       label: _stopPhrase(stop.id, stop.name),
@@ -1491,8 +1529,9 @@ class _AddStopDialogState extends State<_AddStopDialog> {
 }
 
 /// Add-route dialog: origin stop and destination label. Once the stop is
-/// looked up, its lines (`transporteRest/lineas`) and the directions of its
-/// upcoming buses (`destino`) are picked as chips; none picked = all.
+/// looked up, its lines and where they go are picked as chips; none
+/// picked = all. Where a line goes comes from the stop's directions, or,
+/// for a line without any, from its upcoming buses (`destino`).
 class _AddRouteDialog extends StatefulWidget {
   const _AddRouteDialog();
 
@@ -1505,9 +1544,9 @@ class _AddRouteDialogState extends State<_AddRouteDialog> {
   final _destCtrl = TextEditingController();
   bool _loading = false;
   String? _error;
-  // Looked-up stop with its lines (null = not looked up yet)
-  BusStop? _stop;
-  // Upcoming buses of the stop: where each line is heading
+  // Looked-up stop with its lines and directions (null = not looked up yet)
+  StopDetails? _stop;
+  // Upcoming buses of the stop: where a line without directions is heading
   List<BusArrival> _arrivals = const [];
   final _lines = <String>{};
   final _directions = <String>{};
@@ -1539,18 +1578,19 @@ class _AddRouteDialogState extends State<_AddRouteDialog> {
       _loading = true;
       _error = null;
     });
-    final arrivals = MvdApiService.getNextArrivals(stopId);
-    BusStop? stop;
+    // In parallel: the directions may leave a line out
+    final board = MvdApiService.getBoard(stopId);
+    StopDetails? stop;
     String? error;
-    try {
-      stop = await MvdApiService.resolveStop(stopId);
-      if (stop == null) {
+    switch (await MvdApiService.getStopDetails(stopId)) {
+      case ApiOk(:final value):
+        stop = value;
+      case ApiError(failure: ApiFailure.notFound):
+        error = 'No existe la parada $stopId. Revisá el número.';
+      case ApiError():
         error = 'No se pudieron cargar las líneas. Revisá la conexión.';
-      }
-    } on StopNotFoundException {
-      error = 'No existe la parada $stopId. Revisá el número.';
     }
-    final upcoming = await arrivals;
+    final upcoming = (await board).valueOrNull?.arrivals;
     if (!mounted) return;
     setState(() {
       _loading = false;
@@ -1562,20 +1602,39 @@ class _AddRouteDialogState extends State<_AddRouteDialog> {
     });
   }
 
-  /// Directions of the upcoming buses of the picked lines (or of all).
-  List<String> get _visibleDirections => {
-        for (final a in _arrivals)
-          if (a.destination.isNotEmpty &&
-              (_lines.isEmpty || _lines.contains(a.line)))
-            a.destination,
-      }.toList()
-        ..sort();
+  /// Where the picked lines (or all) go, by destination, with the variants
+  /// of each: the stop's directions, and for a line without any, its
+  /// upcoming buses.
+  SplayTreeMap<String, Set<int>> get _visibleDirections {
+    final directions = _stop?.directions ?? const <StopDirection>[];
+    bool picked(String line) => _lines.isEmpty || _lines.contains(line);
+    final withDirections = {for (final d in directions) d.line};
+    final chips = SplayTreeMap<String, Set<int>>();
+    for (final d in directions) {
+      if (!picked(d.line)) continue;
+      chips.putIfAbsent(d.destination, () => {}).addAll(d.variantIds);
+    }
+    for (final a in _arrivals) {
+      if (a.destination.isEmpty ||
+          !picked(a.line) ||
+          withDirections.contains(a.line)) {
+        continue;
+      }
+      final variants = chips.putIfAbsent(a.destination, () => {});
+      if (a.variantId case final variant?) variants.add(variant);
+    }
+    return chips;
+  }
 
   void _save() {
     final stopId = int.tryParse(_stopCtrl.text);
     if (stopId == null || _destCtrl.text.trim().isEmpty) return;
     final stop = _stop;
     final directions = _visibleDirections;
+    final destinations = [
+      for (final d in directions.keys)
+        if (_directions.contains(d)) d,
+    ];
     Navigator.pop(
       context,
       _RouteFormData(
@@ -1587,10 +1646,12 @@ class _AddRouteDialogState extends State<_AddRouteDialog> {
           for (final l in stop?.lines ?? const <String>[])
             if (_lines.contains(l)) l,
         ],
-        preferredDestinations: [
-          for (final d in directions)
-            if (_directions.contains(d)) d,
-        ],
+        preferredDestinations: destinations,
+        // A bus of a picked variant matches whatever its label says
+        preferredVariantIds: {
+          for (final d in destinations) ...directions[d]!,
+        }.toList()
+          ..sort(),
       ),
     );
   }
@@ -1615,7 +1676,7 @@ class _AddRouteDialogState extends State<_AddRouteDialog> {
     const label = TimbreText.sectionLabel;
     final stop = _stop;
     final error = _error;
-    final directions = _visibleDirections;
+    final directions = _visibleDirections.keys.toList();
 
     return AlertDialog(
       title: const Text('Agregar ruta'),
@@ -1669,9 +1730,9 @@ class _AddRouteDialogState extends State<_AddRouteDialog> {
                     style: hint)
               else ...[
                 Semantics(
-                  label: _stopPhrase(stop.id, stop.name),
+                  label: _stopPhrase(stop.id, stop.displayName),
                   excludeSemantics: true,
-                  child: Text(stop.name, style: TimbreText.stopName),
+                  child: Text(stop.displayName, style: TimbreText.stopName),
                 ),
                 const SizedBox(height: TimbreSpace.m),
                 const Text('LÍNEAS', style: label),
@@ -1705,10 +1766,11 @@ class _AddRouteDialogState extends State<_AddRouteDialog> {
 class _RouteFormData {
   final int originStopId;
   final String destinationName;
-  // Resolved by the dialog (null = not looked up)
-  final BusStop? origin;
+  // Looked up by the dialog (null = not looked up)
+  final StopDetails? origin;
   final List<String> preferredLines;
   final List<String> preferredDestinations;
+  final List<int> preferredVariantIds;
 
   const _RouteFormData({
     required this.originStopId,
@@ -1716,6 +1778,7 @@ class _RouteFormData {
     this.origin,
     required this.preferredLines,
     required this.preferredDestinations,
+    required this.preferredVariantIds,
   });
 }
 
