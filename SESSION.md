@@ -254,3 +254,40 @@
 - SESSION.md и шаблонный README в ios/ не переводятся; сообщения коммитов остаются на английском.
 - В CHANGELOG заголовок `[Unreleased]` оставлен на английском (его ищут инструменты релиза), разделы — Agregado/Cambiado/Corregido/Eliminado.
 - STM_APP_SETUP.md переведён как есть, хотя описывает старую версию с WebView.
+
+## 2026-10-27 — Timbre на всё приложение, прокси как BFF, документация дизайна (ветка feat/timbre-bff)
+
+### What was done
+- База: `claude/street-search` + влитая `feat/alert-schedule-lines`, перекрашенная в Timbre (5e63ddb).
+- Контракт /v1 сначала: `proxy/contract/v1` (24 случая, golden-ответы, 148 векторов, снимки источников) —
+  общий для прокси и приложения; правила дважды: `proxy/src/rules.js` и `lib/services/api/contract_rules.dart`.
+- Прокси (0.3.0): формы под экраны (`tripId`, `state`, `expectedAt`, `clockTime`), `/v1/news`, `/v1/status/gps`,
+  индекс остановок из CSV geoserver в Durable Object (64 части), `directions` у остановки, линии в каталоге,
+  логи `<источник>: <вид>`, удалены `/v1/lines/{line}/buses` и `/v1/catalog/lines`, `scripts/smoke.js`.
+- Приложение: слой `lib/services/api/` (ApiResult/ApiFailure, V1Parser, ProxySource/DirectSource), прямой
+  режим сохранён; «Paradas cercanas» с прокси считается на телефоне; опрос только на видимом экране;
+  оценки «~H:MM» для старого табло; виджет по `expectedAt`; «Estoy esperando» по `tripId`; RouteAlert поле 11.
+- UI доведён до правил Timbre (ámbar только для живого, Doto ≥ 19, ошибки rojoLed с voseo, TalkBack-фразы).
+- Ревью 5 измерений + адверсарная проверка: 13 находок, 8 подтверждены и исправлены (+2 моих хвоста).
+- Документация: влит `docs/es`; `docs/design/` (13 разделов, `contrato-v1.md`, `pantalla-a-datos.md`,
+  `tokens.json` + `test/design_tokens_test.dart`); политика приватности, store listing, REVIEW; CHANGELOG на испанском.
+- Артефакт дизайн-системы Dkqro485d1MznZZtSmigAy (рус.) сверен с кодом, версия 5, новый раздел 5-Contract.
+
+### Current state
+- What works: прокси `npm test` 313/313, `flutter analyze` чисто, `flutter test` 474/474, `flutter build apk --debug`.
+- What's broken/pending: прокси не задеплоен — F5/BigIP может блокировать Cloudflare к geoserver/notificacion/pci;
+  проверка только `scripts/smoke.js` после деплоя. Устройства не проверялись (нет эмулятора), iOS не собирался.
+  transporteRest сейчас отвечает 500 на `siguientesParada/6325` (кейс `arrivals.empty`) — smoke покажет FAIL.
+
+### Next steps
+- Владелец: деплой прокси → `smoke.js` → сборка с `MVD_PROXY_URL`.
+- Решения владельца: текст «FUENTE DE DATOS» в Info для сборки с прокси; ссылка на политику приватности
+  в приложении (`privacyPolicyUrl` не передаётся); другая остановка для `arrivals.empty`; перерисовка виджета
+  по AlarmManager через 2 мин после ómnibus; блокировка не закрывает Horarios/Info (найдено чтением кода).
+- Превью компонентов в артефакте сняты до /v1 (CartelTira, PageTitleBar, нет состояния «оценка»).
+
+### Key decisions made
+- Без batch-маршрута, без переключения прокси→прямой во время работы, сборка с прокси не ходит в Intendencia.
+- Старое табло — оценка без янтаря: после ошибки до 5 мин; без ошибки через 1 мин по часам телефона, с 5 мин спиннер.
+- Каталог без линий на телефоне живёт 15 мин и не заменяет копию с линиями.
+- Записи фиксов ревью свёрнуты в существующие пункты CHANGELOG (баги внутри одной невыпущенной партии).
