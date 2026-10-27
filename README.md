@@ -1,30 +1,39 @@
 # MVD_Transporte
 
-Неофициальное Flutter-приложение для общественного транспорта Монтевидео: нативная вкладка
-«Mis paradas» — сохранённые остановки и маршруты с временем прибытия автобусов,
-уведомления и Android-виджет, — и быстрый доступ к официальным сайтам (Mi STM, пополнение
-карты, Cómo Ir, Avisos), которые открываются в системном браузере (Custom Tabs /
-SFSafariViewController), а не во встроенном WebView.
+Timbre MVD: app no oficial en Flutter para el transporte público de Montevideo. Tiene una
+pestaña nativa «Mis paradas» —paradas y rutas guardadas con los tiempos de arribo de los ómnibus,
+horarios, novedades, notificaciones y un widget de Android— y accesos rápidos a los sitios
+oficiales (Mi STM, recarga de la tarjeta, Cómo Ir, Avisos), que se abren en el navegador del
+sistema (Custom Tabs / SFSafariViewController) y no en un WebView integrado.
 
-Не аффилировано с Intendencia de Montevideo.
+No está afiliada a la Intendencia de Montevideo.
 
-## Данные
+## Datos
 
-Время прибытия, расписания и названия остановок — открытые сервисы Intendencia de Montevideo,
-которые использует веб-версия Cómo Ir (`api.montevideo.gub.uy/transporteRest`).
-Кондиционер и «cero emisiones» у прибывающих автобусов — официальный API IM
-(`api.montevideo.gub.uy/api/transportepublico`, OAuth2, 14 запросов в минуту на ключ). Его ключ
-живёт только в прокси на Cloudflare Workers ([proxy/](proxy/README.md)); если приложение собрано с
-адресом прокси, все эти запросы идут через него (маршруты `/v1`), иначе — напрямую в `transporteRest`
-и без данных о комфорте.
-Поиск остановок рядом («Paradas cercanas») — открытый WFS GeoServer IM
-(`geoserver.montevideo.gub.uy/geoserver/ows`, слой `imm:v_uptu_paradas`, без авторизации).
-Поиск остановки по названиям улиц («Buscar por calles») — каталог остановок официального API
-(`/v1/catalog/stops` прокси, хранится на устройстве сутки); есть только в сборке с прокси.
-Кнопка «Ver en Cómo Ir» открывает остановку по deep link `m.montevideo.gub.uy/comoir/parada?numero={id}`.
-Карта API, условия использования и правовые ограничения — в [docs/REVIEW.md](docs/REVIEW.md).
+Con `--dart-define=MVD_PROXY_URL=…` la app le pide todo al proxy del proyecto, un Cloudflare
+Worker ([proxy/](proxy/README.md)) con rutas `/v1`: tiempos de arribo, paradas (nombre, líneas y
+destinos), horarios, el catálogo de paradas, novedades y el estado del GPS. El proxy guarda la
+clave de la API oficial de la IM (`api.montevideo.gub.uy/api/transportepublico`, OAuth2,
+14 pedidos por minuto para todos) y agrega a los ómnibus con GPS si tienen aire acondicionado y si
+son «cero emisiones». Los tiempos de arribo y los horarios siguen saliendo de los servicios
+abiertos que usa la versión web de Cómo Ir (`api.montevideo.gub.uy/transporteRest`), pero los
+pide el proxy: la app no se conecta con ningún servidor de la Intendencia. «Paradas cercanas» se
+calcula en el teléfono con el catálogo, así que tu ubicación no sale del dispositivo; con el mismo
+catálogo se busca una parada por los nombres de sus calles («Buscar por calles»).
 
-## Запуск
+Sin `MVD_PROXY_URL`, la app usa directamente los servicios abiertos de la ciudad, como la versión
+web de Cómo Ir: `transporteRest` para arribos, paradas y horarios, `notificacion/mensajes` para las
+novedades y `pci.montevideo.gub.uy/buses/control` para el estado del GPS. No hay datos de confort,
+ni destinos por línea, ni búsqueda por calles. «Paradas cercanas» le pide al WFS abierto del
+GeoServer de la IM (`geoserver.montevideo.gub.uy/geoserver/ows`, capa `imm:v_uptu_paradas`, sin
+autenticación) un área aproximada alrededor de tu posición redondeada a 3 decimales, y filtra en el
+teléfono con la posición exacta. Este modo queda hasta que el proxy esté desplegado.
+
+El botón «Ver en Cómo Ir» abre la parada con el deep link `m.montevideo.gub.uy/comoir/parada?numero={id}`.
+El contrato /v1 está en [docs/design/contrato-v1.md](docs/design/contrato-v1.md); el mapa de la API,
+las condiciones de uso y las restricciones legales, en [docs/REVIEW.md](docs/REVIEW.md).
+
+## Cómo ejecutarla
 
 ```bash
 flutter pub get
@@ -32,27 +41,38 @@ flutter test
 flutter run
 ```
 
-Через прокси (адрес Worker после деплоя или `http://127.0.0.1:8787` при `npm run dev` в `proxy/`):
+Con el proxy (la dirección del Worker después del deploy, o `http://127.0.0.1:8787` con
+`npm run dev` en `proxy/`):
 
 ```bash
-flutter run --dart-define=MVD_PROXY_URL=https://mvd-transporte-proxy.<subdomain>.workers.dev
+flutter run --dart-define=MVD_PROXY_URL=https://mvd-transporte-proxy.<subdominio>.workers.dev
 ```
 
-Сборки для сторов — с тем же `--dart-define`.
+Las builds para las tiendas llevan el mismo `--dart-define`. Primero se despliega el proxy y
+después la app.
 
-## Структура
+## Estructura
 
-- `lib/services/mvd_api_service.dart` — клиент API (ETA, остановки, расписания; прокси или напрямую;
-  каталог остановок и поиск по улицам — только через прокси)
-- `proxy/` — Cloudflare Worker: маршруты `/v1`, Durable Object `ImGateway` с ключом официального API
-- `lib/services/nearby_stops_service.dart` — остановки рядом (геолокация + WFS)
-- `lib/services/background_worker.dart` — фоновая проверка алертов (WorkManager, ≥15 мин)
+- `lib/services/mvd_api_service.dart` — punto de entrada de los datos (arribos, paradas, horarios,
+  catálogo, estado GPS); elige la fuente: el proxy o el modo directo
+- `lib/services/api/` — capa de datos del contrato /v1: `ProxySource` (el proxy), `DirectSource` y
+  `direct/` (los servicios de la ciudad convertidos a JSON v1 en el teléfono), `V1Parser`,
+  `ApiResult`, `ContractRules`
+- `proxy/` — Cloudflare Worker: rutas `/v1`, Durable Object `ImGateway` con la clave de la API oficial
+- `proxy/contract/v1/` — el contrato /v1 compartido: casos, respuestas esperadas y vectores que usan
+  las pruebas del proxy y de la app
+- `lib/services/nearby_stops_service.dart` — paradas cercanas (con proxy, del catálogo en el
+  teléfono; sin proxy, del WFS)
+- `lib/services/background_worker.dart` — verificación de alertas en segundo plano (WorkManager, ≥15 min)
 - `lib/models/bus_wait.dart`, `lib/services/bus_wait_service.dart`, `lib/services/bus_wait_task.dart` —
-  «Estoy esperando»: Android — служба переднего плана (опрос раз в 30 с), iOS — напоминание на
-  прогнозное время
-- `lib/ui/stops_page.dart` — остановки и маршруты
-- `lib/ui/home_page.dart` — вкладки, биометрический замок
-- `lib/ui/services_page.dart`, `lib/services/official_sites.dart` — официальные сайты в системном браузере
-- `android/.../MVDTransporteWidgetProvider.kt` — виджет домашнего экрана
+  «Estoy esperando»: en Android, un servicio en primer plano (consulta cada 30 s); en iOS, un recordatorio
+  para la hora prevista
+- `lib/ui/stops_page.dart` — paradas y rutas
+- `lib/ui/home_page.dart` — pestañas, bloqueo biométrico
+- `lib/ui/services_page.dart`, `lib/services/official_sites.dart` — sitios oficiales en el navegador del sistema
+- `lib/ui/theme/` — el sistema de diseño Timbre: colores, medidas y opacidades (`timbre_tokens.dart`),
+  estilos de texto (`timbre_text.dart`) y tema (`timbre_theme.dart`); los componentes están en
+  `lib/ui/widgets/`. Guía: [docs/design/README.md](docs/design/README.md)
+- `android/.../MVDTransporteWidgetProvider.kt` — widget de la pantalla de inicio
 
-История изменений — [CHANGELOG.md](CHANGELOG.md).
+Historial de cambios: [CHANGELOG.md](CHANGELOG.md).
