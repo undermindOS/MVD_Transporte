@@ -786,6 +786,44 @@ void main() {
       expect(stop.latitude, closeTo(-34.90739436, 1e-8));
     });
 
+    // The proxy could not build its stop index: no lines, edge max-age 900
+    final withoutLines = utf8.encode('{"fetchedAt":"2026-10-27T13:22:26.000Z",'
+        '"linesAvailable":false,"stops":[{"id":574,"name":"SAN JOSE y ANDES",'
+        '"location":{"lat":-34.90739436,"lng":-56.198255},"lines":[]}]}');
+
+    test('a catalog without lines does not replace a copy that has them',
+        () async {
+      final dayOld = DateTime.now()
+          .subtract(const Duration(days: 1, minutes: 1))
+          .millisecondsSinceEpoch;
+      await CacheService.saveCatalog(utf8.decode(withLines), dayOld);
+      catalogAnswer = withoutLines;
+
+      final stops = await http.runWithClient(
+          MvdApiService.getStopCatalog, () => client);
+      expect(requested, hasLength(1));
+      expect(stops!.single.lines, contains('116'));
+      expect(CacheService.catalogFetchedAtMs, dayOld);
+      expect(await CacheService.catalogBody(), contains('"116"'));
+    });
+
+    test('a catalog without lines is kept 15 minutes, not a day', () async {
+      catalogAnswer = withoutLines;
+      expect(await load(), 1);
+      expect(await load(), 1);
+      expect(requested, hasLength(1));
+
+      // 16 minutes later the proxy has its lines again
+      await CacheService.saveCatalog((await CacheService.catalogBody())!,
+          CacheService.catalogFetchedAtMs! - 16 * 60000);
+      MvdApiService.clearCatalogMemory();
+      catalogAnswer = withLines;
+      final stops = await http.runWithClient(
+          MvdApiService.getStopCatalog, () => client);
+      expect(requested, hasLength(2));
+      expect(stops!.single.lines, contains('116'));
+    });
+
     test('an old copy is used while the proxy cannot be reached', () async {
       expect(await load(), 4972);
       await CacheService.saveCatalog(utf8.decode(catalogBody), 0);

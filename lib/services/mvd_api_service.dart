@@ -59,6 +59,10 @@ class MvdApiService {
   static const _catalogTtl = Duration(days: 1);
   static List<CatalogStop>? _catalog;
 
+  // A catalog without lines (the proxy could not build its stop index) is
+  // kept as long as the proxy's edge keeps it (max-age=900)
+  static const _catalogWithoutLinesTtl = Duration(minutes: 15);
+
   // After a 429 nothing is requested until then, in this isolate
   static DateTime? _busyUntil;
 
@@ -210,7 +214,9 @@ class MvdApiService {
   /// by streets and the nearby stops — only through the proxy
   /// (`/v1/catalog/stops`), null without it.
   /// Downloaded at most once a day; when the proxy cannot be reached an
-  /// older copy is used. Returns null when there is neither.
+  /// older copy is used. A catalog the proxy sends without lines never
+  /// replaces a copy with lines, and is asked again after 15 minutes.
+  /// Returns null when there is neither.
   static Future<List<CatalogStop>?> getStopCatalog() async {
     if (!usesProxy) return null;
 
@@ -229,13 +235,22 @@ class MvdApiService {
       body = json;
       return V1Parser.catalog(json);
     }, backOff: false);
-    final fresh = result.valueOrNull?.stops;
+    final catalog = result.valueOrNull;
+    final fresh = catalog?.stops;
     if (fresh == null || fresh.isEmpty) return cached;
+    final withLines = catalog!.linesAvailable;
+    if (!withLines && (cached?.any((s) => s.lines.isNotEmpty) ?? false)) {
+      return cached;
+    }
 
     _catalog = fresh;
+    // Without lines it is dated back, so it expires after 15 minutes
+    final fetchedAt = withLines
+        ? DateTime.now()
+        : DateTime.now().subtract(_catalogTtl - _catalogWithoutLinesTtl);
     // The /v1 body as it came, read again by V1Parser
     await CacheService.saveCatalog(
-        jsonEncode(body), DateTime.now().millisecondsSinceEpoch);
+        jsonEncode(body), fetchedAt.millisecondsSinceEpoch);
     return fresh;
   }
 
