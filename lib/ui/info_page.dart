@@ -3,6 +3,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../services/mvd_api_service.dart';
 import '../services/official_sites.dart';
+import 'privacy_policy_page.dart';
 import 'theme/timbre_text.dart';
 import 'theme/timbre_tokens.dart';
 import 'widgets/led_matrix.dart';
@@ -16,16 +17,10 @@ class InfoPage extends StatefulWidget {
   /// Returns the lock state after the attempt (unchanged if cancelled).
   final Future<bool> Function(bool) onToggleBiometricLock;
 
-  /// Public privacy policy. Google Play wants it inside the app too; the
-  /// row stays hidden until the policy is published (docs/privacy-policy.md
-  /// is still a draft).
-  final Uri? privacyPolicyUrl;
-
   const InfoPage({
     super.key,
     required this.biometricLockEnabled,
     required this.onToggleBiometricLock,
-    this.privacyPolicyUrl,
   });
 
   @override
@@ -72,6 +67,10 @@ class _InfoPageState extends State<InfoPage> {
           'correo configurada.');
     }
   }
+
+  /// Bundled with the app: it opens here, not in the browser.
+  void _openPrivacyPolicy() => Navigator.of(context).push(
+      MaterialPageRoute<void>(builder: (_) => const PrivacyPolicyPage()));
 
   /// What failed and what to do.
   void _cannotOpen(String message) => ScaffoldMessenger.of(context)
@@ -264,15 +263,12 @@ class _InfoPageState extends State<InfoPage> {
           _card(
             padding: EdgeInsets.zero,
             child: Column(children: [
-              if (widget.privacyPolicyUrl != null) ...[
-                _LinkRow(
-                  title: 'Política de privacidad',
-                  icon: PixelGlyphs.external,
-                  opensIn: _inBrowser,
-                  onTap: () => _openWeb(widget.privacyPolicyUrl!),
-                ),
-                const Divider(),
-              ],
+              _LinkRow(
+                title: 'Política de privacidad',
+                icon: PixelGlyphs.chevronRight,
+                onTap: _openPrivacyPolicy,
+              ),
+              const Divider(),
               _LinkRow(
                 title: 'Código fuente',
                 subtitle: _sourceCode,
@@ -315,15 +311,16 @@ class _InfoPageState extends State<InfoPage> {
       );
 }
 
-/// A link out of the app. Screen readers hear one phrase that says where
-/// it opens: "Código fuente, github.com/…, se abre en el navegador".
+/// A link out of the app, or to a page of it. Screen readers hear one
+/// phrase that says where a link out opens: "Código fuente, github.com/…,
+/// se abre en el navegador".
 class _LinkRow extends StatelessWidget {
   const _LinkRow({
     required this.title,
     required this.icon,
-    required this.opensIn,
     required this.onTap,
     this.subtitle,
+    this.opensIn,
   });
 
   final String title;
@@ -331,8 +328,9 @@ class _LinkRow extends StatelessWidget {
   final PixelGlyph icon;
 
   /// Where the link opens, said after the title ("se abre en el
-  /// navegador"): the icon telling it is hidden from screen readers.
-  final String opensIn;
+  /// navegador"): the icon telling it is hidden from screen readers. Null
+  /// for a page of the app.
+  final String? opensIn;
   final VoidCallback onTap;
 
   @override
@@ -340,7 +338,7 @@ class _LinkRow extends StatelessWidget {
     return Semantics(
       container: true,
       button: true,
-      label: [title, ?subtitle, opensIn].join(', '),
+      label: [title, ?subtitle, ?opensIn].join(', '),
       // excludeSemantics drops the InkWell's tap action too
       onTap: onTap,
       excludeSemantics: true,

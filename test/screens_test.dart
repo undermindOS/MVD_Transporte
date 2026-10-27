@@ -12,6 +12,7 @@ import 'package:stm_app/models/transport_news.dart';
 import 'package:stm_app/services/official_sites.dart';
 import 'package:stm_app/ui/info_page.dart';
 import 'package:stm_app/ui/news_list.dart';
+import 'package:stm_app/ui/privacy_policy_page.dart';
 import 'package:stm_app/ui/schedule_page.dart';
 import 'package:stm_app/ui/services_page.dart';
 import 'package:stm_app/ui/theme/timbre_theme.dart';
@@ -94,10 +95,9 @@ Widget _pushed(Widget page) => Builder(
       ),
     );
 
-Widget _info({Uri? privacy}) => InfoPage(
+Widget _info() => InfoPage(
       biometricLockEnabled: false,
       onToggleBiometricLock: (v) async => v,
-      privacyPolicyUrl: privacy,
     );
 
 void main() {
@@ -320,10 +320,9 @@ void main() {
       expect(find.text('NO OFICIAL'), findsOneWidget);
       expect(find.textContaining('No está afiliada con la Intendencia'),
           findsOneWidget);
+      expect(find.text('Política de privacidad'), findsOneWidget);
       expect(find.text('Código fuente'), findsOneWidget);
       expect(find.text('Contacto'), findsOneWidget);
-      // No public privacy policy yet: no dead link
-      expect(find.text('Política de privacidad'), findsNothing);
     });
 
     testWidgets('links say where they open', (tester) async {
@@ -332,6 +331,8 @@ void main() {
       await tester.pumpWidget(_app(_info()));
 
       for (final link in [
+        // Bundled: it opens in the app, not in the browser
+        'Política de privacidad',
         'Código fuente, github.com/undermindOS/MVD_Transporte, '
             'se abre en el navegador',
         'Contacto, zhongnanhaii@yahoo.com, se abre en tu app de correo',
@@ -345,11 +346,26 @@ void main() {
       handle.dispose();
     });
 
-    testWidgets('privacy policy row once it is published', (tester) async {
+    testWidgets('the privacy policy opens inside the app', (tester) async {
       usePhoneScreen(tester);
-      await tester.pumpWidget(
-          _app(_info(privacy: Uri.parse('https://example.com/privacidad'))));
-      expect(find.text('Política de privacidad'), findsOneWidget);
+      await tester.pumpWidget(_app(_info()));
+
+      final row = find.text('Política de privacidad');
+      await tester.ensureVisible(row);
+      // A page of the app: a chevron, not the "opens outside" arrow
+      expect(
+          find.descendant(
+              of: find.ancestor(of: row, matching: find.byType(InkWell)),
+              matching: find.byWidgetPredicate((w) =>
+                  w is PixelIcon && w.glyph == PixelGlyphs.chevronRight)),
+          findsOneWidget);
+      await tester.tap(row);
+      await tester.pumpAndSettle();
+
+      expect(find.byType(PrivacyPolicyPage), findsOneWidget);
+      expect(find.text('PRIVACIDAD'), findsOneWidget);
+      expect(
+          find.text('Política de privacidad — Timbre MVD'), findsOneWidget);
     });
   });
 
@@ -359,6 +375,7 @@ void main() {
     for (final (name, page, title) in [
       ('Info', _info(), 'INFO'),
       ('Horarios', _schedule(), 'HORARIOS'),
+      ('Privacidad', const PrivacyPolicyPage(), 'PRIVACIDAD'),
     ]) {
       testWidgets('$name: identity bar with the plate and the back arrow',
           (tester) async {
@@ -431,7 +448,7 @@ void main() {
       ('Servicios', _services([])),
       ('Novedades', _newsList()),
       ('Horarios', _schedule()),
-      ('Info', _info(privacy: Uri.parse('https://example.com/privacidad'))),
+      ('Info', _info()),
     ]) {
       testWidgets(name, (tester) async {
         usePhoneScreen(tester);
