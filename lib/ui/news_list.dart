@@ -79,7 +79,8 @@ class _FailedBanner extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      margin: const EdgeInsets.fromLTRB(12, 12, 12, 4),
+      margin: const EdgeInsets.fromLTRB(
+          TimbreSpace.l, TimbreSpace.m, TimbreSpace.l, TimbreSpace.xs),
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: BoxDecoration(
         color: TimbreColors.avisoNoche,
@@ -89,7 +90,7 @@ class _FailedBanner extends StatelessWidget {
       child: Row(
         children: [
           const PixelIcon(PixelGlyphs.warning,
-              size: 20, color: TimbreColors.ambar),
+              size: TimbreIconSize.row, color: TimbreColors.ambar),
           const SizedBox(width: 10),
           Expanded(
             child: Text(
@@ -112,66 +113,105 @@ class _NewsRow extends StatelessWidget {
   final TransportNews news;
   final bool isNew;
 
+  /// "Nueva. 2 de octubre. Título. Resumen": the row as one phrase.
+  String get _sentence => [
+        if (isNew) 'Nueva',
+        _spokenDate(news.date),
+        news.title,
+        if (news.summary.isNotEmpty) news.summary,
+      ].map((part) => part.trim().replaceFirst(_endDots, '')).join('. ');
+
+  static final _endDots = RegExp(r'[.\s]+$');
+
   @override
   Widget build(BuildContext context) {
     final n = news;
-    return Material(
-      // Unread rows are lifted from the board
-      color: isNew ? TimbreColors.tinta : TimbreColors.noche,
-      child: InkWell(
-        onTap: () => showNewsDetail(context, n),
-        child: Container(
-          padding: const EdgeInsets.all(16),
-          decoration: const BoxDecoration(
-            border: Border(bottom: BorderSide(color: TimbreColors.lineaNoche)),
-          ),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _DateTile(date: n.date, filled: isNew),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    if (isNew) ...[
-                      const Text(
-                        'NUEVA',
+    void open() => showNewsDetail(context, n);
+    return Semantics(
+      container: true,
+      button: true,
+      label: _sentence,
+      // excludeSemantics drops the InkWell's tap action too
+      onTap: open,
+      excludeSemantics: true,
+      child: Material(
+        // Unread rows are lifted from the board
+        color: isNew ? TimbreColors.tinta : TimbreColors.noche,
+        child: InkWell(
+          onTap: open,
+          child: Container(
+            padding: const EdgeInsets.all(16),
+            decoration: const BoxDecoration(
+              border:
+                  Border(bottom: BorderSide(color: TimbreColors.lineaNoche)),
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _DateTile(date: n.date, filled: isNew),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      if (isNew) ...[
+                        const Text(
+                          'NUEVA',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 0.72,
+                            color: TimbreColors.ambar,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                      ],
+                      Text(
+                        n.title,
                         style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: 0.72,
-                          color: TimbreColors.ambar,
+                          fontSize: 17,
+                          height: 1.25,
+                          fontWeight: isNew ? FontWeight.w700 : FontWeight.w600,
+                          color: TimbreColors.papel,
                         ),
                       ),
-                      const SizedBox(height: 4),
+                      if (n.summary.isNotEmpty) ...[
+                        const SizedBox(height: 4),
+                        Text(
+                          n.summary,
+                          style: TimbreText.subtitle.copyWith(height: 1.4),
+                        ),
+                      ],
                     ],
-                    Text(
-                      n.title,
-                      style: TextStyle(
-                        fontSize: 17,
-                        height: 1.25,
-                        fontWeight: isNew ? FontWeight.w700 : FontWeight.w600,
-                        color: TimbreColors.papel,
-                      ),
-                    ),
-                    if (n.summary.isNotEmpty) ...[
-                      const SizedBox(height: 4),
-                      Text(
-                        n.summary,
-                        style: TimbreText.subtitle.copyWith(height: 1.4),
-                      ),
-                    ],
-                  ],
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
     );
   }
 }
+
+const _monthNames = [
+  'enero',
+  'febrero',
+  'marzo',
+  'abril',
+  'mayo',
+  'junio',
+  'julio',
+  'agosto',
+  'setiembre',
+  'octubre',
+  'noviembre',
+  'diciembre',
+];
+
+/// "2 de octubre", for screen readers.
+String _spokenDate(DateTime date) =>
+    '${date.day} de ${_monthNames[date.month - 1]}';
 
 /// Day and month in a tile: a small lit LED display while unread, an
 /// empty frame after.
@@ -204,25 +244,10 @@ class _DateTile extends StatelessWidget {
   );
   static final _ledDay = TimbreText.cartel(24);
 
-  static const _monthNames = [
-    'enero',
-    'febrero',
-    'marzo',
-    'abril',
-    'mayo',
-    'junio',
-    'julio',
-    'agosto',
-    'setiembre',
-    'octubre',
-    'noviembre',
-    'diciembre',
-  ];
-
   @override
   Widget build(BuildContext context) {
     return Semantics(
-      label: '${date.day} de ${_monthNames[date.month - 1]}',
+      label: _spokenDate(date),
       excludeSemantics: true,
       child: Container(
         width: 52,
@@ -311,7 +336,8 @@ Future<void> showNewsDetail(BuildContext context, TransportNews n) {
               alignment: Alignment.centerLeft,
               child: FilledButton.icon(
                 onPressed: () => openExternalLink(ctx, n.link!),
-                icon: const PixelIcon(PixelGlyphs.external, size: 18),
+                icon: const PixelIcon(PixelGlyphs.external,
+                    size: TimbreIconSize.row),
                 label: const Text('Ver más'),
               ),
             ),
@@ -336,7 +362,9 @@ Future<void> openExternalLink(BuildContext context, String link) async {
   if (!ok && context.mounted) {
     ScaffoldMessenger.of(
       context,
-    ).showSnackBar(const SnackBar(content: Text('No se pudo abrir el enlace')));
+    ).showSnackBar(const SnackBar(
+        content:
+            Text('No se pudo abrir el enlace. Probá de nuevo más tarde.')));
   }
 }
 

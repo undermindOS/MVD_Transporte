@@ -37,6 +37,7 @@ AppBar buildTimbreAppBar(
       subtitleStyle: subtitleStyle,
       semanticLabel: semanticLabel,
       textScaler: MediaQuery.textScalerOf(context),
+      width: MediaQuery.sizeOf(context).width,
     ),
   );
 }

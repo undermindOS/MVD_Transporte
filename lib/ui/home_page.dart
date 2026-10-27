@@ -206,9 +206,10 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
 
       if (!canAuth && !isSupported) {
         if (mounted) {
+          // biometricOnly is off: a PIN or a pattern is enough
           ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-            content:
-                Text('Tu dispositivo no soporta autenticación biométrica'),
+            content: Text('Tu dispositivo no tiene bloqueo de pantalla. '
+                'Configuralo en Ajustes.'),
           ));
         }
         return _biometricLockEnabled;
@@ -217,7 +218,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       _isAuthenticating = true;
       try {
         final ok = await _localAuth.authenticate(
-          localizedReason: 'Confirma para activar el bloqueo biométrico',
+          localizedReason: 'Confirmá para activar el bloqueo biométrico',
           options: const AuthenticationOptions(
             stickyAuth: true,
             biometricOnly: false,
@@ -253,7 +254,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     final opened = await SystemBrowser.open(uri);
     if (!opened && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-        content: Text('No se pudo abrir el navegador'),
+        content: Text(
+            'No se pudo abrir el navegador. Revisá que tengas uno activado.'),
       ));
     }
   }

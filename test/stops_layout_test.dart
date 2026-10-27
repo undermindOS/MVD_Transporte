@@ -94,16 +94,22 @@ void main() {
     }, () => client);
   });
 
-  testWidgets('Text at 2x: the "Estoy esperando" sheet fits', (tester) async {
-    await http.runWithClient(() async {
-      await pumpBoard(tester, 2);
-      await tester.tap(find.text('PUNTA CARRETAS'));
-      await tester.pumpAndSettle();
-      expect(find.text('Avisarme cuando llegue'), findsOneWidget);
-      // The sign keeps the destination, on its own line
-      final sign = tester.renderObject<RenderParagraph>(find.descendant(
-          of: find.byType(CartelTira), matching: find.text('PUNTA CARRETAS')));
-      expect(sign.didExceedMaxLines, isFalse);
-    }, () => client);
-  });
+  for (final scale in [1.0, 1.3, 2.0]) {
+    for (final destination in ['PUNTA CARRETAS', 'DELTA DEL TIGRE']) {
+      testWidgets('Text at ${scale}x: the "Estoy esperando" sign keeps '
+          '$destination', (tester) async {
+        await http.runWithClient(() async {
+          await pumpBoard(tester, scale);
+          await tester.tap(find.text(destination));
+          await tester.pumpAndSettle();
+          expect(find.text('Avisarme cuando llegue'), findsOneWidget);
+          // The sign keeps the destination: a second line below 150 %, a
+          // line of its own above
+          final sign = tester.renderObject<RenderParagraph>(find.descendant(
+              of: find.byType(CartelTira), matching: find.text(destination)));
+          expect(sign.didExceedMaxLines, isFalse);
+        }, () => client);
+      });
+    }
+  }
 }

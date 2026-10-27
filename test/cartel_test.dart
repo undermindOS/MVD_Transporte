@@ -10,6 +10,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:stm_app/ui/theme/timbre_theme.dart';
 import 'package:stm_app/ui/theme/timbre_tokens.dart';
 import 'package:stm_app/ui/widgets/cartel.dart';
+import 'package:stm_app/ui/widgets/empty_state.dart';
 import 'package:stm_app/ui/widgets/led_matrix.dart';
 import 'package:stm_app/ui/widgets/timbre_bus.dart';
 
@@ -76,8 +77,8 @@ void main() {
 
       expect(
         find.bySemanticsLabel(
-            'Próximo: 121 a Punta Carretas, llega en 1 minuto, con GPS, '
-            'accesible, cero emisiones'),
+            'Próximo: línea 121 a Punta Carretas, llega en 1 minuto, '
+            'con GPS, accesible, cero emisiones'),
         findsOneWidget,
       );
       handle.dispose();
@@ -118,6 +119,7 @@ void main() {
 
   group('CartelTira', () {
     testWidgets('one line for the bus being followed', (tester) async {
+      final handle = tester.ensureSemantics();
       await tester.pumpWidget(_wrap(const CartelTira(
         line: '116',
         destination: 'POCITOS',
@@ -127,7 +129,37 @@ void main() {
       expect(find.text('116'), findsOneWidget);
       expect(find.text('POCITOS'), findsOneWidget);
       expect(find.text('6'), findsOneWidget);
+      expect(
+          find.bySemanticsLabel(
+              'Línea 116 a Pocitos, llega en 6 minutos, con GPS'),
+          findsOneWidget);
+      handle.dispose();
     });
+  });
+
+  testWidgets('a small system font never shrinks the dots below 19 px',
+      (tester) async {
+    await tester.pumpWidget(MaterialApp(
+      theme: buildTimbreTheme(),
+      builder: (context, child) => MediaQuery(
+        data: MediaQuery.of(context)
+            .copyWith(textScaler: const TextScaler.linear(0.85)),
+        child: child!,
+      ),
+      home: const Scaffold(
+        body: Column(children: [
+          LlegandoChip(),
+          CartelTira(line: '116', destination: 'POCITOS', etaMinutes: 6),
+          TimbreEmptyState('Sin paradas', sign: 'SIN PARADAS'),
+        ]),
+      ),
+    ));
+    for (final text in ['LLEGANDO', 'min', 'POCITOS', 'SIN PARADAS']) {
+      final paragraph = tester.renderObject<RenderParagraph>(find.text(text));
+      final size = (paragraph.text.style?.fontSize)!;
+      expect(paragraph.textScaler.scale(size), greaterThanOrEqualTo(19),
+          reason: text);
+    }
   });
 
   group('CartelCompacto', () {

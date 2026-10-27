@@ -119,7 +119,10 @@ void main() {
     await tester.tap(find.text('Avisos'));
     await tester.pump();
 
-    expect(find.text('No se pudo abrir el navegador'), findsOneWidget);
+    expect(
+        find.text(
+            'No se pudo abrir el navegador. Revisá que tengas uno activado.'),
+        findsOneWidget);
   });
 
   testWidgets('Ver en Cómo Ir opens the stop deep link',

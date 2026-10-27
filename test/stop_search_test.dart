@@ -92,6 +92,13 @@ void main() {
       expect(inDialog(find.byType(ListTile)), findsOneWidget);
       expect(inDialog(find.text('SAN JOSE y ANDES')), findsOneWidget);
       expect(inDialog(find.text('#574')), findsOneWidget);
+      // One phrase per tile, the street names in words
+      final handle = tester.ensureSemantics();
+      expect(
+          tester.getSemantics(
+              find.bySemanticsLabel('Parada 574, San Jose y Andes')),
+          isSemantics(isButton: true, hasTapAction: true));
+      handle.dispose();
       // In the app font, not the platform one
       final number = tester.widget<RichText>(find.descendant(
           of: inDialog(find.text('#574')), matching: find.byType(RichText)));

@@ -30,7 +30,9 @@ class CartelCompacto extends StatelessWidget {
       label: 'Timbre MVD',
       container: true,
       child: ExcludeSemantics(
+        // Never below its size: smaller dots stop reading as letters
         child: MediaQuery.withClampedTextScaling(
+          minScaleFactor: 1,
           maxScaleFactor: 1.3,
           child: DecoratedBox(
             decoration: BoxDecoration(
@@ -116,17 +118,21 @@ class LlegandoChip extends StatelessWidget {
         child: DecoratedBox(
           decoration: BoxDecoration(
             color: TimbreColors.ambar,
-            borderRadius: BorderRadius.circular(8),
+            borderRadius: BorderRadius.circular(TimbreRadii.badge),
             boxShadow: const [TimbreShadow.ledGlow],
           ),
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-            child: Text(
-              'LLEGANDO',
-              style: TimbreText.cartel(fontSize, color: TimbreColors.tinta)
-                  .copyWith(letterSpacing: 1),
-              maxLines: 1,
-              softWrap: false,
+            // A small system font must not shrink the dots below 19 px
+            child: MediaQuery.withClampedTextScaling(
+              minScaleFactor: 1,
+              child: Text(
+                'LLEGANDO',
+                style: TimbreText.cartel(fontSize, color: TimbreColors.tinta)
+                    .copyWith(letterSpacing: 1),
+                maxLines: 1,
+                softWrap: false,
+              ),
             ),
           ),
         ),
@@ -195,7 +201,7 @@ class CartelParada extends StatelessWidget {
 
   String get _semanticLabel {
     final parts = <String>[
-      'Próximo: $line a ${spokenName(destination)}',
+      'Próximo: línea $line a ${spokenName(destination)}',
       _arriving ? 'llegando' : 'llega en ${_minutosLabel(etaMinutes)}',
       'con GPS',
       if (accessible) 'accesible',
@@ -327,7 +333,8 @@ class CartelParada extends StatelessWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            PixelIcon(icon, size: 16, color: TimbreColors.etiquetaCartel),
+            PixelIcon(icon,
+                size: TimbreIconSize.mark, color: TimbreColors.etiquetaCartel),
             const SizedBox(width: 6),
             Text(
               label,
@@ -343,7 +350,9 @@ class CartelParada extends StatelessWidget {
 }
 
 /// One-line cartel for the "Estoy esperando" sheet: line, destination and
-/// the live minutes of the bus being followed.
+/// the live minutes of the bus being followed. A long destination takes a
+/// second line; when two lines are not enough, or with large text, it gets
+/// a line of its own under the line and the minutes.
 class CartelTira extends StatelessWidget {
   const CartelTira({
     super.key,
@@ -355,6 +364,42 @@ class CartelTira extends StatelessWidget {
   final String line;
   final String destination;
   final int etaMinutes;
+
+  static const _gap = 12.0;
+
+  /// Whether the destination fits in two lines, no word broken, between
+  /// the line and the minutes of a sign [width] wide inside.
+  bool _fitsInRow(double width, TextScaler scaler) {
+    TextPainter painter(String text, double size, {int? maxLines}) =>
+        TextPainter(
+          text: TextSpan(text: text, style: TimbreText.cartel(size)),
+          textDirection: TextDirection.ltr,
+          textScaler: scaler,
+          maxLines: maxLines,
+        );
+    double widthOf(String text, double size) {
+      final p = painter(text, size)..layout();
+      final w = p.width;
+      p.dispose();
+      return w;
+    }
+
+    // The same pieces as the row in [build]
+    final time = etaMinutes <= 0
+        ? widthOf('LLEGANDO', 22)
+        : const LiveDot().size + 6 + widthOf('$etaMinutes', 34) + 4 +
+            widthOf('min', 19);
+    final room = width - widthOf(line, 26) - 2 * _gap - time;
+    if (room <= 0) return false;
+    if (destination.split(' ').any((word) => widthOf(word, 22) > room)) {
+      return false;
+    }
+    final lines = painter(destination, 22, maxLines: 2)
+      ..layout(maxWidth: room);
+    final fits = !lines.didExceedMaxLines;
+    lines.dispose();
+    return fits;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -368,62 +413,70 @@ class CartelTira extends StatelessWidget {
             const SizedBox(width: 4),
             Text('min', style: TimbreText.cartel(19)),
           ]);
-    // With large text the destination gets its own line under the line
-    // and the minutes, instead of being cut to nothing
-    final stacked = TimbreText.isLarge(context);
     return Semantics(
-      label: '$line a ${spokenName(destination)}, '
+      label: 'Línea $line a ${spokenName(destination)}, '
           '${arriving ? 'llegando' : 'llega en ${_minutosLabel(etaMinutes)}'}'
           ', con GPS',
       child: ExcludeSemantics(
-        child: DecoratedBox(
-          decoration: BoxDecoration(
-            color: TimbreColors.tinta,
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: TimbreColors.lineaNoche),
-          ),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-            child: stacked
-                ? Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(children: [
-                        Text(line, style: TimbreText.cartel(26)),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Align(
-                            alignment: AlignmentDirectional.centerEnd,
-                            child: FittedBox(
-                                fit: BoxFit.scaleDown, child: time),
+        // All dot-matrix: a small system font must not shrink the dots
+        // below 19 px
+        child: MediaQuery.withClampedTextScaling(
+          minScaleFactor: 1,
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              color: TimbreColors.tinta,
+              borderRadius: BorderRadius.circular(TimbreRadii.button),
+              border: Border.all(color: TimbreColors.lineaNoche),
+            ),
+            child: Padding(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              child: LayoutBuilder(builder: (context, constraints) {
+                // Its own line instead of being cut to nothing
+                final stacked = TimbreText.isLarge(context) ||
+                    !_fitsInRow(constraints.maxWidth,
+                        MediaQuery.textScalerOf(context));
+                return stacked
+                    ? Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(children: [
+                            Text(line, style: TimbreText.cartel(26)),
+                            const SizedBox(width: _gap),
+                            Expanded(
+                              child: Align(
+                                alignment: AlignmentDirectional.centerEnd,
+                                child: FittedBox(
+                                    fit: BoxFit.scaleDown, child: time),
+                              ),
+                            ),
+                          ]),
+                          const SizedBox(height: 8),
+                          Text(destination,
+                              style: TimbreText.cartel(22),
+                              maxLines: 3,
+                              overflow: TextOverflow.ellipsis),
+                        ],
+                      )
+                    : Row(
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          Text(line, style: TimbreText.cartel(26)),
+                          const SizedBox(width: _gap),
+                          Expanded(
+                            child: Text(
+                              destination,
+                              style: TimbreText.cartel(22),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
                           ),
-                        ),
-                      ]),
-                      const SizedBox(height: 8),
-                      Text(destination,
-                          style: TimbreText.cartel(22),
-                          maxLines: 3,
-                          overflow: TextOverflow.ellipsis),
-                    ],
-                  )
-                : Row(
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    children: [
-                      Text(line, style: TimbreText.cartel(26)),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Text(
-                          destination,
-                          style: TimbreText.cartel(22),
-                          maxLines: 1,
-                          softWrap: false,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      time,
-                    ],
-                  ),
+                          const SizedBox(width: _gap),
+                          time,
+                        ],
+                      );
+              }),
+            ),
           ),
         ),
       ),

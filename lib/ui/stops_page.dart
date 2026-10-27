@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/semantics.dart';
 import 'package:flutter/services.dart';
 import '../models/alert_schedule.dart';
 import '../models/bus_arrival.dart';
@@ -21,6 +22,7 @@ import '../services/notification_service.dart';
 import '../services/transport_news_service.dart';
 import 'news_list.dart';
 import 'schedule_page.dart';
+import 'spoken_text.dart';
 import 'theme/timbre_text.dart';
 import 'theme/timbre_tokens.dart';
 import 'widgets/arrival_row.dart';
@@ -76,6 +78,9 @@ class _StopsPageState extends State<StopsPage>
 
   // Cards showing all their buses ("s574" stop, "r3" route)
   final Set<String> _expanded = {};
+
+  /// Deleting a card without the swipe, for screen readers.
+  static const _deleteAction = CustomSemanticsAction(label: 'Borrar');
 
   @override
   void initState() {
@@ -196,7 +201,7 @@ class _StopsPageState extends State<StopsPage>
     messenger.showSnackBar(SnackBar(
       content: Row(children: [
         const PixelIcon(PixelGlyphs.warning,
-            size: 18, color: TimbreColors.rojoLed),
+            size: TimbreIconSize.row, color: TimbreColors.rojoLed),
         const SizedBox(width: 10),
         Expanded(child: Text(message)),
       ]),
@@ -241,7 +246,7 @@ class _StopsPageState extends State<StopsPage>
     try {
       resolved = await MvdApiService.resolveStop(stopId);
     } on StopNotFoundException {
-      _showError('No existe la parada $stopId');
+      _showError('No existe la parada $stopId. Revisá el número.');
       return;
     }
     // Offline: keep the stop with a placeholder name
@@ -267,8 +272,8 @@ class _StopsPageState extends State<StopsPage>
   }
 
   Future<void> _editStopAlert(BusStop stop) async {
-    final settings = await _showAlertSettings(
-        stop.name, stop.etaAlertMinutes, stop.schedule);
+    final settings = await _showAlertSettings(stop.name,
+        _stopPhrase(stop.id, stop.name), stop.etaAlertMinutes, stop.schedule);
     if (settings == null || !mounted) return;
     final (minutes, schedule) = settings;
     setState(() => stop
@@ -321,7 +326,8 @@ class _StopsPageState extends State<StopsPage>
       try {
         resolved = await MvdApiService.resolveStop(result.originStopId);
       } on StopNotFoundException {
-        _showError('No existe la parada ${result.originStopId}');
+        _showError(
+            'No existe la parada ${result.originStopId}. Revisá el número.');
         return;
       }
     }
@@ -358,6 +364,7 @@ class _StopsPageState extends State<StopsPage>
   Future<void> _editRouteAlert(RouteAlert route) async {
     final settings = await _showAlertSettings(
         '${route.originName} → ${route.destinationName}',
+        _routeName(route),
         route.alertMinutes,
         route.schedule);
     if (settings == null || !mounted) return;
@@ -370,14 +377,18 @@ class _StopsPageState extends State<StopsPage>
 
   // ------------------------------------------------------- Alert settings --
 
-  /// Threshold and schedule of a stop or route alert.
-  Future<(int, AlertSchedule)?> _showAlertSettings(
-          String title, int minutes, AlertSchedule schedule) =>
+  /// Threshold and schedule of a stop or route alert. [spokenTitle] is
+  /// what screen readers hear instead of the uppercase [title].
+  Future<(int, AlertSchedule)?> _showAlertSettings(String title,
+          String spokenTitle, int minutes, AlertSchedule schedule) =>
       showModalBottomSheet<(int, AlertSchedule)>(
         context: context,
         isScrollControlled: true,
         builder: (_) => _AlertSettingsSheet(
-            title: title, minutes: minutes, schedule: schedule),
+            title: title,
+            spokenTitle: spokenTitle,
+            minutes: minutes,
+            schedule: schedule),
       );
 
   void _deleteRoute(RouteAlert route) {
@@ -439,25 +450,40 @@ class _StopsPageState extends State<StopsPage>
                     etaMinutes: trip.etaMinutes,
                   )
                 else
-                  Text(
-                    trip.destination.isEmpty
+                  Semantics(
+                    label: trip.destination.isEmpty
                         ? 'Línea ${trip.line}'
-                        : '${trip.line} → ${trip.destination}',
-                    style: TimbreText.destination.copyWith(fontSize: 20),
+                        : 'Línea ${trip.line} a '
+                            '${spokenName(trip.destination)}',
+                    excludeSemantics: true,
+                    child: Text(
+                      trip.destination.isEmpty
+                          ? 'Línea ${trip.line}'
+                          : '${trip.line} → ${trip.destination}',
+                      style: TimbreText.destination.copyWith(fontSize: 20),
+                    ),
                   ),
                 const SizedBox(height: 8),
-                Text(
-                  trip.isRealTime
-                      ? '$stopName · con GPS'
-                      : 'Según horario ${trip.etaLabel}, sin GPS todavía · '
-                          '$stopName',
-                  style: TimbreText.subtitle,
+                Semantics(
+                  label: trip.isRealTime
+                      ? '${spokenName(stopName)}, con GPS'
+                      : 'Según horario ${trip.etaLabel}, sin GPS todavía, '
+                          '${spokenName(stopName)}',
+                  excludeSemantics: true,
+                  child: Text(
+                    trip.isRealTime
+                        ? '$stopName · con GPS'
+                        : 'Según horario ${trip.etaLabel}, sin GPS '
+                            'todavía · $stopName',
+                    style: TimbreText.subtitle,
+                  ),
                 ),
                 const SizedBox(height: 18),
                 if (waiting)
                   OutlinedButton.icon(
                     onPressed: () => Navigator.pop(ctx, -1),
-                    icon: const PixelIcon(PixelGlyphs.bell, size: 20),
+                    icon: const PixelIcon(PixelGlyphs.bell,
+                        size: TimbreIconSize.row),
                     label: const Text('Dejar de esperar'),
                   )
                 else ...[
@@ -475,7 +501,8 @@ class _StopsPageState extends State<StopsPage>
                   const SizedBox(height: 16),
                   FilledButton.icon(
                     onPressed: () => Navigator.pop(ctx, alertMinutes),
-                    icon: const PixelIcon(PixelGlyphs.bellRing, size: 20),
+                    icon: const PixelIcon(PixelGlyphs.bellRing,
+                        size: TimbreIconSize.row),
                     label: const Text('Avisarme cuando llegue'),
                   ),
                   const SizedBox(height: 10),
@@ -521,7 +548,8 @@ class _StopsPageState extends State<StopsPage>
             content: Text(
                 'El ${trip.line} ya está a ${trip.etaMinutes} min')));
       case WaitStart.failed:
-        _showError('No se pudo activar el aviso');
+        _showError('No se pudo activar el aviso. Revisá que las '
+            'notificaciones estén permitidas y probá de nuevo.');
     }
   }
 
@@ -549,7 +577,10 @@ class _StopsPageState extends State<StopsPage>
             Tab(
               icon: Badge(
                 isLabelVisible: unread > 0,
-                label: Text('$unread'),
+                label: Text('$unread',
+                    semanticsLabel: unread == 1
+                        ? '1 novedad sin leer'
+                        : '$unread novedades sin leer'),
                 child: const PixelIcon(PixelGlyphs.news, size: 22),
               ),
               text: 'Novedades',
@@ -580,7 +611,8 @@ class _StopsPageState extends State<StopsPage>
               tooltip: _tabController.index == 0
                   ? 'Agregar parada'
                   : 'Agregar ruta',
-              child: const PixelIcon(PixelGlyphs.plus, size: 26),
+              child: const PixelIcon(PixelGlyphs.plus,
+                  size: TimbreIconSize.rowLarge),
             ),
     );
   }
@@ -630,16 +662,26 @@ class _StopsPageState extends State<StopsPage>
             padding: const EdgeInsets.fromLTRB(14, 10, 4, 8),
             child: Row(children: [
               Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(stop.name, style: TimbreText.stopName),
-                    const SizedBox(height: 3),
-                    Text('#${stop.id}',
-                        style: const TextStyle(
-                            fontSize: 13,
-                            color: TimbreColors.etiquetaCartel)),
-                  ],
+                // One phrase for screen readers, with the swipe to delete
+                // as an action
+                child: Semantics(
+                  container: true,
+                  label: _stopPhrase(stop.id, stop.name),
+                  customSemanticsActions: {
+                    _deleteAction: () => _deleteStop(stop),
+                  },
+                  excludeSemantics: true,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(stop.name, style: TimbreText.stopName),
+                      const SizedBox(height: 3),
+                      Text('#${stop.id}',
+                          style: const TextStyle(
+                              fontSize: 13,
+                              color: TimbreColors.etiquetaCartel)),
+                    ],
+                  ),
                 ),
               ),
               IconButton(
@@ -668,7 +710,8 @@ class _StopsPageState extends State<StopsPage>
               padding: const EdgeInsets.only(right: 6),
               child: TextButton.icon(
                 onPressed: () => widget.onOpenStopInComoIr(stop.id),
-                icon: const PixelIcon(PixelGlyphs.map, size: 18),
+                icon: const PixelIcon(PixelGlyphs.map,
+                    size: TimbreIconSize.row),
                 label: const Text('Ver en Cómo Ir'),
               ),
             ),
@@ -721,37 +764,49 @@ class _StopsPageState extends State<StopsPage>
             padding: const EdgeInsets.fromLTRB(14, 10, 4, 8),
             child: Row(children: [
               Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(children: [
-                      const PixelIcon(PixelGlyphs.stop,
-                          size: 14, color: TimbreColors.etiquetaCartel),
-                      const SizedBox(width: 6),
-                      Expanded(
-                        child: Text(route.originName,
-                            style: const TextStyle(
-                                fontSize: 13,
-                                color: TimbreColors.etiquetaCartel)),
-                      ),
-                    ]),
-                    const SizedBox(height: 4),
-                    Text('→ ${route.destinationName}',
-                        style: TimbreText.stopName),
-                    if (route.preferredLines.isNotEmpty ||
-                        route.preferredDestinations.isNotEmpty) ...[
-                      const SizedBox(height: 3),
-                      Text(
-                          [
-                            if (route.preferredLines.isNotEmpty)
-                              'Líneas: ${route.preferredLines.join(", ")}',
-                            if (route.preferredDestinations.isNotEmpty)
-                              'Hacia: ${route.preferredDestinations.join(", ")}',
-                          ].join(' · '),
-                          style: TimbreText.caption
-                              .copyWith(color: TimbreColors.tenue)),
+                // One phrase for screen readers, with the swipe to delete
+                // as an action
+                child: Semantics(
+                  container: true,
+                  label: _routePhrase(route),
+                  customSemanticsActions: {
+                    _deleteAction: () => _deleteRoute(route),
+                  },
+                  excludeSemantics: true,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(children: [
+                        const PixelIcon(PixelGlyphs.stop,
+                            size: TimbreIconSize.mark,
+                            color: TimbreColors.etiquetaCartel),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(route.originName,
+                              style: const TextStyle(
+                                  fontSize: 13,
+                                  color: TimbreColors.etiquetaCartel)),
+                        ),
+                      ]),
+                      const SizedBox(height: 4),
+                      Text('→ ${route.destinationName}',
+                          style: TimbreText.stopName),
+                      if (route.preferredLines.isNotEmpty ||
+                          route.preferredDestinations.isNotEmpty) ...[
+                        const SizedBox(height: 3),
+                        Text(
+                            [
+                              if (route.preferredLines.isNotEmpty)
+                                'Líneas: ${route.preferredLines.join(", ")}',
+                              if (route.preferredDestinations.isNotEmpty)
+                                'Hacia: '
+                                    '${route.preferredDestinations.join(", ")}',
+                            ].join(' · '),
+                            style: TimbreText.caption
+                                .copyWith(color: TimbreColors.tenue)),
+                      ],
                     ],
-                  ],
+                  ),
                 ),
               ),
               _AlertButton(
@@ -778,7 +833,8 @@ class _StopsPageState extends State<StopsPage>
     final text = BusStatusService.partialWarning(_gpsStatus);
     if (text == null) return const SizedBox.shrink();
     return Container(
-      margin: const EdgeInsets.fromLTRB(12, 6, 12, 6),
+      margin:
+          const EdgeInsets.symmetric(horizontal: TimbreSpace.l, vertical: 6),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: TimbreColors.avisoNoche,
@@ -789,7 +845,7 @@ class _StopsPageState extends State<StopsPage>
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const PixelIcon(PixelGlyphs.signal,
-              size: 18, color: TimbreColors.ambar),
+              size: TimbreIconSize.row, color: TimbreColors.ambar),
           const SizedBox(width: 10),
           Expanded(
             child: Text(text,
@@ -802,29 +858,35 @@ class _StopsPageState extends State<StopsPage>
   }
 
   /// Under an enabled alert: "Aviso 5 min antes · Lun a Vie 7:30–8:30".
-  /// Opens the threshold and schedule settings.
+  /// Opens the threshold and schedule settings. A setting, not live data:
+  /// only the bell is lit.
   Widget _buildAlertSettingsRow(
       int minutes, AlertSchedule schedule, VoidCallback onTap) {
-    return InkWell(
-      onTap: onTap,
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(minHeight: TimbreSpace.touch),
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(14, 0, 14, 4),
-          child: Row(children: [
-            const PixelIcon(PixelGlyphs.bellRing,
-                size: 14, color: TimbreColors.ambar),
-            const SizedBox(width: TimbreSpace.s),
-            Expanded(
-              child: Text('Aviso $minutes min antes · ${schedule.label}',
-                  style: const TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w700,
-                      color: TimbreColors.ambar)),
-            ),
-            const PixelIcon(PixelGlyphs.chevronRight,
-                size: 14, color: TimbreColors.etiquetaCartel),
-          ]),
+    return Semantics(
+      container: true,
+      button: true,
+      child: InkWell(
+        onTap: onTap,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minHeight: TimbreSpace.touch),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(14, 0, 14, 4),
+            child: Row(children: [
+              const PixelIcon(PixelGlyphs.bellRing,
+                  size: TimbreIconSize.mark, color: TimbreColors.ambar),
+              const SizedBox(width: TimbreSpace.s),
+              Expanded(
+                child: Text('Aviso $minutes min antes · ${schedule.label}',
+                    style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: TimbreColors.etiquetaCartel)),
+              ),
+              const PixelIcon(PixelGlyphs.chevronRight,
+                  size: TimbreIconSize.mark,
+                  color: TimbreColors.etiquetaCartel),
+            ]),
+          ),
         ),
       ),
     );
@@ -845,11 +907,12 @@ class _StopsPageState extends State<StopsPage>
         ),
       );
     }
-    // Offline must not look like "no buses are coming"
+    // Offline must not look like "no buses are coming". An error inside a
+    // card is a red LED; a warning over a list is the avisoNoche panel
     if (failed) {
       return const _BoardNote(
         icon: PixelGlyphs.warning,
-        color: TimbreColors.ambar,
+        color: TimbreColors.rojoLed,
         text: 'No se pudo actualizar. Deslizá para reintentar',
       );
     }
@@ -889,7 +952,7 @@ class _StopsPageState extends State<StopsPage>
                     open ? _expanded.remove(key) : _expanded.add(key)),
                 icon: PixelIcon(
                     open ? PixelGlyphs.minus : PixelGlyphs.chevronDown,
-                    size: 16),
+                    size: TimbreIconSize.row),
                 label: Text(open ? 'Ver menos' : 'Ver las ${all.length}'),
               ),
             ),
@@ -899,7 +962,8 @@ class _StopsPageState extends State<StopsPage>
   }
 
   Widget _deleteBackground() => Container(
-        margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        margin:
+            const EdgeInsets.symmetric(horizontal: TimbreSpace.l, vertical: 6),
         alignment: Alignment.centerRight,
         padding: const EdgeInsets.only(right: 22),
         decoration: BoxDecoration(
@@ -920,7 +984,8 @@ class _Board extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      padding:
+          const EdgeInsets.symmetric(horizontal: TimbreSpace.l, vertical: 6),
       child: Card(
         clipBehavior: Clip.antiAlias,
         child: Column(
@@ -946,7 +1011,7 @@ class _BoardNote extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
       child: Row(children: [
-        PixelIcon(icon, size: 16, color: color),
+        PixelIcon(icon, size: TimbreIconSize.row, color: color),
         const SizedBox(width: 10),
         Expanded(
           child: Text(text, style: TimbreText.subtitle.copyWith(color: color)),
@@ -1014,7 +1079,7 @@ class _FieldIcon extends StatelessWidget {
         dimension: 44,
         child: Center(
           child: PixelIcon(glyph,
-              size: 20, color: TimbreColors.etiquetaCartel),
+              size: TimbreIconSize.row, color: TimbreColors.etiquetaCartel),
         ),
       );
 }
@@ -1111,9 +1176,10 @@ class _AddStopDialogState extends State<_AddStopDialog> {
         NearbyStopsError.serviceDisabled =>
           'Activá la ubicación del teléfono para buscar paradas cercanas.',
         NearbyStopsError.permissionDenied =>
-          'Sin permiso de ubicación no se pueden buscar paradas cercanas.',
+          'Permití la ubicación para buscar paradas cercanas.',
         NearbyStopsError.permissionDeniedForever =>
-          'El permiso de ubicación está desactivado para la app.',
+          'El permiso de ubicación está desactivado para la app. '
+              'Activalo en Ajustes.',
         NearbyStopsError.locationUnavailable =>
           'No se pudo obtener tu ubicación. Probá de nuevo.',
         NearbyStopsError.network =>
@@ -1203,7 +1269,7 @@ class _AddStopDialogState extends State<_AddStopDialog> {
             const SizedBox(height: 12),
             OutlinedButton.icon(
               onPressed: _searching ? null : _findNearby,
-              icon: const PixelIcon(PixelGlyphs.gps, size: 20),
+              icon: const PixelIcon(PixelGlyphs.gps, size: TimbreIconSize.row),
               label: const Text('Paradas cercanas'),
             ),
             if (_searching)
@@ -1260,38 +1326,61 @@ class _AddStopDialogState extends State<_AddStopDialog> {
     );
   }
 
-  Widget _buildNearbyTile(NearbyStop stop) => ListTile(
+  /// A stop around the user. Without lines (the catalog could not get
+  /// them) the line ends at the distance.
+  Widget _buildNearbyTile(NearbyStop stop) {
+    final meters = stop.distanceMeters.round();
+    void pick() => Navigator.pop(context, stop.id);
+    return Semantics(
+      button: true,
+      label: '${_stopPhrase(stop.id, stop.name)}, a $meters metros'
+          '${stop.lines.isEmpty ? '' : ', líneas ${stop.lines.join(', ')}'}',
+      onTap: pick,
+      excludeSemantics: true,
+      child: ListTile(
         contentPadding: EdgeInsets.zero,
         dense: true,
+        // A passive mark: not lit
         leading: const PixelIcon(PixelGlyphs.stop,
-            size: 22, color: TimbreColors.ambar),
+            size: 22, color: TimbreColors.etiquetaCartel),
         title: Text(stop.name,
             style: const TextStyle(
                 fontWeight: FontWeight.w600, color: TimbreColors.papel)),
         // Merged into the tile's style, so it keeps the app font
         subtitle: Text(
-          '#${stop.id} · ${stop.distanceMeters.round()} m'
+          '#${stop.id} · $meters m'
           '${stop.lines.isEmpty ? '' : ' · ${stop.lines.join(', ')}'}',
           maxLines: 2,
           overflow: TextOverflow.ellipsis,
           style: TimbreText.caption,
         ),
-        onTap: () => Navigator.pop(context, stop.id),
-      );
+        onTap: pick,
+      ),
+    );
+  }
 
   /// A stop found by its streets: the same tile as a nearby one, with
   /// the number under the name.
-  Widget _buildMatchTile(CatalogStop stop) => ListTile(
+  Widget _buildMatchTile(CatalogStop stop) {
+    void pick() => Navigator.pop(context, stop.id);
+    return Semantics(
+      button: true,
+      label: _stopPhrase(stop.id, stop.name),
+      onTap: pick,
+      excludeSemantics: true,
+      child: ListTile(
         contentPadding: EdgeInsets.zero,
         dense: true,
         leading: const PixelIcon(PixelGlyphs.stop,
-            size: 22, color: TimbreColors.ambar),
+            size: 22, color: TimbreColors.etiquetaCartel),
         title: Text(stop.name,
             style: const TextStyle(
                 fontWeight: FontWeight.w600, color: TimbreColors.papel)),
         subtitle: Text('#${stop.id}', style: TimbreText.caption),
-        onTap: () => Navigator.pop(context, stop.id),
-      );
+        onTap: pick,
+      ),
+    );
+  }
 }
 
 /// Add-route dialog: origin stop and destination label. Once the stop is
@@ -1352,7 +1441,7 @@ class _AddRouteDialogState extends State<_AddRouteDialog> {
         error = 'No se pudieron cargar las líneas. Revisá la conexión.';
       }
     } on StopNotFoundException {
-      error = 'No existe la parada $stopId';
+      error = 'No existe la parada $stopId. Revisá el número.';
     }
     final upcoming = await arrivals;
     if (!mounted) return;
@@ -1438,13 +1527,16 @@ class _AddRouteDialogState extends State<_AddRouteDialog> {
                 onChanged: (_) => _reset(),
                 onSubmitted: (_) => _lookUp(),
                 decoration: InputDecoration(
-                  labelText: 'Parada de origen *',
+                  // Screen readers say "obligatorio", not "asterisco"
+                  label: const Text('Parada de origen *',
+                      semanticsLabel: 'Parada de origen, obligatorio'),
                   hintText: 'Ej: 1234',
                   prefixIcon: const _FieldIcon(PixelGlyphs.stop),
                   suffixIcon: IconButton(
                     onPressed: _loading ? null : _lookUp,
                     tooltip: 'Ver líneas',
-                    icon: const PixelIcon(PixelGlyphs.search, size: 20),
+                    icon: const PixelIcon(PixelGlyphs.search,
+                        size: TimbreIconSize.row),
                   ),
                 ),
               ),
@@ -1452,7 +1544,8 @@ class _AddRouteDialogState extends State<_AddRouteDialog> {
               TextField(
                 controller: _destCtrl,
                 decoration: const InputDecoration(
-                  labelText: 'Destino *',
+                  label: Text('Destino *',
+                      semanticsLabel: 'Destino, obligatorio'),
                   hintText: 'Ej: Centro',
                   prefixIcon: _FieldIcon(PixelGlyphs.route),
                 ),
@@ -1468,7 +1561,11 @@ class _AddRouteDialogState extends State<_AddRouteDialog> {
                 const Text('Buscá la parada para elegir sus líneas',
                     style: hint)
               else ...[
-                Text(stop.name, style: TimbreText.stopName),
+                Semantics(
+                  label: _stopPhrase(stop.id, stop.name),
+                  excludeSemantics: true,
+                  child: Text(stop.name, style: TimbreText.stopName),
+                ),
                 const SizedBox(height: TimbreSpace.m),
                 const Text('LÍNEAS', style: label),
                 const SizedBox(height: TimbreSpace.xs),
@@ -1519,11 +1616,17 @@ class _RouteFormData {
 /// Monday to Friday 7:30–8:30. Pops with the chosen values.
 class _AlertSettingsSheet extends StatefulWidget {
   final String title;
+
+  /// What screen readers hear instead of the uppercase [title].
+  final String spokenTitle;
   final int minutes;
   final AlertSchedule schedule;
 
   const _AlertSettingsSheet(
-      {required this.title, required this.minutes, required this.schedule});
+      {required this.title,
+      required this.spokenTitle,
+      required this.minutes,
+      required this.schedule});
 
   @override
   State<_AlertSettingsSheet> createState() => _AlertSettingsSheetState();
@@ -1531,6 +1634,16 @@ class _AlertSettingsSheet extends StatefulWidget {
 
 class _AlertSettingsSheetState extends State<_AlertSettingsSheet> {
   static const _dayChips = ['Lu', 'Ma', 'Mi', 'Ju', 'Vi', 'Sá', 'Do'];
+  // What screen readers say for each chip
+  static const _dayNames = [
+    'Lunes',
+    'Martes',
+    'Miércoles',
+    'Jueves',
+    'Viernes',
+    'Sábado',
+    'Domingo',
+  ];
   // Offered when "Todo el día" is turned off
   static const _defaultFrom = 7 * 60, _defaultTo = 9 * 60;
 
@@ -1588,7 +1701,12 @@ class _AlertSettingsSheetState extends State<_AlertSettingsSheet> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text(widget.title, style: TimbreText.stopName),
+            Semantics(
+              header: true,
+              label: widget.spokenTitle,
+              excludeSemantics: true,
+              child: Text(widget.title, style: TimbreText.stopName),
+            ),
             if (defaultTargetPlatform == TargetPlatform.android) ...[
               const SizedBox(height: TimbreSpace.xs),
               Text(
@@ -1616,7 +1734,8 @@ class _AlertSettingsSheetState extends State<_AlertSettingsSheet> {
               children: [
                 for (var day = DateTime.monday; day <= DateTime.sunday; day++)
                   FilterChip(
-                    label: Text(_dayChips[day - 1]),
+                    label: Text(_dayChips[day - 1],
+                        semanticsLabel: _dayNames[day - 1]),
                     showCheckmark: false,
                     selected: _days.contains(day),
                     onSelected: (on) => setState(
@@ -1663,3 +1782,23 @@ class _AlertSettingsSheetState extends State<_AlertSettingsSheet> {
     );
   }
 }
+
+/// "Parada 574, San Jose y Andes": a stop for screen readers, the API name
+/// in words. A stop saved offline is just "Parada 574".
+String _stopPhrase(int id, String name) =>
+    name == 'Parada $id' ? name : 'Parada $id, ${spokenName(name)}';
+
+/// "De San Jose y Andes a Trabajo": the origin is an API name, the
+/// destination the user's own words.
+String _routeName(RouteAlert route) =>
+    'De ${spokenName(route.originName)} a ${route.destinationName}';
+
+/// The route card for screen readers: [_routeName] and the picked lines
+/// and directions.
+String _routePhrase(RouteAlert route) => [
+      _routeName(route),
+      if (route.preferredLines.isNotEmpty)
+        'líneas ${route.preferredLines.join(', ')}',
+      if (route.preferredDestinations.isNotEmpty)
+        'hacia ${route.preferredDestinations.map(spokenName).join(', ')}',
+    ].join(', ');

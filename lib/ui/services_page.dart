@@ -160,7 +160,7 @@ class _SiteTile extends StatelessWidget {
                       Center(
                         child: PixelIcon(
                           site.icon,
-                          size: 48,
+                          size: TimbreIconSize.tile,
                           color: TimbreColors.ambar,
                           glow: true,
                         ),
@@ -170,7 +170,7 @@ class _SiteTile extends StatelessWidget {
                         right: 9,
                         child: PixelIcon(
                           PixelGlyphs.external,
-                          size: 16,
+                          size: TimbreIconSize.mark,
                           color: TimbreColors.ambarTenue,
                         ),
                       ),
@@ -223,8 +223,9 @@ class _BrowserNote extends StatelessWidget {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // A note, not a lit LED
             const PixelIcon(PixelGlyphs.external,
-                size: 22, color: TimbreColors.ambar),
+                size: 22, color: TimbreColors.etiquetaCartel),
             const SizedBox(width: 12),
             Expanded(
               child: Text(

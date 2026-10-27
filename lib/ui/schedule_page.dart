@@ -93,8 +93,8 @@ class _SchedulePageState extends State<SchedulePage> {
 
     return Scaffold(
       backgroundColor: TimbreColors.noche,
-      // The identity bar of the tabs; a long stop name is cut, the stop
-      // number never is
+      // The identity bar of the tabs; a long stop name takes a second
+      // line, the stop number is never cut
       appBar: buildTimbreAppBar(
         context,
         title: 'Horarios',
@@ -130,7 +130,8 @@ class _SchedulePageState extends State<SchedulePage> {
                 Row(children: [
                   OutlinedButton.icon(
                     onPressed: _pickTime,
-                    icon: const PixelIcon(PixelGlyphs.clock, size: 18),
+                    icon: const PixelIcon(PixelGlyphs.clock,
+                        size: TimbreIconSize.row),
                     label: Text('Desde ${_formatTime(_time)}'),
                     style: OutlinedButton.styleFrom(
                       foregroundColor: TimbreColors.ambar,
@@ -165,15 +166,19 @@ class _SchedulePageState extends State<SchedulePage> {
     if (_loading) {
       return const Center(child: CircularProgressIndicator(strokeWidth: 2));
     }
-    // Offline must not look like "no buses"
+    // Offline must not look like "no buses"; an error is a red LED
     if (_failed) {
       return Center(
         child: Column(mainAxisSize: MainAxisSize.min, children: [
           const PixelIcon(PixelGlyphs.warning,
-              size: 28, color: TimbreColors.ambar),
+              size: TimbreIconSize.rowLarge, color: TimbreColors.rojoLed),
           const SizedBox(height: 8),
-          Text('No se pudo cargar el horario',
-              style: TimbreText.body.copyWith(fontWeight: FontWeight.w600)),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: TimbreSpace.xl),
+            child: Text('No se pudo cargar el horario. Revisá la conexión.',
+                textAlign: TextAlign.center,
+                style: TimbreText.body.copyWith(fontWeight: FontWeight.w600)),
+          ),
           const SizedBox(height: 4),
           TextButton(onPressed: _load, child: const Text('Reintentar')),
         ]),
@@ -236,12 +241,13 @@ class _HourHeader extends StatelessWidget {
           color: TimbreColors.tinta,
           border: Border(bottom: BorderSide(color: TimbreColors.lineaNoche)),
         ),
+        // A timetable is never lit: the hour is a label
         child: Text('$hour h',
             style: const TextStyle(
                 fontFamily: TimbreFonts.firaCondensed,
                 fontWeight: FontWeight.w800,
                 fontSize: 20,
-                color: TimbreColors.ambar)),
+                color: TimbreColors.etiquetaCartel)),
       ),
     );
   }
@@ -278,8 +284,9 @@ class _PassRow extends StatelessWidget {
           LineBadge(p.line, live: false, compact: true),
           const SizedBox(width: 10),
           Expanded(
+            // Two lines, like the arrival rows, before anything is cut
             child: Text(p.destination,
-                maxLines: 1,
+                maxLines: 2,
                 overflow: TextOverflow.ellipsis,
                 style: TimbreText.destination.copyWith(fontSize: 17)),
           ),

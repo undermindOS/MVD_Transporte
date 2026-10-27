@@ -39,6 +39,7 @@ class _InfoPageState extends State<InfoPage> {
       'Montevideo, el STM ni ninguna empresa de transporte.';
   static const _sourceCode = 'github.com/undermindOS/MVD_Transporte';
   static const _contact = 'zhongnanhaii@yahoo.com';
+  static const _inBrowser = 'se abre en el navegador';
 
   /// Paragraphs of the cards.
   static final _reading = TimbreText.subtitle
@@ -51,7 +52,10 @@ class _InfoPageState extends State<InfoPage> {
 
   Future<void> _openWeb(Uri uri) async {
     final ok = await SystemBrowser.open(uri);
-    if (!ok && mounted) _cannotOpen();
+    if (!ok && mounted) {
+      _cannotOpen(
+          'No se pudo abrir el navegador. Revisá que tengas uno activado.');
+    }
   }
 
   Future<void> _writeEmail() async {
@@ -62,11 +66,15 @@ class _InfoPageState extends State<InfoPage> {
     } catch (e) {
       debugPrint('❌ Mail app error: $e');
     }
-    if (!ok && mounted) _cannotOpen();
+    if (!ok && mounted) {
+      _cannotOpen('No se pudo abrir el correo. Revisá que tengas una app de '
+          'correo configurada.');
+    }
   }
 
-  void _cannotOpen() => ScaffoldMessenger.of(context)
-      .showSnackBar(const SnackBar(content: Text('No se pudo abrir')));
+  /// What failed and what to do.
+  void _cannotOpen(String message) => ScaffoldMessenger.of(context)
+      .showSnackBar(SnackBar(content: Text(message)));
 
   @override
   Widget build(BuildContext context) {
@@ -74,7 +82,8 @@ class _InfoPageState extends State<InfoPage> {
       // The identity bar of the tabs, with the back arrow
       appBar: buildTimbreAppBar(context, title: 'Info'),
       body: ListView(
-        padding: const EdgeInsets.fromLTRB(12, 14, 12, 28),
+        padding:
+            const EdgeInsets.fromLTRB(TimbreSpace.l, 14, TimbreSpace.l, 28),
         children: [
           _card(
             padding: const EdgeInsets.fromLTRB(16, 18, 16, 16),
@@ -145,9 +154,14 @@ class _InfoPageState extends State<InfoPage> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text('NO OFICIAL',
-                                  style: TimbreText.cartel(22)
-                                      .copyWith(letterSpacing: 1.5)),
+                              // A small system font must not shrink the
+                              // dots below 19 px
+                              MediaQuery.withClampedTextScaling(
+                                minScaleFactor: 1,
+                                child: Text('NO OFICIAL',
+                                    style: TimbreText.cartel(22)
+                                        .copyWith(letterSpacing: 1.5)),
+                              ),
                               const SizedBox(height: 10),
                               Text(
                                 _notAffiliated,
@@ -168,8 +182,10 @@ class _InfoPageState extends State<InfoPage> {
             padding: const EdgeInsets.fromLTRB(16, 10, 12, 10),
             child: MergeSemantics(
               child: Row(children: [
+                // A label, not a lit LED
                 const PixelIcon(PixelGlyphs.lock,
-                    color: TimbreColors.ambar, size: 24),
+                    color: TimbreColors.etiquetaCartel,
+                    size: TimbreIconSize.rowLarge),
                 const SizedBox(width: 12),
                 const Expanded(
                   child: Column(
@@ -241,6 +257,7 @@ class _InfoPageState extends State<InfoPage> {
                 _LinkRow(
                   title: 'Política de privacidad',
                   icon: PixelGlyphs.external,
+                  opensIn: _inBrowser,
                   onTap: () => _openWeb(widget.privacyPolicyUrl!),
                 ),
                 const Divider(),
@@ -249,6 +266,7 @@ class _InfoPageState extends State<InfoPage> {
                 title: 'Código fuente',
                 subtitle: _sourceCode,
                 icon: PixelGlyphs.external,
+                opensIn: _inBrowser,
                 onTap: () => _openWeb(Uri.parse('https://$_sourceCode')),
               ),
               const Divider(),
@@ -256,6 +274,7 @@ class _InfoPageState extends State<InfoPage> {
                 title: 'Contacto',
                 subtitle: _contact,
                 icon: PixelGlyphs.mail,
+                opensIn: 'se abre en tu app de correo',
                 onTap: _writeEmail,
               ),
             ]),
@@ -285,10 +304,13 @@ class _InfoPageState extends State<InfoPage> {
       );
 }
 
+/// A link out of the app. Screen readers hear one phrase that says where
+/// it opens: "Código fuente, github.com/…, se abre en el navegador".
 class _LinkRow extends StatelessWidget {
   const _LinkRow({
     required this.title,
     required this.icon,
+    required this.opensIn,
     required this.onTap,
     this.subtitle,
   });
@@ -296,36 +318,50 @@ class _LinkRow extends StatelessWidget {
   final String title;
   final String? subtitle;
   final PixelGlyph icon;
+
+  /// Where the link opens, said after the title ("se abre en el
+  /// navegador"): the icon telling it is hidden from screen readers.
+  final String opensIn;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
+    return Semantics(
+      container: true,
+      button: true,
+      label: [title, ?subtitle, opensIn].join(', '),
+      // excludeSemantics drops the InkWell's tap action too
       onTap: onTap,
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(minHeight: 52),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          child: Row(children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(title,
-                      style: TimbreText.body
-                          .copyWith(fontWeight: FontWeight.w500)),
-                  if (subtitle != null) ...[
-                    const SizedBox(height: 2),
-                    Text(subtitle!,
-                        style: const TextStyle(
-                            fontSize: 13, color: TimbreColors.etiquetaCartel)),
+      excludeSemantics: true,
+      child: InkWell(
+        onTap: onTap,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minHeight: 52),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: Row(children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(title,
+                        style: TimbreText.body
+                            .copyWith(fontWeight: FontWeight.w500)),
+                    if (subtitle != null) ...[
+                      const SizedBox(height: 2),
+                      Text(subtitle!,
+                          style: const TextStyle(
+                              fontSize: 13,
+                              color: TimbreColors.etiquetaCartel)),
+                    ],
                   ],
-                ],
+                ),
               ),
-            ),
-            const SizedBox(width: 12),
-            PixelIcon(icon, size: 20, color: TimbreColors.ambar),
-          ]),
+              const SizedBox(width: 12),
+              PixelIcon(icon,
+                  size: TimbreIconSize.row, color: TimbreColors.ambar),
+            ]),
+          ),
         ),
       ),
     );
