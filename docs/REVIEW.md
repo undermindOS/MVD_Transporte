@@ -230,8 +230,8 @@ corren tanto las pruebas del proxy como las de la app. Sin desplegar todavía.
   queda incompleto, sin `directions`), se reintenta a los 15 min. La hora de un armado fallido se guarda en
   `stopmeta:failedAt`, así esa espera se cumple aunque el objeto hiberne.
 - Se guarda en 64 partes (`stopmeta:{id % 64}`) más `stopmeta:info`: unas 65 escrituras por armado. Después de
-  hibernar, los datos de una parada son como mucho dos lecturas del almacenamiento (`stopmeta:info` y la parte de
-  esa parada), sin pedidos.
+  hibernar, los datos de una parada son como mucho tres lecturas del almacenamiento (`stopmeta:info`,
+  `stopmeta:failedAt` y la parte de esa parada), sin pedidos.
 - En `/v1/stops/{id}`, `directions` se queda solo con las líneas que lista transporteRest. `/v1/catalog/stops`
   espera hasta 20 s el primer armado; si no hay índice, contesta `linesAvailable:false` con `lines: []` en cada
   parada, y el Worker lo guarda 15 min.

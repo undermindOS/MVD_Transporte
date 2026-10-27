@@ -335,9 +335,10 @@ de la lista, sin otro pedido, y después se pide su tablero.
 | búsqueda por calles | el catálogo `GET /v1/catalog/stops`, filtrado en el teléfono (`MvdApiService.searchStops`) | no existe: el campo no aparece |
 | paradas cercanas | el mismo catálogo; la distancia se calcula en el teléfono y la ubicación no sale de él | la capa WFS de geoserver, pedida para un cuadrado alrededor de la posición redondeada a 3 decimales (472 m de medio lado) y filtrada en el teléfono con la posición exacta |
 
-Si el proxy contesta el catálogo con `linesAvailable: false`, las filas salen sin líneas. Ese
-catálogo nunca reemplaza una copia guardada que tiene líneas, y si se guarda vence a los 15 min,
-como en el proxy: después se vuelve a pedir.
+Si el proxy contesta el catálogo con `linesAvailable: false`, ese catálogo nunca reemplaza una
+copia guardada que tiene líneas: la app sigue con esa copia. Sin una copia con líneas, las filas
+salen sin líneas y el catálogo nuevo se guarda solo 15 min, como en el proxy: después se vuelve a
+pedir.
 
 ## Agregar ruta
 

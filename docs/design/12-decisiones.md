@@ -334,9 +334,10 @@ una celda de 0.001°), y filtra en el teléfono con la posición exacta.
 
 **Consecuencia.** En una build con proxy la posición no sale del teléfono;
 `test/proxy_privacy_test.dart` lo comprueba. Si el catálogo llega con
-`linesAvailable: false`, la lista se muestra sin líneas y no se recurre a
-geoserver. Ese catálogo no reemplaza una copia del teléfono que tiene líneas,
-y si se guarda vence a los 15 min, lo mismo que en la caché del proxy.
+`linesAvailable: false`, no se recurre a geoserver. Ese catálogo no reemplaza
+una copia del teléfono que tiene líneas, y la lista sigue con esa copia; sin
+una copia con líneas, la lista se muestra sin líneas y el catálogo vence a los
+15 min, lo mismo que en la caché del proxy.
 
 ### Sin cambio automático al modo directo
 

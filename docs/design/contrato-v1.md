@@ -592,8 +592,8 @@ del proxy:
 - Se guarda en 64 partes (`stopmeta:{id % 64}`) más `stopmeta:info`. Después
   de dormirse, la metadata de una parada se lee de una parte, sin ningún
   pedido.
-- Si un armado falla, su hora queda en `stopmeta:failedAt`, que se lee en la
-  misma lectura que `stopmeta:info`. Así la espera de 15 min se cumple
+- Si un armado falla, su hora queda en `stopmeta:failedAt`, que se lee junto
+  con `stopmeta:info`. Así la espera de 15 min se cumple
   aunque el objeto se duerma en el medio; si no, cada vez que se despertara
   volvería a bajar la capa entera.
 - `/v1/catalog/stops` espera hasta 20 s el primer armado. `/stops/{id}/meta`
@@ -692,7 +692,7 @@ ningún pedido (`MvdApiService._call`).
 | `notFound` | tarjeta guardada en Mis paradas o en Rutas | «Esta parada ya no existe. Deslizá la tarjeta para borrarla.» |
 | `failed`, `timeout`, `offline` | tarjeta, sin un tablero de menos de 5 min | «No se pudo actualizar. Deslizá para reintentar» |
 | `failed`, `timeout`, `offline` | tarjeta, con un tablero de menos de 5 min | «No se pudo actualizar. Datos de las H:MM. Deslizá para reintentar.» y debajo las filas viejas como estimado («~H:MM») |
-| `busy` | tarjetas | nada: siguen igual |
+| `busy` | tarjetas | nada: siguen igual, pero el tablero sigue envejeciendo (fila siguiente) |
 | ningún fallo, pero el tablero llegó hace 1 min o más | tarjeta | ningún texto: las filas pasan a estimado («~H:MM»); desde los 5 min, o si no queda ninguna fila, el indicador de carga |
 | cualquier falla menos `notFound` | «Agregar parada» con un número escrito | se guarda igual como «Parada N»; al abrir la app, `healPlaceholderStops` le completa nombre y líneas |
 | cualquier falla menos `notFound` | «Agregar ruta» | «No se pudieron cargar las líneas. Revisá la conexión.» |

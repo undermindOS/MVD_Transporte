@@ -132,7 +132,7 @@ versiones: [SemVer](https://semver.org/lang/es/).
 - `lib/services/api/`, la capa de datos del contrato /v1 en la app: `ApiResult` y `ApiFailure`, las reglas de
   derivación en Dart (las mismas que el proxy), un único lector por forma (`V1Parser`) y dos fuentes: el proxy, o
   los servidores de la ciudad convertidos a JSON v1 en el teléfono. Sin proxy, una respuesta que no se puede
-  convertir hace fallar solo esa parada, no las demás ni los avisos.
+  convertir hace fallar solo ese pedido: las otras paradas y sus avisos siguen andando.
 - `proxy/scripts/smoke.js <url>`, para probar un proxy andando: pide cada ruta de los casos 200 del contrato y
   verifica status, `Cache-Control`, `Content-Type` y las claves del cuerpo.
 - Dependencias: `url_launcher` (enlaces de las novedades), `html` (parseo del HTML de las novedades; ya era transitiva).

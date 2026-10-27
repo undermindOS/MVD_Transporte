@@ -144,8 +144,8 @@ No se enciende:
   `LineBadge(live: false)` en contorno, reloj `tenue`.
 - Una fila vieja, después de una actualización fallida o de un tablero que
   llegó hace 1 min o más: `ArrivalRow(stale: true)` muestra «~20:01» como
-  estimación, con la
-  insignia apagada y sin campana, aunque esa fila haya tenido GPS.
+  estimación, con la insignia apagada y sin campana, aunque esa fila haya
+  tenido GPS.
 - El encabezado de hora de Horarios (`etiquetaCartel`).
 - El texto «Aviso 5 min antes · …» de un aviso: es un ajuste, va en
   `etiquetaCartel`; solo la campana va en ámbar.

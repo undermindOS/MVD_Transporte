@@ -98,8 +98,8 @@ disposición:
   bloqueo.
 
 Lo que sí puede terminar en «…»: un destino de más de 2 líneas, la línea «#5109 · 48 m · …» de una
-parada cercana después de 2 líneas, el subtítulo de la barra si la pantalla es más angosta que la
-medida, y el destino de `CartelParada`, que hoy no se usa.
+parada cercana después de 2 líneas, el subtítulo de la barra después de 4 líneas o si la pantalla
+es más angosta que la medida, y el destino de `CartelParada`, que hoy no se usa.
 
 ### Doto nunca por debajo de 19 px
 
