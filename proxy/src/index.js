@@ -14,6 +14,7 @@ import {
   StopNotFoundError,
   UpstreamError,
 } from './transporte_rest.js';
+import { DAY_TYPES } from './rules.js';
 
 export { ImGateway } from './im_gateway.js';
 
@@ -28,13 +29,12 @@ const CATALOG_TTL = 24 * 3600;
 // Comfort data is optional: arrivals do not wait longer for it
 const VEHICLES_WAIT_MS = 2000;
 
-const DAY_TYPES = { weekday: 'HABIL', saturday: 'SABADO', sunday: 'DOMINGO' };
-
 // Stop codes are positive ints; no leading zeros, so one stop = one cache key
 const STOP = '([1-9]\\d{0,6})';
 // Line names as the official API writes them: "121", "D10", "CE1"
 const LINE = '([0-9A-Z]{1,6})';
-const ROUTES = [
+// Exported for the contract tests: every route needs a case
+export const ROUTES = [
   [new RegExp(`^/v1/stops/${STOP}$`), stop],
   [new RegExp(`^/v1/stops/${STOP}/arrivals$`), arrivals],
   [new RegExp(`^/v1/stops/${STOP}/schedule/([a-z]+)/(\\d{1,2}):(\\d{2})$`), schedule],
@@ -64,7 +64,12 @@ export default {
   },
 };
 
-async function respond(handler, env, params) {
+/**
+ * Runs a route handler and turns its errors into /v1 error answers, so the
+ * client always gets JSON. Logs are fixed strings "<source>: <kind>": no URL,
+ * path or IP (see ../contract/v1/README.md).
+ */
+export async function respond(handler, env, params) {
   try {
     return await handler(env, ...params);
   } catch (e) {
@@ -74,12 +79,13 @@ async function respond(handler, env, params) {
       });
     }
     if (e instanceof UpstreamError) {
-      console.error(`transporteRest ${e.message}`);
+      console.error(`${e.source}: ${e.message}`);
       return e.timeout
         ? error(504, 'upstream_timeout')
         : error(502, 'upstream_error');
     }
-    throw e;
+    console.error(`internal: ${e?.name}`);
+    return error(500, 'internal_error');
   }
 }
 
@@ -128,7 +134,7 @@ async function lookupVehicles(env, list) {
     const { vehicles } = await response.json();
     return vehicles ?? {};
   } catch (e) {
-    console.error(`im-gateway vehicles: ${e.message}`);
+    console.error(`im-gateway: ${e.name}`);
     return {};
   } finally {
     clearTimeout(timer);
@@ -141,7 +147,7 @@ async function schedule(_env, id, day, hour, minute) {
   if (!Object.hasOwn(DAY_TYPES, day) || h > 23 || m > 59) {
     return error(400, 'bad_request');
   }
-  const passes = await getSchedule(Number(id), DAY_TYPES[day], h, m);
+  const passes = await getSchedule(Number(id), day, h, m);
   return json({ passes }, SCHEDULE_TTL);
 }
 
@@ -161,7 +167,7 @@ async function fromGateway(env, path, maxAge) {
   try {
     response = await gateway(env, path);
   } catch (e) {
-    console.error(`im-gateway ${path}: ${e.message}`);
+    console.error(`im-gateway: ${e.name}`);
     return error(502, 'upstream_error');
   }
   if (response.ok) {

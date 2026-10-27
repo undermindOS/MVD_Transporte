@@ -2,72 +2,43 @@
 // (api.montevideo.gub.uy/transporteRest), no credentials — and the mapping of
 // its answers to the /v1 contract (see ../README.md).
 
+import { StopNotFoundError, UpstreamError } from './errors.js';
+import { fetchUpstream } from './http.js';
+import { isObject, schedulePath, text, toIntLoose as toInt } from './rules.js';
+
+// im_api.js and im_gateway.js import the errors from here
+export { StopNotFoundError, UpstreamError };
+
+const SOURCE = 'transporteRest';
 const BASE_URL = 'https://api.montevideo.gub.uy/transporteRest';
 const TIMEOUT_MS = 8000;
-const HEADERS = {
-  Accept: 'application/json',
-  'User-Agent':
-    'MVD-Transporte-proxy/0.1 (+https://github.com/undermindOS/MVD_Transporte)',
-};
-
-/** The stop code does not exist in the STM network. */
-export class StopNotFoundError extends Error {}
-
-/** transporteRest failed, timed out or answered something unusable. */
-export class UpstreamError extends Error {
-  constructor(message, { timeout = false } = {}) {
-    super(message);
-    this.timeout = timeout;
-  }
-}
 
 /** Stop name and lines: `GET /lineas/{id}`. */
 export async function getStop(stopId) {
-  return toStop(stopId, await getJson(`/lineas/${stopId}`));
+  return toStop(stopId, await getJson(`${BASE_URL}/lineas/${stopId}`));
 }
 
 /** Upcoming buses, soonest first: `GET /siguientesParada/{id}`. */
 export async function getArrivals(stopId) {
-  return toArrivals(await getJson(`/siguientesParada/${stopId}`));
+  return toArrivals(await getJson(`${BASE_URL}/siguientesParada/${stopId}`));
 }
 
 /**
  * Theoretical timetable, about 50 passes from hour:minute on, wrapping past
  * midnight: `GET /siguientesParada/{id}/{HABIL|SABADO|DOMINGO}/{H:MM}`.
  */
-export async function getSchedule(stopId, dayType, hour, minute) {
-  const time = `${hour}:${String(minute).padStart(2, '0')}`;
-  return toSchedule(
-    await getJson(`/siguientesParada/${stopId}/${dayType}/${time}`),
-  );
+export async function getSchedule(stopId, day, hour, minute) {
+  const { directUrl } = schedulePath({ stopId, day, hour, minute });
+  return toSchedule(await getJson(directUrl));
 }
 
-async function getJson(path) {
-  let response;
+async function getJson(url) {
   try {
-    response = await fetch(BASE_URL + path, {
-      headers: HEADERS,
-      signal: AbortSignal.timeout(TIMEOUT_MS),
-    });
+    return await fetchUpstream(SOURCE, url, { timeoutMs: TIMEOUT_MS });
   } catch (e) {
-    throw new UpstreamError(`${path}: ${e.name}`, {
-      timeout: e.name === 'TimeoutError',
-    });
-  }
-
-  const body = await response.text();
-  if (!response.ok) {
     // The backend answers 500 "No existe la ubicación de parada con código 'N'."
-    if (body.trimStart().startsWith('No existe')) {
-      throw new StopNotFoundError(path);
-    }
-    throw new UpstreamError(`${path}: HTTP ${response.status}`);
-  }
-
-  try {
-    return JSON.parse(body);
-  } catch {
-    throw new UpstreamError(`${path}: invalid JSON`);
+    if (e.body?.trimStart().startsWith('No existe')) throw new StopNotFoundError();
+    throw e;
   }
 }
 
@@ -76,7 +47,7 @@ async function getJson(path) {
  *   "lineas":[{"descripcion":"116","codigo":38}, ...]}`
  */
 export function toStop(stopId, data) {
-  if (!isObject(data)) throw new UpstreamError('lineas: unexpected shape');
+  if (!isObject(data)) throw new UpstreamError('unexpected shape', { source: SOURCE });
 
   const lines = [];
   for (const l of Array.isArray(data.lineas) ? data.lineas : []) {
@@ -97,7 +68,7 @@ export function toStop(stopId, data) {
  */
 export function toArrivals(data) {
   if (!Array.isArray(data)) {
-    throw new UpstreamError('siguientesParada: unexpected shape');
+    throw new UpstreamError('unexpected shape', { source: SOURCE });
   }
 
   const arrivals = [];
@@ -133,7 +104,7 @@ export function toArrivals(data) {
  */
 export function toSchedule(data) {
   if (!Array.isArray(data)) {
-    throw new UpstreamError('siguientesParada schedule: unexpected shape');
+    throw new UpstreamError('unexpected shape', { source: SOURCE });
   }
 
   const passes = [];
@@ -150,23 +121,4 @@ export function toSchedule(data) {
     });
   }
   return passes;
-}
-
-function isObject(value) {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
-function text(value) {
-  return value === null || value === undefined ? '' : String(value);
-}
-
-/** Int from a number or a numeric string, otherwise null. */
-function toInt(value) {
-  if (typeof value === 'number' && Number.isFinite(value)) {
-    return Math.trunc(value);
-  }
-  if (typeof value === 'string' && /^-?\d+$/.test(value.trim())) {
-    return Number.parseInt(value, 10);
-  }
-  return null;
 }

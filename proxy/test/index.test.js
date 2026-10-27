@@ -2,7 +2,7 @@ import { afterEach, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
-import worker, { ImGateway } from '../src/index.js';
+import worker, { ImGateway, respond } from '../src/index.js';
 
 const UPSTREAM = 'https://api.montevideo.gub.uy/transporteRest';
 
@@ -12,9 +12,18 @@ const fixture = (name) =>
 const NOT_FOUND_BODY = "No existe la ubicación de parada con código '99999999'.";
 
 const realFetch = globalThis.fetch;
+const realConsoleError = console.error;
 afterEach(() => {
   globalThis.fetch = realFetch;
+  console.error = realConsoleError;
 });
+
+/** Records what is logged with console.error from now on. */
+function captureLogs() {
+  const lines = [];
+  console.error = (...args) => lines.push(args.join(' '));
+  return lines;
+}
 
 /** Replies to upstream calls with [handler(url)] and records the URLs. */
 function mockUpstream(handler) {
@@ -360,6 +369,69 @@ describe('upstream failures', () => {
 
     assert.equal(response.status, 504);
     assert.deepEqual(await response.json(), { error: 'upstream_timeout' });
+  });
+});
+
+describe('unexpected errors', () => {
+  it('respond() answers 500 internal_error as JSON, not cached', async () => {
+    const logs = captureLogs();
+    const response = await respond(
+      () => {
+        throw new TypeError("Cannot read properties of undefined (reading 'x')");
+      },
+      {},
+      [],
+    );
+
+    assert.equal(response.status, 500);
+    assert.equal(response.headers.get('Content-Type'), 'application/json; charset=utf-8');
+    assert.equal(response.headers.get('Cache-Control'), 'no-store');
+    assert.deepEqual(await response.json(), { error: 'internal_error' });
+    assert.deepEqual(logs, ['internal: TypeError']);
+  });
+});
+
+describe('logs', () => {
+  it('name the source and the kind of an upstream error', async () => {
+    const logs = captureLogs();
+    mockUpstream(() => new Response('Internal Server Error', { status: 500 }));
+    await call('/v1/stops/3140/arrivals');
+
+    assert.deepEqual(logs, ['transporteRest: HTTP 500']);
+  });
+
+  it('never carry a URL, a path or a query string', async () => {
+    const logs = captureLogs();
+    const failures = [
+      () => new Response('Internal Server Error', { status: 500 }),
+      () => new Response('<html>maintenance</html>'),
+      () => Response.json({ unexpected: true }),
+      () => {
+        throw new DOMException('The operation timed out.', 'TimeoutError');
+      },
+      () => {
+        throw new TypeError('fetch failed: https://api.montevideo.gub.uy/x?y=1');
+      },
+    ];
+    for (const failure of failures) {
+      mockUpstream(failure);
+      await call('/v1/stops/3140/arrivals');
+      await call('/v1/stops/3140/schedule/weekday/8:05');
+    }
+    // Comfort from the gateway fails on its own
+    mockUpstream(() => new Response(fixture('transporte_rest/arrivals_574.json')));
+    await call('/v1/stops/574/arrivals', {
+      gateway: gatewayNamespace(() => {
+        throw new Error('https://im-gateway/vehicles?ids=50:111 reset');
+      }),
+    });
+
+    assert.equal(logs.length, failures.length * 2 + 1);
+    for (const line of logs) {
+      assert.ok(!line.includes('/siguientesParada'), line);
+      assert.ok(!line.includes('?'), line);
+      assert.ok(!line.includes('3140'), line);
+    }
   });
 });
 
