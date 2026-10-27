@@ -10,14 +10,26 @@ abstract final class ContractRules {
 
   static final _intText = RegExp(r'^-?\d+$');
 
+  // Past ±(2^53 − 1) JS rounds and Dart overflows: neither has the value
+  static const _maxSafeInt = 9007199254740991;
+
+  // The widest time a JS Date holds, and a DateTime too: ±10^8 days
+  static const _maxDateMs = 8640000000000000;
+
   /// A number truncated toward zero, or a text that is an integer once
-  /// trimmed ("007" → 7); anything else is null ("5.0", true, "").
+  /// trimmed ("007" → 7); anything else is null ("5.0", true, ""), and so
+  /// is an integer past ±(2^53 − 1).
   /// Vectors: `int_coercion.json`.
   static int? toIntLoose(Object? value) {
-    if (value is num) return value.isFinite ? value.truncate() : null;
+    if (value is num) {
+      return value >= -_maxSafeInt && value <= _maxSafeInt
+          ? value.truncate()
+          : null;
+    }
     if (value is String) {
       final text = value.trim();
-      if (_intText.hasMatch(text)) return int.parse(text);
+      final n = _intText.hasMatch(text) ? int.tryParse(text) : null;
+      if (n != null && n >= -_maxSafeInt && n <= _maxSafeInt) return n;
     }
     return null;
   }
@@ -85,8 +97,9 @@ abstract final class ContractRules {
       int.tryParse(clockTime.replaceAll(_nonDigits, ''));
 
   /// One row of transporteRest `siguientesParada` as a /v1 arrival, or
-  /// null when it has no line or no minutes. [fetchedAt] is when the answer
-  /// came. Comfort is always null here: only the proxy knows it.
+  /// null when it has no line or no minutes, or its time is past what a
+  /// date holds. [fetchedAt] is when the answer came. Comfort is always
+  /// null here: only the proxy knows it.
   /// Vectors: `arrival.json`.
   static Map<String, Object?>? arrival(Object? row, DateTime fetchedAt) {
     if (row is! Map) return null;
@@ -103,11 +116,15 @@ abstract final class ContractRules {
     final eta = minutes < 0 ? 0 : minutes;
 
     final time = row['time'];
-    final expectedMs = time is num
-        ? time.toInt()
-        : (fetchedAt.millisecondsSinceEpoch + eta * 60000) ~/ 60000 * 60000;
+    // In doubles, as JS computes it: eta * 60000 can pass the int range
+    final num expectedMs = time is num
+        ? time
+        : ((fetchedAt.millisecondsSinceEpoch + eta * 60000.0) / 60000)
+                .floorToDouble() * 60000;
+    // DateTime would throw: one bad row, not a failure for the whole stop
+    if (!(expectedMs.abs() <= _maxDateMs)) return null;
     final expectedAt =
-        DateTime.fromMillisecondsSinceEpoch(expectedMs, isUtc: true);
+        DateTime.fromMillisecondsSinceEpoch(expectedMs.toInt(), isUtc: true);
 
     var clockTime = clock(row['horaDesc']);
     if (clockTime.isEmpty) clockTime = montevideoClock(expectedAt);

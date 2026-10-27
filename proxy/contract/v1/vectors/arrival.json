@@ -5,7 +5,8 @@
     "Los vectores no tienen datos de confort: airConditioning y zeroEmission son siempre null (como en modo directo).",
     "real cuenta solo si es exactamente true. time cuenta solo si es un número JSON. destino nunca se recorta.",
     "tripId sin ómnibus: sched-{variante ?? 0}-{hora ?? los dígitos de clockTime como entero}.",
-    "El orden de la lista (estable por etaMinutes) no se prueba acá: lo prueban las respuestas de responses/."
+    "El orden de la lista (estable por etaMinutes) no se prueba acá: lo prueban las respuestas de responses/.",
+    "Una fila cuya hora esperada (time, o fetchedAt + minutos) cae fuera del rango de Date de JS (±8.64e15 ms) se descarta: null, no un error para toda la parada."
   ],
   "cases": [
     {
@@ -113,6 +114,10 @@
     },
     {"in": {"fetchedAt": "2026-10-19T22:52:10.000Z", "row": "garbage"}, "out": null},
     {"in": {"fetchedAt": "2026-10-19T22:52:10.000Z", "row": null}, "out": null},
-    {"in": {"fetchedAt": "2026-10-19T22:52:10.000Z", "row": [1, 2]}, "out": null}
+    {"in": {"fetchedAt": "2026-10-19T22:52:10.000Z", "row": [1, 2]}, "out": null},
+    {"in": {"fetchedAt": "2026-10-19T22:52:10.000Z", "row": {"linea": "121", "destino": "PUNTA CARRETAS", "minutos": 5, "real": false, "variante": 881, "hora": 2003, "horaDesc": "20:03", "time": 1e20}}, "out": null},
+    {"in": {"fetchedAt": "2026-10-19T22:52:10.000Z", "row": {"linea": "121", "destino": "PUNTA CARRETAS", "minutos": 5, "real": false, "variante": 881, "hora": 2003, "horaDesc": "20:03", "time": -1e20}}, "out": null},
+    {"in": {"fetchedAt": "2026-10-19T22:52:10.000Z", "row": {"linea": "121", "destino": "PUNTA CARRETAS", "minutos": 1e15, "real": false, "variante": 881, "hora": 2003, "horaDesc": "20:03"}}, "out": null},
+    {"in": {"fetchedAt": "2026-10-19T22:52:10.000Z", "row": {"linea": "121", "destino": "PUNTA CARRETAS", "minutos": "99999999999999999999", "real": false, "variante": 881}}, "out": null}
   ]
 }

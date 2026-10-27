@@ -14,6 +14,9 @@ const MONTEVIDEO_OFFSET_MS = -3 * 3600 * 1000;
 // Below this share of buses with GPS an operator counts as partial (Cómo Ir)
 const PARTIAL_PERCENT = 70;
 
+// The widest time a Date holds, and a Dart DateTime too: ±10^8 days
+const MAX_DATE_MS = 8.64e15;
+
 export function isObject(value) {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
@@ -24,16 +27,17 @@ export function text(value) {
 
 /**
  * Int from a number (truncated) or a string that is `^-?\d+$` once trimmed,
- * otherwise null: "5.0", "+5" and booleans are not ints.
+ * otherwise null: "5.0", "+5" and booleans are not ints. Past ±(2^53 − 1)
+ * also null: JS rounds there and Dart overflows, so neither has the value.
  */
 export function toIntLoose(value) {
+  let int = null;
   if (typeof value === 'number' && Number.isFinite(value)) {
-    return Math.trunc(value);
+    int = Math.trunc(value);
+  } else if (typeof value === 'string' && /^-?\d+$/.test(value.trim())) {
+    int = Number.parseInt(value.trim(), 10);
   }
-  if (typeof value === 'string' && /^-?\d+$/.test(value.trim())) {
-    return Number.parseInt(value.trim(), 10);
-  }
-  return null;
+  return Number.isSafeInteger(int) ? int : null;
 }
 
 /** `trim()`, also of U+0085, which JS keeps and Dart removes. */
@@ -83,9 +87,10 @@ export function clockText(value) {
 
 /**
  * One row of transporteRest `siguientesParada` → one /v1 arrival, or null
- * without a line or minutes. [fetchedAtMs] is when the answer arrived: it
- * dates the minutes when the row has no `time`. Comfort is unknown here
- * (null); index.js fills it from the official API.
+ * without a line or minutes, or when its time is past what a Date holds.
+ * [fetchedAtMs] is when the answer arrived: it dates the minutes when the
+ * row has no `time`. Comfort is unknown here (null); index.js fills it from
+ * the official API.
  */
 export function arrival(row, fetchedAtMs) {
   if (!isObject(row)) return null;
@@ -99,6 +104,8 @@ export function arrival(row, fetchedAtMs) {
     typeof row.time === 'number'
       ? row.time
       : Math.floor((fetchedAtMs + etaMinutes * 60000) / 60000) * 60000;
+  // toISOString would throw: one bad row, not a 500 for the whole stop
+  if (!(Math.abs(expectedMs) <= MAX_DATE_MS)) return null;
   const clockTime = clockText(row.horaDesc) || montevideoClock(expectedMs);
   const tripId =
     real && row.idEmpresa != null && row.idBus != null

@@ -2,7 +2,8 @@
   "rule": "toIntLoose",
   "notes": [
     "Número: se trunca hacia el cero. Texto: se recorta y tiene que ser ^-?\\d+$. Cualquier otra cosa: null.",
-    "5.0 está escrito como número con punto: Dart lo lee como double y JS como 5; los dos dan 5."
+    "5.0 está escrito como número con punto: Dart lo lee como double y JS como 5; los dos dan 5.",
+    "Fuera de ±(2^53 − 1) da null: ahí JS ya redondea y Dart se desborda, así que ninguno tiene el valor."
   ],
   "cases": [
     {"in": 5, "out": 5},
@@ -27,6 +28,12 @@
     {"in": "5 5", "out": null},
     {"in": false, "out": null},
     {"in": [5], "out": null},
-    {"in": {"v": 5}, "out": null}
+    {"in": {"v": 5}, "out": null},
+    {"in": 9007199254740991, "out": 9007199254740991},
+    {"in": "-9007199254740991", "out": -9007199254740991},
+    {"in": 9007199254740992, "out": null},
+    {"in": 1e20, "out": null},
+    {"in": "99999999999999999999", "out": null},
+    {"in": "-9223372036854775808", "out": null}
   ]
 }

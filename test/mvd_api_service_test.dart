@@ -407,6 +407,8 @@ void main() {
       final boards = await run(() => MvdApiService.getBoards([4189, 3140]));
       expect(boards.keys, unorderedEquals([4189, 3140]));
       expect(boards[3140]!.valueOrNull!.arrivals, hasLength(3));
+      // The bad row alone is dropped, as the proxy drops it
+      expect(boards[4189]!.valueOrNull!.arrivals.map((a) => a.line), ['116']);
     });
 
     test('timeouts and lost connections are told apart', () async {
