@@ -341,6 +341,13 @@ void main() {
             500),
         '$_directBase/siguientesParada/3140' => _json(_siguientesParada3140),
         '$_directBase/siguientesParada/574' => _json('{}'),
+        // A usable row, then one whose time is past any date
+        '$_directBase/siguientesParada/4189' => _json(
+            '[{"linea":"116","destino":"POCITOS","minutos":3,"real":false,'
+            '"variante":630,"hora":2001,"horaDesc":"20:01"},'
+            '{"linea":"121","destino":"PUNTA CARRETAS","minutos":5,'
+            '"real":false,"variante":881,"hora":2003,"horaDesc":"20:03",'
+            '"time":1e20}]'),
         '$_directBase/siguientesParada/3140/HABIL/8:05' => _json(
             '[{"linea":"143","destino":"CIUDADELA","hora":809,'
             '"horaDesc":"8:09","minutos":null,"real":false}]'),
@@ -393,6 +400,13 @@ void main() {
       expect((result as ApiError).failure, ApiFailure.failed);
       final other = await run(() => MvdApiService.getBoard(4));
       expect((other as ApiError).failure, ApiFailure.failed);
+    });
+
+    test('a stop with an unusable row does not take the others down',
+        () async {
+      final boards = await run(() => MvdApiService.getBoards([4189, 3140]));
+      expect(boards.keys, unorderedEquals([4189, 3140]));
+      expect(boards[3140]!.valueOrNull!.arrivals, hasLength(3));
     });
 
     test('timeouts and lost connections are told apart', () async {

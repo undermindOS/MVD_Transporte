@@ -29,7 +29,7 @@ class DirectSource implements V1Source {
     final raw = await _get(TransporteRestAdapter.stopUrl(id),
         transporteRest: true);
     if (raw.failure != null) return raw;
-    return _converted(TransporteRestAdapter.stopToV1(raw.json, id));
+    return _converted(() => TransporteRestAdapter.stopToV1(raw.json, id));
   }
 
   @override
@@ -37,7 +37,7 @@ class DirectSource implements V1Source {
     final raw = await _get(TransporteRestAdapter.arrivalsUrl(id),
         transporteRest: true);
     if (raw.failure != null) return raw;
-    return _converted(TransporteRestAdapter.arrivalsToV1(raw.json, id,
+    return _converted(() => TransporteRestAdapter.arrivalsToV1(raw.json, id,
         fetchedAt: DateTime.now()));
   }
 
@@ -48,7 +48,7 @@ class DirectSource implements V1Source {
         ContractRules.schedulePath(id, day.proxyValue, hour, minute).directUrl,
         transporteRest: true);
     if (raw.failure != null) return raw;
-    return _converted(TransporteRestAdapter.scheduleToV1(raw.json));
+    return _converted(() => TransporteRestAdapter.scheduleToV1(raw.json));
   }
 
   /// Only the proxy has the catalog (it needs the official API's secret).
@@ -81,11 +81,20 @@ class DirectSource implements V1Source {
     final raw = await _get(PciAdapter.url);
     if (raw.failure != null) return raw;
     return _converted(
-        PciAdapter.controlToV1(raw.json, fetchedAt: DateTime.now()));
+        () => PciAdapter.controlToV1(raw.json, fetchedAt: DateTime.now()));
   }
 
-  static SourceAnswer _converted(Map<String, Object?>? v1) =>
-      v1 == null ? answerFailure(ApiFailure.failed) : answerJson(v1);
+  /// [convert]'s /v1 JSON. Null, or a throw on data no rule expected,
+  /// fails this request alone: getBoards still has the other stops.
+  static SourceAnswer _converted(Map<String, Object?>? Function() convert) {
+    try {
+      final v1 = convert();
+      return v1 == null ? answerFailure(ApiFailure.failed) : answerJson(v1);
+    } catch (e) {
+      debugPrint('⚠️ Direct API answer not converted: $e');
+      return answerFailure(ApiFailure.failed);
+    }
+  }
 
   /// The decoded JSON of [url], or why there is none.
   static Future<SourceAnswer> _get(String url,
