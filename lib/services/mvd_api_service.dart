@@ -4,6 +4,7 @@ import '../models/arrivals_board.dart';
 import '../models/bus_arrival.dart';
 import '../models/bus_stop.dart';
 import '../models/catalog_stop.dart';
+import '../models/gps_status.dart';
 import '../models/scheduled_pass.dart';
 import '../models/stop_details.dart';
 import 'api/api_result.dart';
@@ -24,7 +25,8 @@ class StopNotFoundException implements Exception {
   String toString() => 'StopNotFoundException($stopId)';
 }
 
-/// Arrivals, timetables, stop names and the stop catalog.
+/// Arrivals, timetables, stop names, the stop catalog, transport news and
+/// the GPS status.
 ///
 /// With `--dart-define=MVD_PROXY_URL=https://…` every call goes to the
 /// project's proxy (`proxy/`, routes `/v1`). The proxy holds the secret of the
@@ -129,9 +131,9 @@ class MvdApiService {
   }
 
   /// [request] after the busy check. With [backOff] a busy answer stops
-  /// every request for its `retryAfter`: on the stop routes it can only be
-  /// the proxy's 429, its limit per phone, which covers every route. The
-  /// catalog's 503 upstream_busy is about the catalog alone.
+  /// every request for its `retryAfter`: on every route but the catalog it
+  /// can only be the proxy's 429, its limit per phone, which covers every
+  /// route. The catalog's 503 upstream_busy is about the catalog alone.
   static Future<ApiResult<T>> _request<T>(
       Future<SourceAnswer> Function() request,
       T? Function(Object? json) parse,
@@ -205,15 +207,15 @@ class MvdApiService {
   }
 
   /// Every stop with its street names, lines and location, for the search
-  /// by streets — only through the proxy (`/v1/catalog/stops`), null
-  /// without it.
+  /// by streets and the nearby stops — only through the proxy
+  /// (`/v1/catalog/stops`), null without it.
   /// Downloaded at most once a day; when the proxy cannot be reached an
   /// older copy is used. Returns null when there is neither.
   static Future<List<CatalogStop>?> getStopCatalog() async {
     if (!usesProxy) return null;
 
-    final cached = _cachedCatalog();
-    final lastMs = CacheService.get<int>(CacheService.keyStopCatalogFetchedAt);
+    final cached = await _cachedCatalog();
+    final lastMs = CacheService.catalogFetchedAtMs;
     if (cached != null &&
         lastMs != null &&
         DateTime.now()
@@ -232,15 +234,14 @@ class MvdApiService {
 
     _catalog = fresh;
     // The /v1 body as it came, read again by V1Parser
-    await CacheService.set(CacheService.keyStopCatalog, jsonEncode(body));
-    await CacheService.set(CacheService.keyStopCatalogFetchedAt,
-        DateTime.now().millisecondsSinceEpoch);
+    await CacheService.saveCatalog(
+        jsonEncode(body), DateTime.now().millisecondsSinceEpoch);
     return fresh;
   }
 
-  static List<CatalogStop>? _cachedCatalog() {
+  static Future<List<CatalogStop>?> _cachedCatalog() async {
     if (_catalog != null) return _catalog;
-    final raw = CacheService.get<String>(CacheService.keyStopCatalog);
+    final raw = await CacheService.catalogBody();
     if (raw == null) return null;
     try {
       final stops = V1Parser.catalog(jsonDecode(raw))?.stops;
@@ -254,6 +255,16 @@ class MvdApiService {
   /// Forgets the decoded catalog; the copy in Hive stays.
   @visibleForTesting
   static void clearCatalogMemory() => _catalog = null;
+
+  /// The newest transport news, newest first: the last page of the
+  /// notification backend (`/v1/news`, or the jump paging from id 0
+  /// without the proxy).
+  static Future<ApiResult<NewsList>> getNews() =>
+      _request(source.news, V1Parser.news);
+
+  /// The share of each operator's buses whose GPS data arrives.
+  static Future<ApiResult<List<OperatorGpsStatus>>> getGpsStatus() =>
+      _request(source.gpsStatus, V1Parser.gpsStatus);
 
   /// Stops whose name contains every word of [query], in any order,
   /// ignoring case, accents and punctuation: "18 de julio ejido" finds

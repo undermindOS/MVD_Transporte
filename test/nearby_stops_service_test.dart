@@ -2,7 +2,15 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
+import 'package:stm_app/models/catalog_stop.dart';
+import 'package:stm_app/models/nearby_stop.dart';
 import 'package:stm_app/services/api/direct/wfs_adapter.dart';
+import 'package:stm_app/services/api/v1_parser.dart';
+import 'package:stm_app/services/cache_service.dart';
+import 'package:stm_app/services/mvd_api_service.dart';
 import 'package:stm_app/services/nearby_stops_service.dart';
 
 // Live WFS response captured on 2026-10-17: imm:v_uptu_paradas, 200 m box
@@ -11,11 +19,20 @@ const _fixture = 'test/fixtures/wfs_paradas_18_de_julio.json';
 const _lat = -34.9066;
 const _lng = -56.1985;
 
+/// A WFS answer as the direct mode reads it: catalog stops.
+List<CatalogStop> _catalogOf(Object? wfs) =>
+    V1Parser.catalog({'stops': WfsAdapter.featuresToCatalogItems(wfs)})!
+        .stops;
+
+/// The stops of a WFS answer around the fixture's point.
+List<NearbyStop> _nearby(Object? wfs, {double radius = 400}) =>
+    NearbyStopsService.nearbyFrom(_catalogOf(wfs), _lat, _lng,
+        radius: radius);
+
 void main() {
-  group('parseFeatures', () {
+  group('nearbyFrom on the WFS fixture', () {
     final data = jsonDecode(File(_fixture).readAsStringSync());
-    final stops = NearbyStopsService.parseFeatures(data,
-        lat: _lat, lng: _lng, radius: 200);
+    final stops = _nearby(data, radius: 200);
 
     test('groups variants by stop, drops box corners, nearest first', () {
       expect(stops.map((s) => s.id),
@@ -52,12 +69,12 @@ void main() {
     });
 
     test('default radius keeps every stop of the 200 m box', () {
-      final all = NearbyStopsService.parseFeatures(data, lat: _lat, lng: _lng);
+      final all = NearbyStopsService.nearbyFrom(_catalogOf(data), _lat, _lng);
       expect(all, hasLength(10));
     });
   });
 
-  group('parseFeatures robustness', () {
+  group('nearbyFrom robustness', () {
     Map<String, dynamic> feature(Map<String, dynamic> props,
             {List<dynamic>? coords}) =>
         {
@@ -69,19 +86,12 @@ void main() {
           'properties': props,
         };
 
-    test('returns empty for non-collections', () {
-      expect(
-          NearbyStopsService.parseFeatures(null, lat: _lat, lng: _lng), isEmpty);
-      expect(NearbyStopsService.parseFeatures([], lat: _lat, lng: _lng),
-          isEmpty);
-      expect(
-          NearbyStopsService.parseFeatures({'features': null},
-              lat: _lat, lng: _lng),
-          isEmpty);
+    test('nothing near an empty catalog', () {
+      expect(NearbyStopsService.nearbyFrom(const [], _lat, _lng), isEmpty);
     });
 
     test('skips features without stop code or coordinates', () {
-      final stops = NearbyStopsService.parseFeatures({
+      final stops = _nearby({
         'features': [
           feature({'desc_linea': '116'}),
           feature({'cod_ubic_parada': 1, 'desc_linea': '116'}, coords: []),
@@ -90,18 +100,18 @@ void main() {
           'garbage',
           feature({'cod_ubic_parada': 3, 'calle': 'A', 'esquina': 'B'}),
         ],
-      }, lat: _lat, lng: _lng);
+      });
       expect(stops.map((s) => s.id), [3]);
       expect(stops.single.lines, isEmpty);
     });
 
     test('falls back when street names are missing', () {
-      final stops = NearbyStopsService.parseFeatures({
+      final stops = _nearby({
         'features': [
           feature({'cod_ubic_parada': 1, 'calle': 'RAMBLA', 'esquina': null}),
           feature({'cod_ubic_parada': 2, 'calle': ' ', 'esquina': ''}),
         ],
-      }, lat: _lat, lng: _lng);
+      });
       expect(stops.map((s) => s.name), containsAll(['RAMBLA', 'Parada 2']));
     });
   });
@@ -141,8 +151,15 @@ void main() {
   });
 
   group('buildUri', () {
-    final uri = NearbyStopsService.buildUri(_lat, _lng, 400);
+    final uri = NearbyStopsService.buildUri(_lat, _lng);
     final q = uri.queryParameters;
+
+    // [minLon, minLat, maxLon, maxLat] of the BBOX
+    List<double> box(Uri uri) {
+      final parts = uri.queryParameters['bbox']!.split(',');
+      expect(parts.last, 'EPSG:4326');
+      return parts.take(4).map(double.parse).toList();
+    }
 
     test('queries the stops layer as GeoJSON in lat/lon degrees', () {
       expect(uri.host, 'geoserver.montevideo.gub.uy');
@@ -154,19 +171,140 @@ void main() {
     });
 
     test('BBOX is lon,lat around the point (lat,lon returns nothing)', () {
-      final parts = q['bbox']!.split(',');
-      expect(parts.last, 'EPSG:4326');
-      final box = parts.take(4).map(double.parse).toList();
-      final [minLon, minLat, maxLon, maxLat] = box;
+      final [minLon, minLat, maxLon, maxLat] = box(uri);
       expect(minLon, lessThan(_lng));
       expect(maxLon, greaterThan(_lng));
       expect(minLat, lessThan(_lat));
       expect(maxLat, greaterThan(_lat));
-      // Half-side is the radius in both directions
-      expect(NearbyStopsService.distanceMeters(_lat, _lng, maxLat, _lng),
-          closeTo(400, 1));
-      expect(NearbyStopsService.distanceMeters(_lat, _lng, _lat, maxLon),
-          closeTo(400, 1));
+    });
+
+    test('the box is centred on the position rounded to 3 decimals', () {
+      final [minLon, minLat, maxLon, maxLat] =
+          box(NearbyStopsService.buildUri(-34.9058, -56.1913));
+      final (lat, lng) = ((minLat + maxLat) / 2, (minLon + maxLon) / 2);
+      expect(lat, closeTo(-34.906, 1e-6));
+      expect(lng, closeTo(-56.191, 1e-6));
+      // Half-side 472 m: the 400 m radius plus half a 0.001° cell diagonal
+      expect(NearbyStopsService.distanceMeters(lat, lng, maxLat, lng),
+          closeTo(472, 1));
+      expect(NearbyStopsService.distanceMeters(lat, lng, lat, maxLon),
+          closeTo(472, 1));
+      // Any position in the same cell asks for the same box
+      expect(NearbyStopsService.buildUri(-34.90551, -56.19149),
+          NearbyStopsService.buildUri(-34.9058, -56.1913));
+    });
+  });
+
+  group('without the proxy', () {
+    final wfs = File(_fixture).readAsStringSync();
+    final requests = <Uri>[];
+    var answer = http.Response(wfs, 200);
+    final client = MockClient((request) async {
+      requests.add(request.url);
+      return answer;
+    });
+
+    setUp(() {
+      MvdApiService.proxyUrl = '';
+      requests.clear();
+      answer = http.Response.bytes(utf8.encode(wfs), 200);
+    });
+
+    test('the stops of the WFS box, filtered by the exact position',
+        () async {
+      final stops = await http.runWithClient(
+          () => NearbyStopsService.fetchNearby(_lat, _lng), () => client);
+      expect(requests.single.host, 'geoserver.montevideo.gub.uy');
+      expect(requests.single, NearbyStopsService.buildUri(_lat, _lng));
+      // The same order and distances as the shared nearbyFrom
+      final expected = _nearby(jsonDecode(wfs));
+      expect(stops!.map((s) => s.id), expected.map((s) => s.id));
+      expect(stops.map((s) => s.distanceMeters),
+          expected.map((s) => s.distanceMeters));
+      expect(stops.first.id, 5109);
+      expect(stops.first.distanceMeters, closeTo(47.8, 0.5));
+    });
+
+    test('a failed or malformed answer is a network error', () async {
+      for (final failure in [
+        http.Response('', 500),
+        http.Response('{"error":true}', 200),
+      ]) {
+        answer = failure;
+        expect(
+            await http.runWithClient(
+                () => NearbyStopsService.fetchNearby(_lat, _lng),
+                () => client),
+            isNull);
+      }
+    });
+  });
+
+  group('through the proxy', () {
+    late Directory hiveDir;
+    final catalog =
+        File('test/fixtures/proxy_catalog_stops.json').readAsBytesSync();
+    var proxyUp = true;
+    final requests = <Uri>[];
+    final client = MockClient((request) async {
+      requests.add(request.url);
+      if (!proxyUp) throw http.ClientException('offline');
+      return request.url.path == '/v1/catalog/stops'
+          ? http.Response.bytes(catalog, 200)
+          : http.Response('{"error":"not_found"}', 404);
+    });
+    Future<List<NearbyStop>> findNearMe() =>
+        http.runWithClient(NearbyStopsService.findNearMe, () => client);
+
+    setUpAll(() async {
+      hiveDir = await Directory.systemTemp.createTemp('mvd_nearby_test');
+      await CacheService.init(path: hiveDir.path);
+    });
+
+    setUp(() async {
+      MvdApiService.proxyUrl = 'https://proxy.test';
+      MvdApiService.clearCatalogMemory();
+      await CacheService.remove(CacheService.keyStopCatalog);
+      GeolocatorPlatform.instance = _FakeGeolocator();
+      proxyUp = true;
+      requests.clear();
+    });
+
+    tearDown(() => MvdApiService.proxyUrl = '');
+
+    tearDownAll(() async {
+      await hiveDir.delete(recursive: true);
+    });
+
+    test('the position never leaves the phone: only the catalog is asked',
+        () async {
+      final stops = await findNearMe();
+      expect(requests.map((u) => '$u'),
+          ['https://proxy.test/v1/catalog/stops']);
+      for (final u in requests) {
+        expect('$u', isNot(contains('34.9')));
+        expect('$u', isNot(contains('56.1')));
+      }
+      expect(stops.map((s) => s.id), contains(574));
+      expect(stops.every((s) => s.distanceMeters <= 400), isTrue);
+      final distances = [for (final s in stops) s.distanceMeters];
+      expect(distances, [...distances]..sort());
+
+      // With the catalog on the phone nothing is requested at all
+      requests.clear();
+      expect(await findNearMe(), hasLength(stops.length));
+      MvdApiService.clearCatalogMemory();
+      expect(await findNearMe(), hasLength(stops.length));
+      expect(requests, isEmpty);
+    });
+
+    test('no catalog and no proxy is a network error', () async {
+      proxyUp = false;
+      await expectLater(
+          findNearMe(),
+          throwsA(isA<NearbyStopsException>()
+              .having((e) => e.error, 'error', NearbyStopsError.network)));
+      expect(requests.map((u) => u.host), everyElement('proxy.test'));
     });
   });
 
@@ -175,4 +313,30 @@ void main() {
     expect(lines..sort(NearbyStopsService.compareLines),
         ['21', '104', '124', '124 SD', '125', 'CE1', 'D1', 'D10']);
   });
+}
+
+/// Location allowed, at 18 de Julio y Andes.
+class _FakeGeolocator extends GeolocatorPlatform {
+  @override
+  Future<bool> isLocationServiceEnabled() async => true;
+
+  @override
+  Future<LocationPermission> checkPermission() async =>
+      LocationPermission.whileInUse;
+
+  @override
+  Future<Position> getCurrentPosition(
+          {LocationSettings? locationSettings}) async =>
+      Position(
+        latitude: _lat,
+        longitude: _lng,
+        timestamp: DateTime(2026, 10, 27),
+        accuracy: 10,
+        altitude: 0,
+        altitudeAccuracy: 0,
+        heading: 0,
+        headingAccuracy: 0,
+        speed: 0,
+        speedAccuracy: 0,
+      );
 }

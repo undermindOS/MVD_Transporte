@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 import '../models/transport_news.dart';
 import 'api/direct/news_adapter.dart';
 import 'cache_service.dart';
+import 'mvd_api_service.dart';
 
 /// One response of `GET /notificacion/mensajes`.
 class NewsPage implements NewsPaging {
@@ -18,11 +19,13 @@ class NewsPage implements NewsPaging {
   int get size => messages.length;
 }
 
-/// Official transport news — the open endpoint Cómo Ir reads
+/// Official transport news — through the proxy (`/v1/news`) or, without
+/// it, the open endpoint Cómo Ir reads
 /// (`api.montevideo.gub.uy/notificacion/mensajes?idApp=1`), no credentials.
 ///
 /// Fetched only while the app is open, at most every [minInterval]
-/// (pull-to-refresh: every [forcedMinInterval]), and cached in Hive.
+/// (pull-to-refresh: every [forcedMinInterval]), and cached in Hive: each
+/// fetch is merged into the cached list.
 class TransportNewsService {
   static const minInterval = Duration(minutes: 10);
   static const forcedMinInterval = Duration(seconds: 30);
@@ -56,18 +59,33 @@ class TransportNewsService {
       if (age < (force ? forcedMinInterval : minInterval)) return cached();
     }
 
+    if (MvdApiService.usesProxy) {
+      // The proxy pages from id 0 itself: no paging start is kept here
+      final fresh = (await MvdApiService.getNews()).valueOrNull?.news;
+      if (fresh == null) return null;
+      final news = merge(cached(), fresh);
+      await _saveCache(news);
+      await _saveFetchedAt();
+      return news;
+    }
+
     final from = CacheService.get<int>(CacheService.keyNewsFromId) ?? 0;
     final result = await fetchNewest(from, _fetchPage);
     if (result == null) return null;
 
     final news = merge(cached(), result.messages);
-    await CacheService.set(CacheService.keyNewsCache,
-        jsonEncode(news.map((n) => n.toJson()).toList()));
+    await _saveCache(news);
     await CacheService.set(CacheService.keyNewsFromId, result.from);
-    await CacheService.set(
-        CacheService.keyNewsFetchedAt, DateTime.now().millisecondsSinceEpoch);
+    await _saveFetchedAt();
     return news;
   }
+
+  static Future<void> _saveCache(List<TransportNews> news) =>
+      CacheService.set(CacheService.keyNewsCache,
+          jsonEncode(news.map((n) => n.toJson()).toList()));
+
+  static Future<void> _saveFetchedAt() => CacheService.set(
+      CacheService.keyNewsFetchedAt, DateTime.now().millisecondsSinceEpoch);
 
   /// Highest idMensaje the user has seen (null = never opened the news).
   static int? get lastReadId =>

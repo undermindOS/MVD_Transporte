@@ -737,13 +737,25 @@ void main() {
       expect(requested, hasLength(1));
 
       // A day later it is downloaded again
-      await CacheService.set(
-          CacheService.keyStopCatalogFetchedAt,
+      await CacheService.saveCatalog(
+          utf8.decode(catalogBody),
           DateTime.now()
               .subtract(const Duration(days: 1, minutes: 1))
               .millisecondsSinceEpoch);
       expect(await load(), 4972);
       expect(requested, hasLength(2));
+    });
+
+    test('the copy lives in its own lazy box, not in the settings', () async {
+      expect(await load(), 4972);
+      expect(CacheService.get<String>(CacheService.keyStopCatalog), isNull);
+      expect(CacheService.catalogFetchedAtMs, isNotNull);
+      expect(await CacheService.catalogBody(), contains('"stops"'));
+
+      // Removing either key drops the copy at once
+      unawaited(CacheService.remove(CacheService.keyStopCatalogFetchedAt));
+      expect(CacheService.catalogFetchedAtMs, isNull);
+      expect(await CacheService.catalogBody(), isNull);
     });
 
     test('the copy on the device keeps lines and location', () async {
@@ -760,7 +772,7 @@ void main() {
 
     test('an old copy is used while the proxy cannot be reached', () async {
       expect(await load(), 4972);
-      await CacheService.set(CacheService.keyStopCatalogFetchedAt, 0);
+      await CacheService.saveCatalog(utf8.decode(catalogBody), 0);
       MvdApiService.clearCatalogMemory();
 
       proxyUp = false;
