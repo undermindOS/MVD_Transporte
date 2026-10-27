@@ -11,6 +11,7 @@ import '../models/nearby_stop.dart';
 import 'api/contract_rules.dart';
 import 'api/direct/wfs_adapter.dart';
 import 'api/v1_parser.dart';
+import 'external_apps.dart';
 import 'mvd_api_service.dart';
 
 /// Why the nearby-stops search could not run; the UI picks the message.
@@ -64,8 +65,10 @@ class NearbyStopsService {
     return stops;
   }
 
-  /// The only way back after "Don't ask again".
-  static Future<bool> openAppSettings() => Geolocator.openAppSettings();
+  /// The only way back after "Don't ask again". The settings are another
+  /// app, opened from here: coming back from them does not lock.
+  static Future<bool> openAppSettings() =>
+      ExternalApps.open(Geolocator.openAppSettings);
 
   static Future<Position> _currentPosition() async {
     if (!await Geolocator.isLocationServiceEnabled()) {

@@ -213,8 +213,11 @@ void main() {
         AppLifecycleState.inactive,
         AppLifecycleState.resumed,
       ]);
+      // The refresh starts after the first frame back (the app may lock
+      // on its way back), the board shows on the next one
       await tester.pump();
       expect(etaRequests.length, initial + 2);
+      await tester.pump();
       expect(liveMinutes(3), findsOneWidget);
       await tester.pump(StopsPage.autoRefreshInterval);
       expect(etaRequests.length, initial + 3);

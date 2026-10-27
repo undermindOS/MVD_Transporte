@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../models/transport_news.dart';
+import '../services/external_apps.dart';
 import 'safe_html.dart';
 import 'theme/timbre_text.dart';
 import 'theme/timbre_tokens.dart';
@@ -354,7 +355,8 @@ Future<void> openExternalLink(BuildContext context, String link) async {
   var ok = false;
   if (uri != null && (uri.scheme == 'https' || uri.scheme == 'http')) {
     try {
-      ok = await launchUrl(uri, mode: LaunchMode.externalApplication);
+      ok = await ExternalApps.launch(uri,
+          mode: LaunchMode.externalApplication);
     } catch (e) {
       debugPrint('❌ Open link error: $e');
     }

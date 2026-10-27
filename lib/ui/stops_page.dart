@@ -40,8 +40,9 @@ class StopsPage extends StatefulWidget {
   /// Opens the stop in Cómo Ir (official deep link).
   final ValueChanged<int> onOpenStopInComoIr;
 
-  /// Mis paradas is on screen: its tab is selected and no page covers it.
-  /// Arrivals are polled only then; becoming active refreshes them once.
+  /// Mis paradas is on screen: its tab is selected, no page covers it and
+  /// the app is not locked. Arrivals are polled only then; becoming active
+  /// refreshes them once.
   final bool active;
 
   const StopsPage(
@@ -161,7 +162,11 @@ class _StopsPageState extends State<StopsPage>
         if (_inBackground) {
           _inBackground = false;
           BusWaitService.sync();
-          _resumeAutoRefresh();
+          // After the next frame: when the app locks on its way back, that
+          // frame turns this page inactive first, and nothing is requested
+          WidgetsBinding.instance.endOfFrame.then((_) {
+            if (mounted) _resumeAutoRefresh();
+          });
         }
       case AppLifecycleState.hidden:
       case AppLifecycleState.paused:

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../services/external_apps.dart';
 import '../services/official_sites.dart';
 import 'theme/timbre_text.dart';
 import 'theme/timbre_tokens.dart';
@@ -61,7 +62,7 @@ class _InfoPageState extends State<InfoPage> {
   Future<void> _writeEmail() async {
     var ok = false;
     try {
-      ok = await launchUrl(Uri(scheme: 'mailto', path: _contact),
+      ok = await ExternalApps.launch(Uri(scheme: 'mailto', path: _contact),
           mode: LaunchMode.externalApplication);
     } catch (e) {
       debugPrint('❌ Mail app error: $e');
