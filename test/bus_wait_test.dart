@@ -15,6 +15,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:stm_app/models/bus_arrival.dart';
 import 'package:stm_app/models/bus_wait.dart';
+import 'package:stm_app/services/bus_wait_service.dart';
 import 'package:stm_app/services/bus_wait_task.dart';
 import 'package:stm_app/services/mvd_api_service.dart';
 
@@ -42,6 +43,27 @@ BusArrival _bus(String line, int minutes,
       expectedAt: (at ?? _t0).add(Duration(minutes: minutes)),
       clockTime: '8:07',
     );
+
+/// GET /v1/stops/3140/arrivals at [at]: GPS buses of the 116 to POCITOS.
+String _v1Answer(DateTime at, List<(String, int)> buses) => jsonEncode({
+      'arrivals': [
+        for (final (tripId, minutes) in buses)
+          {
+            'tripId': tripId,
+            'variantId': 630,
+            'line': '116',
+            'destination': 'POCITOS',
+            'state': 'live',
+            'etaMinutes': minutes,
+            'expectedAt':
+                at.add(Duration(minutes: minutes)).toUtc().toIso8601String(),
+            'clockTime': '8:07',
+            'accessible': false,
+            'airConditioning': null,
+            'zeroEmission': null,
+          }
+      ],
+    });
 
 String _answer(List<(String, int, bool)> buses) => jsonEncode([
       for (final (line, minutes, real) in buses)
@@ -302,6 +324,35 @@ void main() {
       }, () => client);
     });
 
+    test('follows its bus by trip id through the proxy', () async {
+      MvdApiService.proxyUrl = 'https://proxy.test';
+      addTearDown(() => MvdApiService.proxyUrl = '');
+      final now = DateTime.now();
+      final wait = BusWait.forTrip(
+        stopId: 3140,
+        stopName: 'BV BATLLE',
+        trip: _bus('116', 5, at: now, tripId: 'bus-50-111'),
+        alertMinutes: 4,
+        now: now,
+      );
+      // The followed bus is late; the next one is 4 min away, about when
+      // the followed one was expected
+      final proxy = MockClient((request) async {
+        expect('${request.url}', 'https://proxy.test/v1/stops/3140/arrivals');
+        return http.Response.bytes(
+            utf8.encode(
+                _v1Answer(now, [('bus-50-222', 4), ('bus-50-111', 12)])),
+            200);
+      });
+      await http.runWithClient(() => startHandler(wait), () => proxy);
+
+      expect(shown, isEmpty);
+      final update =
+          serviceCalls.singleWhere((c) => c.method == 'updateService');
+      expect(jsonEncode(update.arguments),
+          contains('Llega en 12 min · BV BATLLE'));
+    });
+
     test('"Dejar de esperar" stops the service without alerting', () async {
       minutes = 20;
       final wait = BusWait.forTrip(
@@ -324,6 +375,59 @@ void main() {
         expect(serviceCalls.length, polls);
         expect(shown, isEmpty);
       }, () => client);
+    });
+  });
+
+  group('iOS reminder', () {
+    TestWidgetsFlutterBinding.ensureInitialized();
+    final messenger =
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+    const notificationsChannel =
+        MethodChannel('dexterous.com/flutter/local_notifications');
+    final scheduled = <DateTime>[];
+
+    setUpAll(AndroidFlutterLocalNotificationsPlugin.registerWith);
+
+    setUp(() {
+      SharedPreferences.setMockInitialValues({});
+      scheduled.clear();
+      messenger.setMockMethodCallHandler(notificationsChannel, (call) async {
+        if (call.method == 'zonedSchedule') {
+          scheduled.add(
+              DateTime.parse(call.arguments['scheduledDateTimeISO8601']));
+        }
+        return call.method == 'requestNotificationsPermission' ? true : null;
+      });
+    });
+
+    tearDown(() =>
+        messenger.setMockMethodCallHandler(notificationsChannel, null));
+
+    test('is set for the trip\'s expected time minus the alert minutes',
+        () async {
+      // Whole seconds: the plugin gets the time with milliseconds
+      final now = DateTime.fromMillisecondsSinceEpoch(
+          DateTime.now().millisecondsSinceEpoch ~/ 1000 * 1000);
+      final trip = _bus('116', 20, at: now, tripId: 'bus-50-111');
+      final wait = BusWait.forTrip(
+        stopId: 3140,
+        stopName: 'BV BATLLE',
+        trip: trip,
+        alertMinutes: 5,
+        now: now,
+      );
+      final ios = ScheduledBusWait();
+      expect(await ios.start(wait, trip), isTrue);
+      expect(scheduled.single,
+          trip.expectedAt.subtract(const Duration(minutes: 5)).toUtc());
+
+      // Moved with the followed bus, not the one now where it was expected
+      final result = await ios.onArrivals(wait, [
+        _bus('116', 20, at: now, tripId: 'bus-50-222'),
+        _bus('116', 26, at: now, tripId: 'bus-50-111'),
+      ]);
+      expect(result, isFalse);
+      expect(scheduled.last, now.add(const Duration(minutes: 21)).toUtc());
     });
   });
 }
