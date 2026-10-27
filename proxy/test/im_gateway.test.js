@@ -51,6 +51,15 @@ const fleet = () => new Response(fixture('im_buses.json'));
 const busstops = () => new Response(fixture('im_busstops.json'));
 const stopIndex = () => new Response(stopIndexCsv());
 
+/** mockIm with what the catalog and the stop index ask for, and [routes]. */
+const mockIndex = (routes = {}) =>
+  mockIm({
+    '/buses/busstops': busstops,
+    '/buses/linevariants': () => new Response(fixture('im_linevariants.json')),
+    [STOP_INDEX_URL]: stopIndex,
+    ...routes,
+  });
+
 /** Durable Object storage in memory; survives a "restarted" gateway. */
 function memoryStorage() {
   const values = new Map();
@@ -475,7 +484,7 @@ describe('stop index (geoserver)', () => {
     Object.fromEntries((await response.json()).stops.map((s) => [s.id, s.lines]));
 
   it('joins the lines of each stop to the catalog, sorted like the app', async () => {
-    const calls = mockIm({ '/buses/busstops': busstops, [STOP_INDEX_URL]: stopIndex });
+    const calls = mockIndex();
     const g = gateway();
 
     const response = await g.get_('/catalog/stops');
@@ -494,6 +503,7 @@ describe('stop index (geoserver)', () => {
     );
     assert.deepEqual(calls.sort(), [
       `GET ${API}/buses/busstops`,
+      `GET ${API}/buses/linevariants`,
       `GET ${STOP_INDEX_URL}`,
       `POST ${TOKEN_URL}`,
     ]);
@@ -502,8 +512,7 @@ describe('stop index (geoserver)', () => {
   it('never sends the token to geoserver or spends the budget on it', async () => {
     const storage = memoryStorage();
     const headers = [];
-    mockIm({
-      '/buses/busstops': busstops,
+    mockIndex({
       [STOP_INDEX_URL]: (init) => {
         headers.push(init.headers);
         return stopIndex();
@@ -514,8 +523,8 @@ describe('stop index (geoserver)', () => {
     await g.get_('/catalog/stops');
     assert.equal(headers.length, 1);
     assert.equal(headers[0].Authorization, undefined);
-    // GET /buses/busstops only
-    assert.equal((await storage.get('budget')).used, 1);
+    // GET /buses/busstops and /buses/linevariants
+    assert.equal((await storage.get('budget')).used, 2);
   });
 
   it('builds even while the key is blocked', async () => {
@@ -526,7 +535,7 @@ describe('stop index (geoserver)', () => {
       used: 0,
       blockedUntil: Date.parse('2026-10-19T22:53:00Z'),
     });
-    const calls = mockIm({ '/buses/busstops': busstops, [STOP_INDEX_URL]: stopIndex });
+    const calls = mockIndex();
     const g = gateway({ storage });
 
     const response = await g.get_('/catalog/stops');
@@ -534,12 +543,13 @@ describe('stop index (geoserver)', () => {
 
     assert.equal(response.status, 503);
     assert.deepEqual(calls.sort(), [`GET ${STOP_INDEX_URL}`, `POST ${TOKEN_URL}`]);
-    assert.ok(await storage.get('stopmeta:info'));
+    // Lines without directions: the line variants could not load
+    assert.equal((await storage.get('stopmeta:info')).complete, false);
   });
 
   it(`saves the index in ${STOP_META_BUCKETS} buckets`, async () => {
     const storage = memoryStorage();
-    mockIm({ '/buses/busstops': busstops, [STOP_INDEX_URL]: stopIndex });
+    mockIndex();
     const g = gateway({ storage });
 
     await g.get_('/catalog/stops');
@@ -554,13 +564,18 @@ describe('stop index (geoserver)', () => {
     });
     // 574 % 64 = 62
     assert.deepEqual(await storage.get('stopmeta:62'), {
-      byStop: { 574: { lines: ['116', '117', '121', '141', '142', '144', '538'] } },
+      byStop: {
+        574: {
+          lines: ['116', '117', '121', '141', '142', '144', '538'],
+          directions: [{ line: '116', destination: 'POCITOS', variantIds: [630] }],
+        },
+      },
     });
   });
 
   it('a woken gateway reads the lines from storage, not from geoserver', async () => {
     const storage = memoryStorage();
-    mockIm({ '/buses/busstops': busstops, [STOP_INDEX_URL]: stopIndex });
+    mockIndex();
     await gateway({ storage }).get_('/catalog/stops');
 
     const calls = mockIm({ '/buses/busstops': busstops });
@@ -574,13 +589,12 @@ describe('stop index (geoserver)', () => {
 
   it('serves an index a day old while a new one is built', async () => {
     const storage = memoryStorage();
-    mockIm({ '/buses/busstops': busstops, [STOP_INDEX_URL]: stopIndex });
+    mockIndex();
     const g = gateway({ storage });
     await g.get_('/catalog/stops');
 
     // Line 117 left stop 574
-    const calls = mockIm({
-      '/buses/busstops': busstops,
+    const calls = mockIndex({
       [STOP_INDEX_URL]: () =>
         new Response('FID,cod_ubic_parada,desc_linea,cod_variante\r\nf,574,116,630\r\n'),
     });
@@ -600,13 +614,10 @@ describe('stop index (geoserver)', () => {
     const logs = [];
     console.error = (...args) => logs.push(args.join(' '));
     const storage = memoryStorage();
-    mockIm({ '/buses/busstops': busstops, [STOP_INDEX_URL]: stopIndex });
+    mockIndex();
     await gateway({ storage }).get_('/catalog/stops');
 
-    mockIm({
-      '/buses/busstops': busstops,
-      [STOP_INDEX_URL]: () => new Response('', { status: 500 }),
-    });
+    mockIndex({ [STOP_INDEX_URL]: () => new Response('', { status: 500 }) });
     const g = gateway({ storage, start: '2026-10-26T22:52:10Z' });
     const response = await g.get_('/catalog/stops');
     await g.settle();
@@ -617,7 +628,7 @@ describe('stop index (geoserver)', () => {
   });
 
   it('builds once for concurrent requests', async () => {
-    const calls = mockIm({ '/buses/busstops': busstops, [STOP_INDEX_URL]: stopIndex });
+    const calls = mockIndex();
     const g = gateway();
 
     const answers = await Promise.all(Array.from({ length: 10 }, () => g.get_('/catalog/stops')));
@@ -631,10 +642,7 @@ describe('stop index (geoserver)', () => {
   it('answers without lines when geoserver fails, and tries again after 15 min', async () => {
     const logs = [];
     console.error = (...args) => logs.push(args.join(' '));
-    const calls = mockIm({
-      '/buses/busstops': busstops,
-      [STOP_INDEX_URL]: () => new Response('', { status: 500 }),
-    });
+    const calls = mockIndex({ [STOP_INDEX_URL]: () => new Response('', { status: 500 }) });
     const g = gateway();
 
     const response = await g.get_('/catalog/stops');
@@ -645,6 +653,8 @@ describe('stop index (geoserver)', () => {
     assert.equal(body.linesAvailable, false);
     assert.equal(body.stops.length, 4);
     assert.ok(body.stops.every((s) => s.lines.length === 0));
+    // Line variants are not asked for without the CSV
+    assert.ok(!calls.some((c) => c.endsWith('/linevariants')));
     assert.deepEqual(logs, ['geoserver: HTTP 500']);
 
     g.tick(14 * 60 * 1000);
@@ -652,10 +662,185 @@ describe('stop index (geoserver)', () => {
     await g.settle();
     assert.equal(calls.filter((c) => c.includes('geoserver')).length, 1);
 
-    mockIm({ '/buses/busstops': busstops, [STOP_INDEX_URL]: stopIndex });
+    mockIndex();
     g.tick(60 * 1000);
     const again = await g.get_('/catalog/stops');
     assert.equal(again.headers.get('X-Lines'), null);
     assert.equal((await again.json()).linesAvailable, true);
+  });
+});
+
+describe('GET /stops/{id}/meta', () => {
+  it('answers 503 until the index is built, then the lines and where they go', async () => {
+    const calls = mockIndex();
+    const g = gateway();
+
+    const first = await g.get_('/stops/574/meta');
+    assert.equal(first.status, 503);
+    assert.equal(first.headers.get('Retry-After'), '30');
+    assert.deepEqual(await first.json(), { error: 'upstream_busy' });
+    await g.settle();
+
+    const response = await g.get_('/stops/574/meta');
+    assert.equal(response.status, 200);
+    assert.deepEqual(await response.json(), {
+      builtAt: '2026-10-19T22:52:10.000Z',
+      complete: true,
+      lines: ['116', '117', '121', '141', '142', '144', '538'],
+      // Of the stop's 15 variants only 630 is in the line variants sample
+      directions: [{ line: '116', destination: 'POCITOS', variantIds: [630] }],
+    });
+    assert.deepEqual(calls.sort(), [
+      `GET ${API}/buses/linevariants`,
+      `GET ${STOP_INDEX_URL}`,
+      `POST ${TOKEN_URL}`,
+    ]);
+  });
+
+  it('spends one unit of budget, for the line variants, none for geoserver', async () => {
+    const storage = memoryStorage();
+    const budgetAtGeoserver = [];
+    mockIndex({
+      [STOP_INDEX_URL]: async () => {
+        budgetAtGeoserver.push(await storage.get('budget'));
+        return stopIndex();
+      },
+    });
+    const g = gateway({ storage });
+
+    await g.get_('/stops/574/meta');
+    await g.settle();
+
+    assert.deepEqual(budgetAtGeoserver, [undefined]);
+    assert.equal((await storage.get('budget')).used, 1);
+  });
+
+  it('answers empty lists for a stop the index does not have', async () => {
+    mockIndex();
+    const g = gateway();
+    await g.get_('/stops/574/meta');
+    await g.settle();
+
+    assert.deepEqual(await (await g.get_('/stops/9999999/meta')).json(), {
+      builtAt: '2026-10-19T22:52:10.000Z',
+      complete: true,
+      lines: [],
+      directions: [],
+    });
+  });
+
+  it('gives one direction per line and destination, sorted like the app', async () => {
+    const variant = (lineVariantId, line, destination, special = false) => ({
+      lineVariantId,
+      line,
+      destination,
+      special,
+    });
+    mockIndex({
+      [STOP_INDEX_URL]: () =>
+        new Response(
+          [
+            'FID,cod_ubic_parada,desc_linea,cod_variante',
+            ...[2, 1, 3, 4, 5, 6, 7, 8, 9, 10].map((v) => `f${v},100,x,${v}`),
+          ].join('\r\n'),
+        ),
+      '/buses/linevariants': () =>
+        Response.json([
+          variant(1, '21', 'ÁLVAREZ'),
+          variant(2, '21', 'ÁLVAREZ'),
+          variant(3, '21', 'BELVEDERE'),
+          variant(4, '124 SD', 'CENTRO'),
+          variant(5, 'D10', 'PUNTA CARRETAS'),
+          variant(6, 'D9', 'PUNTA CARRETAS'),
+          variant(8, '21', ''),
+          variant(9, '121', 'ZOOLÓGICO', true),
+          variant(10, '21', 'ÁLVAREZ'),
+          // 7 is not in the official API
+        ]),
+    });
+    const g = gateway();
+    await g.get_('/stops/100/meta');
+    await g.settle();
+
+    const { directions } = await (await g.get_('/stops/100/meta')).json();
+    assert.deepEqual(directions, [
+      // "B" (U+0042) before "Á" (U+00C1): code units, not the dictionary
+      { line: '21', destination: 'BELVEDERE', variantIds: [3] },
+      { line: '21', destination: 'ÁLVAREZ', variantIds: [1, 2, 10] },
+      // A special variant is still a direction
+      { line: '121', destination: 'ZOOLÓGICO', variantIds: [9] },
+      { line: '124 SD', destination: 'CENTRO', variantIds: [4] },
+      { line: 'D10', destination: 'PUNTA CARRETAS', variantIds: [5] },
+      { line: 'D9', destination: 'PUNTA CARRETAS', variantIds: [6] },
+    ]);
+  });
+
+  it('keeps the lines but no directions when the line variants fail, and tries again after 15 min', async () => {
+    const logs = [];
+    console.error = (...args) => logs.push(args.join(' '));
+    const storage = memoryStorage();
+    mockIndex({ '/buses/linevariants': () => new Response('', { status: 500 }) });
+    const g = gateway({ storage });
+    await g.get_('/stops/574/meta');
+    await g.settle();
+
+    const incomplete = await (await g.get_('/stops/574/meta')).json();
+    assert.equal(incomplete.complete, false);
+    assert.deepEqual(incomplete.lines, ['116', '117', '121', '141', '142', '144', '538']);
+    assert.deepEqual(incomplete.directions, []);
+    assert.equal((await storage.get('stopmeta:info')).complete, false);
+    assert.deepEqual(logs, ['im-gateway: no line variants']);
+
+    const calls = mockIndex();
+    g.tick(15 * 60 * 1000);
+    // Served as it is while a new build runs
+    assert.equal((await (await g.get_('/stops/574/meta')).json()).complete, false);
+    await g.settle();
+
+    const complete = await (await g.get_('/stops/574/meta')).json();
+    assert.equal(complete.complete, true);
+    assert.deepEqual(complete.directions, [
+      { line: '116', destination: 'POCITOS', variantIds: [630] },
+    ]);
+    assert.equal(calls.filter((c) => c.endsWith('/linevariants')).length, 1);
+  });
+
+  it('a woken gateway answers from storage without any request', async () => {
+    const storage = memoryStorage();
+    mockIndex();
+    const first = gateway({ storage });
+    await first.get_('/stops/574/meta');
+    await first.settle();
+
+    const calls = mockIm({});
+    const g = gateway({ storage, start: '2026-10-20T10:00:00Z' });
+    const response = await g.get_('/stops/574/meta');
+    await g.settle();
+
+    assert.equal(response.status, 200);
+    assert.deepEqual((await response.json()).directions, [
+      { line: '116', destination: 'POCITOS', variantIds: [630] },
+    ]);
+    assert.deepEqual(calls, []);
+  });
+
+  it('drops copies older than 7 days', async () => {
+    const storage = memoryStorage();
+    mockIndex();
+    const first = gateway({ storage });
+    await first.get_('/stops/574/meta');
+    await first.settle();
+
+    const calls = mockIndex();
+    const g = gateway({ storage, start: '2026-10-26T22:52:10Z' });
+    const response = await g.get_('/stops/574/meta');
+    await g.settle();
+
+    assert.equal(response.status, 503);
+    assert.equal(calls.filter((c) => c.includes('geoserver')).length, 1);
+    assert.equal(
+      (await storage.get('stopmeta:info')).builtAt,
+      Date.parse('2026-10-26T22:52:10Z'),
+    );
   });
 });

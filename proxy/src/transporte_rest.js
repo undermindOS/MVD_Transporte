@@ -61,7 +61,7 @@ async function getJson(url) {
  * `{"descripcion":"SAN JOSE y ANDES",
  *   "lineas":[{"descripcion":"116","codigo":38}, ...]}`
  * transporteRest does not know where the lines go: `directions` is left
- * empty (unknown), and the app falls back to the arrivals.
+ * empty here, and index.js fills it from ImGateway's stop metadata.
  */
 export function toStop(stopId, data) {
   if (!isObject(data)) throw new UpstreamError('unexpected shape', { source: SOURCE });

@@ -2,6 +2,7 @@ import { afterEach, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
+import { STOP_INDEX_URL } from '../src/geoserver.js';
 import worker, { ImGateway, respond } from '../src/index.js';
 
 const UPSTREAM = 'https://api.montevideo.gub.uy/transporteRest';
@@ -130,6 +131,125 @@ describe('GET /v1/stops/{id}', () => {
     assert.equal(response.status, 404);
     assert.equal(response.headers.get('Cache-Control'), 'public, max-age=3600');
     assert.deepEqual(await response.json(), { error: 'stop_not_found' });
+  });
+});
+
+describe('GET /v1/stops/{id} with directions from the stop metadata', () => {
+  const lineas = () => new Response(fixture('transporte_rest/lineas_574.json'));
+  const meta = (directions, complete = true) =>
+    gatewayNamespace(() =>
+      Response.json({ builtAt: '2026-10-27T13:22:26.000Z', complete, lines: [], directions }),
+    );
+
+  it('adds where the lines of the stop go, sorted like the app, cached for a day', async () => {
+    const calls = mockUpstream(lineas);
+    const gateway = meta([
+      { line: '121', destination: 'PUNTA CARRETAS', variantIds: [7884] },
+      // transporteRest does not list 402 at this stop
+      { line: '402', destination: 'URUGUAY Y FLORIDA', variantIds: [8] },
+      { line: '116', destination: 'POCITOS', variantIds: [630] },
+      { line: '116', destination: 'CIUDAD VIEJA', variantIds: [2312] },
+    ]);
+
+    const { response } = await call('/v1/stops/574', { gateway });
+    assert.equal(response.status, 200);
+    assert.equal(response.headers.get('Cache-Control'), 'public, max-age=86400');
+    assert.deepEqual(await response.json(), {
+      id: 574,
+      name: 'SAN JOSE y ANDES',
+      lines: ['116', '117', '121', '141', '142', '144', '538'],
+      directions: [
+        { line: '116', destination: 'CIUDAD VIEJA', variantIds: [2312] },
+        { line: '116', destination: 'POCITOS', variantIds: [630] },
+        { line: '121', destination: 'PUNTA CARRETAS', variantIds: [7884] },
+      ],
+    });
+    assert.deepEqual(gateway.paths, ['/stops/574/meta']);
+    assert.deepEqual(calls, [`${UPSTREAM}/lineas/574`]);
+  });
+
+  it('serves the stop without directions for 5 min while they are unknown', async () => {
+    const logs = captureLogs();
+    const gateways = {
+      incomplete: meta([], false),
+      busy: gatewayNamespace(() =>
+        Response.json(
+          { error: 'upstream_busy' },
+          { status: 503, headers: { 'Retry-After': '30' } },
+        ),
+      ),
+      throws: gatewayNamespace(() => {
+        throw new Error('Durable Object reset');
+      }),
+    };
+
+    for (const [name, gateway] of Object.entries(gateways)) {
+      mockUpstream(lineas);
+      const { response } = await call('/v1/stops/574', { gateway });
+      assert.equal(response.status, 200, name);
+      assert.equal(response.headers.get('Cache-Control'), 'public, max-age=300', name);
+      const body = await response.json();
+      assert.deepEqual(body.lines, ['116', '117', '121', '141', '142', '144', '538'], name);
+      assert.deepEqual(body.directions, [], name);
+    }
+    assert.deepEqual(logs, ['im-gateway: Error']);
+  });
+
+  it('does not wait more than 2 s for directions', async () => {
+    mockUpstream(lineas);
+    const gateway = gatewayNamespace(() => new Promise(() => {}));
+
+    const started = Date.now();
+    const { response } = await call('/v1/stops/574', { gateway });
+    const waited = Date.now() - started;
+
+    assert.equal(response.status, 200);
+    assert.ok(waited >= 1900 && waited < 3000, `waited ${waited} ms`);
+    assert.equal(response.headers.get('Cache-Control'), 'public, max-age=300');
+    assert.deepEqual((await response.json()).directions, []);
+  });
+
+  it('answers stop_not_found whatever the metadata says', async () => {
+    mockUpstream(() => new Response(NOT_FOUND_BODY, { status: 500 }));
+    const gateway = meta([{ line: '116', destination: 'POCITOS', variantIds: [630] }]);
+
+    const { response } = await call('/v1/stops/99999', { gateway });
+    assert.equal(response.status, 404);
+    assert.equal(response.headers.get('Cache-Control'), 'public, max-age=3600');
+    assert.deepEqual(await response.json(), { error: 'stop_not_found' });
+  });
+
+  it('gets them from a real ImGateway once it has built the stop index', async () => {
+    const IM = 'https://api.montevideo.gub.uy/api/transportepublico';
+    mockUpstream((url) => {
+      if (url === `${UPSTREAM}/lineas/574`) return lineas();
+      if (url === STOP_INDEX_URL) return new Response(fixture('geoserver/stop_index_sample.csv'));
+      if (url.includes('openid-connect/token')) {
+        return Response.json({ access_token: 't', expires_in: 300 });
+      }
+      if (url === `${IM}/buses/linevariants`) {
+        return new Response(fixture('im_api/im_linevariants.json'));
+      }
+      return assert.fail(`unexpected ${url}`);
+    });
+    const pending = [];
+    const im = new ImGateway(
+      { waitUntil: (p) => pending.push(p) },
+      { IM_CLIENT_ID: 'id', IM_CLIENT_SECRET: 's' },
+    );
+    const gateway = gatewayNamespace((url) => im.fetch(new Request(url)));
+
+    // The first request starts the build and does not wait for it
+    const { response: first } = await call('/v1/stops/574', { gateway });
+    assert.equal(first.headers.get('Cache-Control'), 'public, max-age=300');
+    assert.deepEqual((await first.json()).directions, []);
+    await Promise.all(pending);
+
+    const { response } = await call('/v1/stops/574', { gateway });
+    assert.equal(response.headers.get('Cache-Control'), 'public, max-age=86400');
+    assert.deepEqual((await response.json()).directions, [
+      { line: '116', destination: 'POCITOS', variantIds: [630] },
+    ]);
   });
 });
 

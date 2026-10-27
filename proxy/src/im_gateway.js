@@ -6,11 +6,13 @@
 // live here and are shared by every user. A stale copy is served while a
 // fresh one loads, so a 4 s `GET /buses` never holds a request up.
 //
-// It also keeps the stop index: the lines of every stop, from one geoserver
-// CSV a day. That request needs no key and never counts against the budget.
+// It also keeps the stop index: the lines of every stop and where they go,
+// from one geoserver CSV a day joined with the official line variants. The
+// CSV request needs no key and never counts against the budget.
 //
 // Internal routes, called by the Worker (index.js), not by the app:
 //   GET /vehicles?ids=50:111,10:22  comfort of buses by operator:bus id
+//   GET /stops/{id}/meta            lines and directions of a stop
 //   GET /catalog/stops              stops with their lines
 //   GET /lines/{line}/buses, /catalog/lines  no public route reaches them
 
@@ -57,6 +59,8 @@ const STOP_META_MAX_AGE_MS = 7 * 24 * 3600 * 1000;
 const STOP_META_RETRY_MS = 15 * 60 * 1000;
 // How long the catalog waits for a first build before answering without lines
 const STOP_META_WAIT_MS = 20 * 1000;
+// Retry-After (s) of /stops/{id}/meta while there is no index yet
+const STOP_META_RETRY_AFTER = 30;
 export const STOP_META_BUCKETS = 64;
 
 const RESOURCES = {
@@ -68,7 +72,10 @@ const RESOURCES = {
 /** IM_CLIENT_ID / IM_CLIENT_SECRET are not set (see ../README.md). */
 export class NotConfiguredError extends Error {}
 
-/** No budget left, or the API asked to wait; `retryAfter` is in seconds. */
+/**
+ * No budget left, the API asked to wait, or the stop index is not built
+ * yet; `retryAfter` is in seconds.
+ */
 export class BusyError extends UpstreamError {
   constructor(retryAfter) {
     super('IM API budget exhausted');
@@ -98,6 +105,8 @@ export class ImGateway {
       if (url.pathname === '/vehicles') {
         return await this.vehicles(url.searchParams.get('ids') ?? '');
       }
+      const stop = /^\/stops\/([1-9]\d{0,6})\/meta$/.exec(url.pathname);
+      if (stop) return await this.stopMetaOf(Number(stop[1]));
       const line = /^\/lines\/([0-9A-Z]{1,6})\/buses$/.exec(url.pathname);
       if (line) return await this.lineBuses(line[1]);
       if (url.pathname === '/catalog/stops') return await this.catalogStops();
@@ -162,6 +171,28 @@ export class ImGateway {
   }
 
   /**
+   * Lines and directions of stop [id] from the stop index; empty lists for
+   * a stop the index does not have. Without an index a build starts and
+   * the answer is 503 upstream_busy: the Worker serves the stop without
+   * directions meanwhile.
+   */
+  async stopMetaOf(id) {
+    const meta = await this.stopMeta();
+    if (!meta) {
+      this.buildStopMetaOnce();
+      throw new BusyError(STOP_META_RETRY_AFTER);
+    }
+    const entry = (await this.stopMetaBucket(meta, id % STOP_META_BUCKETS))[id];
+    return reply({
+      builtAt: iso(meta.info.builtAt),
+      // Nothing is missing for a stop without variants
+      complete: entry ? meta.info.complete : true,
+      lines: entry?.lines ?? [],
+      directions: entry?.directions ?? [],
+    });
+  }
+
+  /**
    * The official stop catalog, each stop with its lines from the stop index
    * (sorted like the app). Without an index it waits up to
    * STOP_META_WAIT_MS for a build; if there is still none, every stop has
@@ -196,8 +227,9 @@ export class ImGateway {
 
   /**
    * The stop index from memory, else from storage, while it is younger than
-   * STOP_META_MAX_AGE_MS; otherwise null. One past its TTL is still served
-   * while a new one is built in the background.
+   * STOP_META_MAX_AGE_MS; otherwise null. One past its TTL, or incomplete
+   * for STOP_META_RETRY_MS, is still served while a new one is built in the
+   * background.
    */
   async stopMeta() {
     this.stopMetaRead ??= Promise.resolve(this.state?.storage?.get('stopmeta:info')).then(
@@ -206,11 +238,13 @@ export class ImGateway {
     const meta = await this.stopMetaRead;
     const age = meta ? this.now() - meta.info.builtAt : Infinity;
     if (age >= STOP_META_MAX_AGE_MS) return null;
-    if (age >= STOP_META_TTL_MS) this.buildStopMetaOnce();
+    if (age >= STOP_META_TTL_MS || (!meta.info.complete && age >= STOP_META_RETRY_MS)) {
+      this.buildStopMetaOnce();
+    }
     return meta;
   }
 
-  /** Bucket [i] of [meta], `{byStop}` by stop id, read from storage once. */
+  /** Bucket [i] of [meta], by stop id, read from storage once. */
   stopMetaBucket(meta, i) {
     meta.buckets[i] ??= Promise.resolve(this.state?.storage?.get(`stopmeta:${i}`)).then(
       (saved) => saved?.byStop ?? {},
@@ -263,16 +297,31 @@ export class ImGateway {
     return pending;
   }
 
-  /** A new stop index from the whole geoserver layer, saved and kept. */
+  /**
+   * A new stop index from the whole geoserver layer, saved and kept. Its
+   * variants are looked up in the official line variants (1 request, once
+   * a day); without them the index is stored as incomplete, with no
+   * directions.
+   */
   async buildStopMeta() {
     // Straight to geoserver, never through call(): no token, no budget
     const index = toStopIndex(await getStopIndexCsv());
+    let byVariant = null;
+    try {
+      const { data } = await this.get('lines', CATALOG_MAX_AGE_MS);
+      byVariant = new Map(data.map((variant) => [variant.id, variant]));
+    } catch {
+      console.error('im-gateway: no line variants');
+    }
 
     const buckets = Array.from({ length: STOP_META_BUCKETS }, () => ({}));
-    for (const [id, { lines }] of index) {
-      buckets[id % STOP_META_BUCKETS][id] = { lines: [...lines].sort(compareLines) };
+    for (const [id, { lines, variants }] of index) {
+      buckets[id % STOP_META_BUCKETS][id] = {
+        lines: [...lines].sort(compareLines),
+        directions: byVariant ? toDirections(variants, byVariant) : [],
+      };
     }
-    const info = { builtAt: this.now(), complete: true };
+    const info = { builtAt: this.now(), complete: byVariant !== null };
 
     // No await in between: storage writes them together, all or none
     const storage = this.state?.storage;
@@ -407,6 +456,37 @@ export class ImGateway {
     this.token = await pending;
     return this.token.token;
   }
+}
+
+/**
+ * Where the lines of a stop go: its geoserver variants (`cod_variante`)
+ * looked up in the official line variants, one entry per line and
+ * destination with all its variant ids, ascending. Sorted by line like the
+ * app, then by destination. Variants the official API does not know or
+ * that have no destination are left out; `special` ones stay.
+ */
+function toDirections(variantIds, byVariant) {
+  const byPair = new Map();
+  for (const id of variantIds) {
+    const variant = byVariant.get(id);
+    if (!variant?.destination) continue;
+    const key = JSON.stringify([variant.line, variant.destination]);
+    if (!byPair.has(key)) {
+      byPair.set(key, { line: variant.line, destination: variant.destination, variantIds: [] });
+    }
+    byPair.get(key).variantIds.push(id);
+  }
+  const directions = [...byPair.values()];
+  for (const direction of directions) direction.variantIds.sort((a, b) => a - b);
+  return directions.sort(compareDirections);
+}
+
+/** By line like the app, then by destination in UTF-16 code units. */
+export function compareDirections(a, b) {
+  return (
+    compareLines(a.line, b.line) ||
+    (a.destination < b.destination ? -1 : a.destination > b.destination ? 1 : 0)
+  );
 }
 
 function failure(e) {

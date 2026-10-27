@@ -16,11 +16,7 @@ const ISO_MS = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/;
 // Cases whose behaviour arrives with a later commit of this branch, by the
 // commit that brings it. Skipped and reported as such, never dropped: the
 // list is empty once the proxy implements the whole contract.
-const PENDING = {
-  'stop.574': 'P5 (directions from the stop metadata)',
-  'stop.574.degraded': 'P5 (directions from the stop metadata)',
-  'catalog.sample': 'P5 (linevariants for the directions)',
-};
+const PENDING = {};
 
 // Error codes no GET case can produce; index.test.js covers them
 const CODES_WITHOUT_CASE = ['internal_error', 'method_not_allowed', 'rate_limited'];

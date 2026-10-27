@@ -16,14 +16,17 @@ import {
   StopNotFoundError,
   UpstreamError,
 } from './transporte_rest.js';
+import { compareDirections } from './im_gateway.js';
 import { getNewest } from './notificacion.js';
 import { getGpsStatus } from './pci.js';
-import { DAY_TYPES } from './rules.js';
+import { DAY_TYPES, isObject } from './rules.js';
 
 export { ImGateway } from './im_gateway.js';
 
 // Seconds
 const STOP_TTL = 24 * 3600; // name and lines change rarely
+// Directions unknown for now (stop metadata failed, slow or incomplete)
+const STOP_WITHOUT_DIRECTIONS_TTL = 300;
 const MISSING_STOP_TTL = 3600; // a new stop may appear
 const ARRIVALS_TTL = 15; // the app refreshes every 30 s
 const SCHEDULE_TTL = 6 * 3600; // same as the app's own timetable cache
@@ -36,6 +39,8 @@ const GPS_TTL = 60; // the app asks at most once a minute
 
 // Comfort data is optional: arrivals do not wait longer for it
 const VEHICLES_WAIT_MS = 2000;
+// Directions are optional too: a stop does not wait longer for them
+const STOP_META_WAIT_MS = 2000;
 
 // Stop codes are positive ints; no leading zeros, so one stop = one cache key
 const STOP = '([1-9]\\d{0,6})';
@@ -98,8 +103,50 @@ export async function respond(handler, env, params) {
   }
 }
 
-async function stop(_env, id) {
-  return json(await getStop(Number(id)), STOP_TTL);
+async function stop(env, id) {
+  const [details, directions] = await Promise.all([
+    getStop(Number(id)),
+    lookupDirections(env, id),
+  ]);
+  // Only lines transporteRest lists for the stop, sorted like the app
+  const lines = new Set(details.lines);
+  return json(
+    {
+      ...details,
+      directions: (directions ?? [])
+        .filter((d) => isObject(d) && lines.has(d.line))
+        .sort(compareDirections),
+    },
+    directions ? STOP_TTL : STOP_WITHOUT_DIRECTIONS_TTL,
+  );
+}
+
+/**
+ * Where the lines of stop [id] go, from ImGateway's stop metadata; null
+ * while they are unknown: the gateway failed, took longer than
+ * STOP_META_WAIT_MS or has them incomplete. Without the binding there is
+ * nothing to wait for: [].
+ */
+async function lookupDirections(env, id) {
+  if (!env.IM_GATEWAY) return [];
+
+  let timer;
+  try {
+    const response = await Promise.race([
+      gateway(env, `/stops/${id}/meta`),
+      new Promise((resolve) => {
+        timer = setTimeout(resolve, STOP_META_WAIT_MS, null);
+      }),
+    ]);
+    if (!response?.ok) return null;
+    const { complete, directions } = await response.json();
+    return complete === true && Array.isArray(directions) ? directions : null;
+  } catch (e) {
+    console.error(`im-gateway: ${e.name}`);
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 async function arrivals(env, id) {
