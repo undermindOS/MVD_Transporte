@@ -13,6 +13,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:local_auth/error_codes.dart' as auth_error;
@@ -306,6 +307,35 @@ void main() {
     expect(auth.reasons, hasLength(2));
   });
 
+  testWidgets('the system settings opened from «Paradas cercanas» do not '
+      'lock on the way back', (tester) async {
+    final geolocator = _FakeGeolocator();
+    GeolocatorPlatform.instance = geolocator;
+    lockSetting(true);
+    await pumpApp(tester);
+    now = now.add(const Duration(minutes: 1));
+
+    // Location denied for good: «Abrir ajustes» is the only way back
+    await tester.tap(find.byTooltip('Agregar parada'));
+    await settle(tester);
+    await tester.tap(find.text('Paradas cercanas'));
+    await settle(tester);
+    await tester.tap(find.text('Abrir ajustes'));
+    await tester.pump();
+    expect(geolocator.settingsOpened, isTrue);
+
+    // Location turned on in the settings, then back
+    auth.autoAnswer = null;
+    now = now.add(const Duration(seconds: 1));
+    lifecycle(tester, _toBackground);
+    now = now.add(const Duration(minutes: 1));
+    lifecycle(tester, _backFromBackground);
+    await tester.pump();
+    expect(find.byType(LockScreen), findsNothing);
+    expect(auth.reasons, hasLength(1));
+    expect(find.text('Abrir ajustes'), findsOneWidget);
+  });
+
   testWidgets('a locked-out prompt keeps the lock (fail closed)',
       (tester) async {
     lockSetting(true);
@@ -406,4 +436,19 @@ class _FakeBrowser extends UrlLauncherPlatform {
     launches.add(url);
     return true;
   }
+}
+
+/// Location denied for good («No volver a preguntar»).
+class _FakeGeolocator extends GeolocatorPlatform {
+  bool settingsOpened = false;
+
+  @override
+  Future<bool> isLocationServiceEnabled() async => true;
+
+  @override
+  Future<LocationPermission> checkPermission() async =>
+      LocationPermission.deniedForever;
+
+  @override
+  Future<bool> openAppSettings() async => settingsOpened = true;
 }
