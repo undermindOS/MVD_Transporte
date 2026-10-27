@@ -51,6 +51,11 @@ class StopsPage extends StatefulWidget {
   /// page is on screen and the app in the foreground.
   static const autoRefreshInterval = Duration(seconds: 30);
 
+  /// The phone's clock: when a board arrived, and how long ago. Tests move
+  /// it forward.
+  @visibleForTesting
+  static DateTime Function() clock = DateTime.now;
+
   @override
   State<StopsPage> createState() => _StopsPageState();
 }
@@ -70,6 +75,9 @@ class _StopsPageState extends State<StopsPage>
   // a bus due more than [_staleRowGrace] ago is dropped from them
   static const _staleFor = Duration(minutes: 5);
   static const _staleRowGrace = Duration(minutes: 1);
+  // Two refresh intervals: a board that arrived longer ago, with no failure
+  // since, is not live any more (one on its way back on screen, or busy)
+  static const _liveFor = Duration(minutes: 1);
   // Without a Retry-After
   static const _busyDefault = Duration(seconds: 60);
 
@@ -220,7 +228,10 @@ class _StopsPageState extends State<StopsPage>
         for (final id in ids) {
           final view = _boards[id];
           _boards[id] = _BoardView(
-              lastGood: view?.lastGood, failure: view?.failure, loading: true);
+              lastGood: view?.lastGood,
+              receivedAt: view?.receivedAt,
+              failure: view?.failure,
+              loading: true);
         }
       });
     }
@@ -252,12 +263,17 @@ class _StopsPageState extends State<StopsPage>
       results.forEach((id, result) {
         final view = _boards[id];
         _boards[id] = switch (result) {
-          ApiOk(:final value) => _BoardView(lastGood: value),
+          ApiOk(:final value) =>
+            _BoardView(lastGood: value, receivedAt: StopsPage.clock()),
           // Nothing new and nothing to say: the next ticks wait
-          ApiError(failure: ApiFailure.busy) =>
-            _BoardView(lastGood: view?.lastGood, failure: view?.failure),
-          ApiError(:final failure) =>
-            _BoardView(lastGood: view?.lastGood, failure: failure),
+          ApiError(failure: ApiFailure.busy) => _BoardView(
+              lastGood: view?.lastGood,
+              receivedAt: view?.receivedAt,
+              failure: view?.failure),
+          ApiError(:final failure) => _BoardView(
+              lastGood: view?.lastGood,
+              receivedAt: view?.receivedAt,
+              failure: failure),
         };
       });
     });
@@ -968,18 +984,17 @@ class _StopsPageState extends State<StopsPage>
     final view = _boards[stopId];
     final board = view?.lastGood;
     final failure = view?.failure;
-    // Nothing to show yet: loading, or busy before the first board
-    if (board == null && (failure == null || view!.loading)) {
-      return const Padding(
-        padding: EdgeInsets.all(16),
-        child: Center(
-          child: SizedBox.square(
-            dimension: 18,
-            child: CircularProgressIndicator(strokeWidth: 2),
-          ),
+    const waiting = Padding(
+      padding: EdgeInsets.all(16),
+      child: Center(
+        child: SizedBox.square(
+          dimension: 18,
+          child: CircularProgressIndicator(strokeWidth: 2),
         ),
-      );
-    }
+      ),
+    );
+    // Nothing to show yet: loading, or busy before the first board
+    if (board == null && (failure == null || view!.loading)) return waiting;
     // An error inside a card is a red LED; a warning over a list is the
     // avisoNoche panel
     if (failure == ApiFailure.notFound) {
@@ -1021,6 +1036,24 @@ class _StopsPageState extends State<StopsPage>
                 stale: true),
         ],
       );
+    }
+    // No failure, but no new board for a while either: old minutes must
+    // not look live. Estimates, then, past [_staleFor], a wait as before
+    // the first board — busy says nothing, and a refresh may be on its way
+    final received = view!.receivedAt;
+    final age = received == null
+        ? Duration.zero
+        : StopsPage.clock().difference(received);
+    if (age >= _liveFor) {
+      final cutoff = now.subtract(_staleRowGrace);
+      final stale = age >= _staleFor
+          ? const <BusArrival>[]
+          : accepted(board!)
+              .where((a) => !a.expectedAt.isBefore(cutoff))
+              .toList();
+      if (stale.isEmpty) return waiting;
+      return _buildRows(key, stale, board!.arrivals, stopId, stopName,
+          stale: true);
     }
     final arrivals = accepted(board!);
     if (arrivals.isEmpty) {
@@ -1102,9 +1135,14 @@ class _StopsPageState extends State<StopsPage>
 /// What the cards of one stop show: the last board that arrived, and why
 /// the latest refresh failed, if it did.
 class _BoardView {
-  const _BoardView({this.lastGood, this.failure, this.loading = false});
+  const _BoardView(
+      {this.lastGood, this.receivedAt, this.failure, this.loading = false});
 
   final ArrivalsBoard? lastGood;
+
+  /// When [lastGood] arrived, on the phone's clock ([StopsPage.clock]):
+  /// its `fetchedAt` is the server's, which may be skewed or edge-cached.
+  final DateTime? receivedAt;
 
   /// The latest refresh failed; null after a good one. A busy answer
   /// changes nothing.

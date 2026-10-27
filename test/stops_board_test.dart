@@ -382,6 +382,112 @@ void main() {
     }, () => client);
   });
 
+  testWidgets('back on screen, an old board is not live while it refreshes',
+      (tester) async {
+    final active = ValueNotifier(true);
+    addTearDown(active.dispose);
+    // How far the phone's clock has moved on
+    var later = Duration.zero;
+    StopsPage.clock = () => DateTime.now().add(later);
+    addTearDown(() => StopsPage.clock = DateTime.now);
+    final pending = <String, Completer<http.Response>>{};
+    var holding = false;
+    answer = (request) {
+      if (!holding) return boards(request);
+      return (pending[request.url.path] = Completer<http.Response>()).future;
+    };
+    Future<void> answerPending() async {
+      for (final MapEntry(key: path, value: reply) in pending.entries) {
+        reply.complete(await boards(http.Request('GET',
+            Uri.parse('https://proxy.test$path'))));
+      }
+      pending.clear();
+      await tester.pump();
+    }
+
+    await http.runWithClient(() async {
+      await tester.pumpWidget(MaterialApp(
+        theme: buildTimbreTheme(),
+        home: ValueListenableBuilder<bool>(
+          valueListenable: active,
+          builder: (_, on, _) =>
+              StopsPage(active: on, onOpenStopInComoIr: (_) {}),
+        ),
+      ));
+      await tester.pump();
+      expect(liveMinutes(9), findsOneWidget);
+      holding = true;
+
+      // Two minutes under Horarios: estimates until the new board comes
+      active.value = false;
+      await tester.pump();
+      later = const Duration(minutes: 2);
+      active.value = true;
+      await tester.pump();
+      expect(pending, hasLength(2));
+      expect(find.byType(MinutosEnVivo), findsNothing);
+      expect(find.byType(LlegandoChip), findsNothing);
+      expect(litBadges, findsNothing);
+      expect(find.text('~20:01'), findsOneWidget);
+      expect(find.text('~19:55'), findsOneWidget);
+      expect(find.textContaining('No se pudo actualizar'), findsNothing);
+      await answerPending();
+      expect(liveMinutes(9), findsOneWidget);
+
+      // Six minutes: those buses are too old even as estimates
+      active.value = false;
+      await tester.pump();
+      later += const Duration(minutes: 6);
+      active.value = true;
+      await tester.pump();
+      expect(find.byType(CircularProgressIndicator), findsNWidgets(2));
+      expect(find.text('~20:01'), findsNothing);
+      expect(find.text('116'), findsNothing);
+      expect(find.textContaining('No se pudo actualizar'), findsNothing);
+      await answerPending();
+      expect(liveMinutes(9), findsOneWidget);
+    }, () => client);
+  });
+
+  testWidgets('a proxy busy for minutes: the old buses stop looking live',
+      (tester) async {
+    var later = Duration.zero;
+    StopsPage.clock = () => DateTime.now().add(later);
+    addTearDown(() => StopsPage.clock = DateTime.now);
+    var busy = false;
+    answer = (request) async => busy
+        ? http.Response('{"error":"rate_limited"}', 429,
+            headers: {'retry-after': '1'})
+        : boards(request);
+
+    await http.runWithClient(() async {
+      await tester.pumpWidget(app());
+      await tester.pump();
+      expect(liveMinutes(9), findsOneWidget);
+
+      busy = true;
+      later = const Duration(minutes: 2);
+      await tester.pump(StopsPage.autoRefreshInterval);
+      await tester.pump();
+      expect(arrivalRequests(), hasLength(4));
+      expect(find.byType(MinutosEnVivo), findsNothing);
+      expect(litBadges, findsNothing);
+      expect(find.text('~20:01'), findsOneWidget);
+      expect(find.textContaining('No se pudo actualizar'), findsNothing);
+
+      // Still busy five minutes on: the cards wait, still without a word
+      later = const Duration(minutes: 6);
+      await tester.runAsync(
+          () => Future<void>.delayed(const Duration(milliseconds: 1100)));
+      await tester.pump(StopsPage.autoRefreshInterval);
+      await tester.pump();
+      expect(arrivalRequests(), hasLength(6));
+      expect(find.byType(CircularProgressIndicator), findsNWidgets(2));
+      expect(find.text('~20:01'), findsNothing);
+      expect(find.textContaining('No se pudo actualizar'), findsNothing);
+    }, () => client);
+  });
+
   testWidgets('the home widget follows each refresh', (tester) async {
     final fetchedAt = DateTime.now().toUtc();
     var failing = false;
