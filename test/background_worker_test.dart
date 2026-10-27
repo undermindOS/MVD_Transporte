@@ -1,6 +1,7 @@
 // Periodic background check (WorkManager): stop and route alerts notify
 // about GPS-tracked buses within their threshold, only inside their
-// schedule. HTTP, the notifications plugin and the home widget are faked.
+// schedule, and the home widget shows the first route's next bus. HTTP,
+// the notifications plugin and the home widget are faked.
 
 import 'dart:convert';
 import 'dart:io';
@@ -16,6 +17,8 @@ import 'package:stm_app/models/bus_stop.dart';
 import 'package:stm_app/models/route_alert.dart';
 import 'package:stm_app/services/background_worker.dart';
 import 'package:stm_app/services/cache_service.dart';
+import 'package:stm_app/services/home_widget_feed.dart';
+import 'package:stm_app/services/mvd_api_service.dart';
 import 'package:stm_app/services/notification_service.dart';
 
 /// Stop 574: 116 in 4 min and 121 in 8 min with GPS, 117 in 2 min only
@@ -36,6 +39,36 @@ final _answer = jsonEncode([
     }
 ]);
 
+// When the proxy answered for stop 574 (19:52 in Montevideo)
+final _t0 = DateTime.utc(2026, 10, 19, 22, 52);
+
+/// GET /v1/stops/574/arrivals at [_t0]: 116 with GPS in 4 min to
+/// [destination], 121 in 9 min.
+String _v1Answer({String destination = 'POCITOS'}) => jsonEncode({
+      'id': 574,
+      'fetchedAt': _t0.toIso8601String(),
+      'arrivals': [
+        for (final (trip, line, dest, minutes, clock) in [
+          ('bus-50-139', '116', destination, 4, '19:56'),
+          ('bus-50-1118', '121', 'PUNTA CARRETAS', 9, '20:01'),
+        ])
+          {
+            'tripId': trip,
+            'variantId': null,
+            'line': line,
+            'destination': dest,
+            'state': 'live',
+            'etaMinutes': minutes,
+            'expectedAt':
+                _t0.add(Duration(minutes: minutes)).toIso8601String(),
+            'clockTime': clock,
+            'accessible': true,
+            'airConditioning': null,
+            'zeroEmission': null,
+          }
+      ],
+    });
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   final messenger =
@@ -46,8 +79,11 @@ void main() {
   late Directory hiveDir;
   final shown = <String>[];
   final requests = <String>[];
+  // What the widget would read, and how often it was told to redraw
+  final widget = <String, Object?>{};
+  var redraws = 0;
 
-  final client = MockClient((request) async {
+  var client = MockClient((request) async {
     requests.add(request.url.path);
     return http.Response(_answer, 200);
   });
@@ -76,7 +112,19 @@ void main() {
       if (call.method == 'show') shown.add(call.arguments['title'] as String);
       return call.method == 'initialize' ? true : null;
     });
-    messenger.setMockMethodCallHandler(widgetChannel, (_) async => true);
+    messenger.setMockMethodCallHandler(widgetChannel, (call) async {
+      final args = call.arguments as Map?;
+      switch (call.method) {
+        case 'saveWidgetData':
+          widget[args!['id'] as String] = args['data'];
+        case 'getWidgetData':
+          return widget[args!['id'] as String];
+        case 'updateWidget':
+          expect(args!['name'], 'MVDTransporteWidgetProvider');
+          redraws++;
+      }
+      return true;
+    });
     await NotificationService.init();
   });
 
@@ -87,6 +135,11 @@ void main() {
     for (final r in CacheService.getAllRoutes()) {
       await CacheService.deleteRoute(r.id);
     }
+  });
+
+  tearDown(() {
+    MvdApiService.proxyUrl = '';
+    MvdApiService.resetBusy();
   });
 
   tearDownAll(() async {
@@ -107,13 +160,15 @@ void main() {
   }
 
   Future<RouteAlert> saveRoute(
-      {int minutes = 5,
+      {int id = 1,
+      int origin = 574,
+      int minutes = 5,
       AlertSchedule? schedule,
       List<String> lines = const [],
       List<String> destinations = const []}) async {
     final route = RouteAlert(
-      id: 1,
-      originStopId: 574,
+      id: id,
+      originStopId: origin,
       originName: 'SAN JOSE y ANDES',
       destinationName: 'Trabajo',
       preferredLines: lines,
@@ -185,6 +240,150 @@ void main() {
         ..preferredDestinations = ['POCITOS'];
       await route.save();
       expect(await check(monday(8, 0)), ['Línea 116 → Trabajo']);
+    });
+
+    test('a bus at the stop is "llegando", not "0 min"', () async {
+      await saveStop();
+      final normal = client;
+      client = MockClient((request) async => http.Response(
+          jsonEncode([
+            {'linea': '116', 'minutos': 0, 'real': true, 'horaDesc': '8:07'}
+          ]),
+          200));
+      addTearDown(() => client = normal);
+
+      expect(await check(monday(8, 0)), ['Línea 116 — llegando']);
+    });
+  });
+
+  group('requests', () {
+    // Saturday 0:00 to 1:00 only
+    const saturdayNight =
+        AlertSchedule(days: [6], fromMinute: 0, toMinute: 60);
+
+    test('each stop is requested once, only when needed', () async {
+      await saveStop(); // 574, at any hour
+      await CacheService.saveStop(BusStop(
+          id: 3140,
+          name: 'BV BATLLE',
+          notificationsEnabled: true,
+          etaAlertMinutes: 5)
+        ..schedule = saturdayNight);
+      await saveRoute(); // from 574 too: the widget's route
+      await saveRoute(id: 2, origin: 6325, schedule: saturdayNight);
+
+      expect(await check(monday(8, 0)),
+          ['Línea 116 — 4 min', 'Línea 116 → Trabajo']);
+      // 3140 and 6325 are outside their schedule; 574 is asked once
+      expect(requests, ['/transporteRest/siguientesParada/574']);
+    });
+
+    test('a stop that cannot be checked gives no alert', () async {
+      await saveStop();
+      await saveRoute();
+      final online = client;
+      client = MockClient((request) async {
+        requests.add(request.url.path);
+        throw http.ClientException('offline');
+      });
+      addTearDown(() => client = online);
+
+      expect(await check(monday(8, 0)), isEmpty);
+      expect(requests, hasLength(1));
+    });
+  });
+
+  group('home widget', () {
+    var proxyUp = true;
+    var destination = 'POCITOS';
+    final proxy = MockClient((request) async {
+      requests.add(request.url.path);
+      if (!proxyUp) throw http.ClientException('offline');
+      return http.Response.bytes(
+          utf8.encode(_v1Answer(destination: destination)), 200);
+    });
+    Future<List<String>> checkAt(DateTime now) async {
+      shown.clear();
+      requests.clear();
+      await http.runWithClient(
+          () => BackgroundWorker.checkAlerts(now), () => proxy);
+      return [...shown];
+    }
+
+    setUp(() {
+      MvdApiService.proxyUrl = 'https://proxy.test';
+      widget.clear();
+      redraws = 0;
+      proxyUp = true;
+      destination = 'POCITOS';
+    });
+
+    test('shows the next bus of the first route, then keeps it offline',
+        () async {
+      await saveRoute(lines: ['116']);
+
+      expect(await checkAt(_t0), ['Línea 116 → Trabajo']);
+      final due = _t0.add(const Duration(minutes: 4));
+      expect(widget, {
+        WidgetFeed.keyLine: '116',
+        // The bus's own destination, as in "Línea 116 a POCITOS"
+        WidgetFeed.keyDestination: 'POCITOS',
+        WidgetFeed.keyEtaMinutes: 4,
+        WidgetFeed.keyClockTime: '19:56',
+        WidgetFeed.keyExpectedAtMs: '${due.millisecondsSinceEpoch}',
+        WidgetFeed.keyCheckedAtMs: '${_t0.millisecondsSinceEpoch}',
+        WidgetFeed.keyStatus: 'ok',
+      });
+      expect(redraws, 1);
+
+      // Offline before the bus is due: no alert, the row stays
+      proxyUp = false;
+      expect(await checkAt(_t0.add(const Duration(minutes: 2))), isEmpty);
+      expect(widget[WidgetFeed.keyLine], '116');
+      expect(widget[WidgetFeed.keyStatus], 'offline');
+      expect(widget[WidgetFeed.keyCheckedAtMs],
+          '${_t0.millisecondsSinceEpoch}');
+      expect(redraws, 2);
+
+      // Offline after it was due: the empty state
+      expect(await checkAt(_t0.add(const Duration(minutes: 5))), isEmpty);
+      expect(widget[WidgetFeed.keyLine], isNull);
+      expect(widget[WidgetFeed.keyStatus], 'offline');
+      expect(redraws, 3);
+    });
+
+    test('no bus of the route coming, or no route at all', () async {
+      final route = await saveRoute(lines: ['999']);
+      await checkAt(_t0);
+      expect(widget[WidgetFeed.keyLine], isNull);
+      expect(widget[WidgetFeed.keyStatus], 'none');
+      expect(widget[WidgetFeed.keyCheckedAtMs],
+          '${_t0.millisecondsSinceEpoch}');
+
+      // Only a stop alert left: nothing for the widget, only its stop asked
+      route.enabled = false;
+      await route.save();
+      await saveStop();
+      await checkAt(_t0);
+      expect(widget[WidgetFeed.keyLine], isNull);
+      expect(widget[WidgetFeed.keyStatus], 'off');
+      expect(requests, ['/v1/stops/574/arrivals']);
+    });
+
+    test('a bus without a destination shows the route\'s name', () async {
+      destination = '';
+      await saveRoute(lines: ['116']);
+      await checkAt(_t0);
+      expect(widget[WidgetFeed.keyDestination], 'Trabajo');
+    });
+
+    test('sync() without alerts empties the widget', () async {
+      widget[WidgetFeed.keyLine] = '116';
+      await BackgroundWorker.sync();
+      await pumpEventQueue(); // the widget is not awaited
+      expect(widget[WidgetFeed.keyLine], isNull);
+      expect(widget[WidgetFeed.keyStatus], 'off');
+      expect(redraws, 1);
     });
   });
 }

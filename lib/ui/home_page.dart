@@ -41,12 +41,21 @@ class _TabDef {
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
 
+  /// Pages pushed over the home page (Horarios, Info): Mis paradas stops
+  /// polling while one covers it. Registered in `main.dart`. A dialog or a
+  /// sheet leaves the board in sight, so only full pages count.
+  static final routeObserver = RouteObserver<PageRoute<dynamic>>();
+
   @override
   State<HomePage> createState() => _HomePageState();
 }
 
-class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
+class _HomePageState extends State<HomePage>
+    with WidgetsBindingObserver, RouteAware {
   int _currentIndex = 0;
+
+  // A page pushed on top (Horarios, Info) hides Mis paradas
+  bool _covered = false;
 
   // Authentication
   final LocalAuthentication _localAuth = LocalAuthentication();
@@ -92,10 +101,24 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final route = ModalRoute.of(context);
+    if (route is PageRoute) HomePage.routeObserver.subscribe(this, route);
+  }
+
+  @override
   void dispose() {
+    HomePage.routeObserver.unsubscribe(this);
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
+
+  @override
+  void didPushNext() => setState(() => _covered = true);
+
+  @override
+  void didPopNext() => setState(() => _covered = false);
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
@@ -206,9 +229,10 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
 
       if (!canAuth && !isSupported) {
         if (mounted) {
+          // biometricOnly is off: a PIN or a pattern is enough
           ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-            content:
-                Text('Tu dispositivo no soporta autenticación biométrica'),
+            content: Text('Tu dispositivo no tiene bloqueo de pantalla. '
+                'Configuralo en Ajustes.'),
           ));
         }
         return _biometricLockEnabled;
@@ -217,7 +241,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       _isAuthenticating = true;
       try {
         final ok = await _localAuth.authenticate(
-          localizedReason: 'Confirma para activar el bloqueo biométrico',
+          localizedReason: 'Confirmá para activar el bloqueo biométrico',
           options: const AuthenticationOptions(
             stickyAuth: true,
             biometricOnly: false,
@@ -253,7 +277,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     final opened = await SystemBrowser.open(uri);
     if (!opened && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-        content: Text('No se pudo abrir el navegador'),
+        content: Text(
+            'No se pudo abrir el navegador. Revisá que tengas uno activado.'),
       ));
     }
   }
@@ -301,6 +326,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
         index: _currentIndex,
         children: [
           StopsPage(
+            // Polls only while on screen
+            active: _currentIndex == 0 && !_covered,
             onOpenStopInComoIr: (stopId) =>
                 _openInBrowser(OfficialSite.comoIrStop(stopId)),
           ),

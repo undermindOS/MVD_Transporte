@@ -55,6 +55,8 @@ class MiTransporteMVDApp extends StatelessWidget {
       title: 'Timbre MVD',
       debugShowCheckedModeBanner: false,
       theme: buildTimbreTheme(),
+      // Tells Mis paradas when a page covers it, so it stops polling
+      navigatorObservers: [HomePage.routeObserver],
       home: const HomePage(),
     );
   }

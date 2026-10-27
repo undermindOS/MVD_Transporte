@@ -20,6 +20,7 @@ import 'package:stm_app/ui/widgets/cartel.dart';
 import 'package:stm_app/ui/widgets/empty_state.dart';
 import 'package:stm_app/ui/widgets/led_matrix.dart';
 import 'package:stm_app/ui/widgets/line_badge.dart';
+import 'package:stm_app/ui/widgets/pixel_icon.dart';
 import 'package:stm_app/ui/widgets/segmented.dart';
 import 'package:stm_app/ui/widgets/timbre_app_bar.dart';
 import 'package:stm_app/ui/widgets/timbre_bus.dart';
@@ -172,6 +173,24 @@ void main() {
       expect(find.text('NUEVA'), findsNWidgets(2));
     });
 
+    testWidgets('each row is one phrase that opens the message',
+        (tester) async {
+      usePhoneScreen(tester);
+      final handle = tester.ensureSemantics();
+      await tester.pumpWidget(_app(_newsList()));
+
+      const unread = 'Nueva. 2 de octubre. Líneas patrimoniales recorren la '
+          'Ciudad Vieja. Este sábado y domingo, de 10 a 18 horas';
+      expect(tester.getSemantics(find.bySemanticsLabel(unread)),
+          isSemantics(isButton: true, hasTapAction: true));
+      expect(find.bySemanticsLabel('11 de setiembre. Desvíos por Expo Prado'),
+          findsOneWidget);
+      tester.semantics.tap(find.semantics.byLabel(unread));
+      await tester.pumpAndSettle();
+      expect(find.text('02/10/2026'), findsOneWidget); // the detail sheet
+      handle.dispose();
+    });
+
     testWidgets('offline is a warning, not "Sin novedades"', (tester) async {
       usePhoneScreen(tester);
       await tester.pumpWidget(_app(_newsList(failed: true)));
@@ -193,6 +212,36 @@ void main() {
       final midnight = tester.getTopLeft(find.text('Después de medianoche')).dy;
       expect(tester.getTopLeft(find.text('23 h')).dy, lessThan(midnight));
       expect(tester.getTopLeft(find.text('0 h')).dy, greaterThan(midnight));
+    });
+
+    testWidgets('the hours are labels, never lit', (tester) async {
+      usePhoneScreen(tester);
+      await tester.pumpWidget(_app(_schedule()));
+      await tester.pumpAndSettle();
+
+      for (final hour in ['23 h', '0 h']) {
+        expect(tester.widget<Text>(find.text(hour)).style!.color,
+            TimbreColors.etiquetaCartel);
+      }
+      expect(tester.widget<Text>(find.text('23:31')).style!.color,
+          TimbreColors.etiquetaCartel);
+    });
+
+    testWidgets('a failed load is a red LED that says what to do',
+        (tester) async {
+      usePhoneScreen(tester);
+      await tester.pumpWidget(_app(SchedulePage(
+        stop: BusStop(id: 3140, name: 'AV RAMON ANADOR y TIBURCIO GOMEZ'),
+        now: DateTime(2026, 10, 17, 23, 33),
+        fetch: (id, day, h, m) async => null,
+      )));
+      await tester.pumpAndSettle();
+
+      expect(find.text('No se pudo cargar el horario. Revisá la conexión.'),
+          findsOneWidget);
+      final icon = tester.widget<PixelIcon>(find.byWidgetPredicate(
+          (w) => w is PixelIcon && w.glyph == PixelGlyphs.warning));
+      expect(icon.color, TimbreColors.rojoLed);
     });
 
     testWidgets('timetable badges are outlined, never live', (tester) async {
@@ -273,6 +322,25 @@ void main() {
       expect(find.text('Contacto'), findsOneWidget);
       // No public privacy policy yet: no dead link
       expect(find.text('Política de privacidad'), findsNothing);
+    });
+
+    testWidgets('links say where they open', (tester) async {
+      usePhoneScreen(tester);
+      final handle = tester.ensureSemantics();
+      await tester.pumpWidget(_app(_info()));
+
+      for (final link in [
+        'Código fuente, github.com/undermindOS/MVD_Transporte, '
+            'se abre en el navegador',
+        'Contacto, zhongnanhaii@yahoo.com, se abre en tu app de correo',
+      ]) {
+        final finder = find.bySemanticsLabel(link);
+        await tester.ensureVisible(finder);
+        expect(tester.getSemantics(finder),
+            isSemantics(isButton: true, hasTapAction: true),
+            reason: link);
+      }
+      handle.dispose();
     });
 
     testWidgets('privacy policy row once it is published', (tester) async {
@@ -390,7 +458,47 @@ void main() {
           lessThanOrEqualTo(bar.bottom));
       expect(tester.getRect(find.text('Sitios oficiales, en tu navegador')).bottom,
           lessThanOrEqualTo(bar.bottom));
+      // A second line, not "…"
+      final subtitle = tester.renderObject<RenderParagraph>(
+          find.text('Sitios oficiales, en tu navegador'));
+      expect(subtitle.didExceedMaxLines, isFalse);
     });
+
+    // Horarios names the stop in full: a long name wraps, the number
+    // follows it, nothing ends in "…"
+    for (final scale in [1.0, 1.3, 2.0]) {
+      testWidgets('Text at ${scale}x: Horarios shows the whole stop name',
+          (tester) async {
+        usePhoneScreen(tester);
+        await tester.pumpWidget(_app(
+            _schedule(passes: const [
+              ScheduledPass(
+                  line: '538',
+                  destination: 'GRAL FLORES Y JOSÉ SERRATO',
+                  time: '23:40',
+                  hhmm: 2340),
+            ]),
+            textScale: scale));
+        await tester.pumpAndSettle();
+
+        final bar = tester.getRect(find.byType(AppBar));
+        final name = find.text('AV RAMON ANADOR y TIBURCIO GOMEZ');
+        expect(tester.renderObject<RenderParagraph>(name).didExceedMaxLines,
+            isFalse);
+        expect(tester.getRect(name).bottom, lessThanOrEqualTo(bar.bottom));
+        if (scale == 2) {
+          // Two lines of 17 px text at 2x
+          expect(tester.getSize(name).height, greaterThan(17 * 2 * 1.5));
+        }
+        final number = tester.getRect(find.text(' · 3140'));
+        expect(number.right, lessThanOrEqualTo(390 - 16));
+        expect(number.bottom, lessThanOrEqualTo(bar.bottom));
+        // The destination of a pass takes two lines before it is cut
+        final destination = tester.renderObject<RenderParagraph>(
+            find.text('GRAL FLORES Y JOSÉ SERRATO'));
+        expect(destination.didExceedMaxLines, isFalse);
+      });
+    }
 
     testWidgets('the longest page title shrinks to fit, never cut',
         (tester) async {

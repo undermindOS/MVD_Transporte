@@ -14,7 +14,7 @@ class LedMatrix extends StatelessWidget {
     this.pitch = 6,
     this.dot = 2,
     this.color = TimbreColors.ambar,
-    this.opacity = 0.1,
+    this.opacity = TimbreOpacity.ledUnlit,
     this.fadeFrom,
   });
 

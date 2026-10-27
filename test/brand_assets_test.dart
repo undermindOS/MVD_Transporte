@@ -7,6 +7,8 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:stm_app/services/home_widget_feed.dart';
+
 String _read(String path) => File(path).readAsStringSync();
 
 void main() {
@@ -33,8 +35,21 @@ void main() {
       expect(_read('$res/$styles/styles.xml'), contains('#070F22'),
           reason: styles);
     }
-    for (final styles in ['values', 'values-night']) {
-      expect(_read('$res/$styles/styles.xml'), contains('@color/noche'),
+    // Behind the Flutter view: the board on every Android version, day
+    // and night. The -v31 files win on Android 12+, and
+    // flutter_native_splash:create rewrites them with the system color
+    for (final styles in [
+      'values',
+      'values-night',
+      'values-v31',
+      'values-night-v31',
+    ]) {
+      final normal = RegExp(r'<style name="NormalTheme".*?</style>',
+              dotAll: true)
+          .firstMatch(_read('$res/$styles/styles.xml'))!
+          .group(0)!;
+      expect(normal,
+          contains('<item name="android:windowBackground">@color/noche</item>'),
           reason: styles);
     }
     expect(_read('$res/values/colors.xml'), contains('#070F22'));
@@ -71,6 +86,12 @@ void main() {
   test('the home widget is a small night board', () {
     final layout = _read('$res/layout/mvd_transporte_widget.xml');
     expect(layout, contains('@drawable/widget_background'));
+    // Mi STM and Recarga are 44 dp touch targets
+    final heights = RegExp(r'android:minHeight="(\d+)dp"')
+        .allMatches(layout)
+        .map((m) => int.parse(m.group(1)!));
+    expect(heights, hasLength(2));
+    expect(heights, everyElement(greaterThanOrEqualTo(44)));
     expect(layout, contains('@drawable/widget_plate'));
     expect(layout, isNot(contains('#FFFFFFFF')));
     expect(_read('$res/drawable/widget_background.xml'),
@@ -87,12 +108,40 @@ void main() {
         .toSet()) {
       expect(layout, contains('@+id/$id'), reason: id);
     }
+    // It reads the keys the app writes, and hides the row 2 min after
+    // its bus was due
+    for (final key in [
+      WidgetFeed.keyLine,
+      WidgetFeed.keyDestination,
+      WidgetFeed.keyEtaMinutes,
+      WidgetFeed.keyClockTime,
+      WidgetFeed.keyExpectedAtMs,
+    ]) {
+      expect(provider, contains('"$key"'), reason: key);
+    }
+    expect(provider, contains('EXPIRED_AFTER_MS = 2 * 60 * 1000L'));
   });
 
   test('iOS has light, dark and tinted 1024 px icons', () {
     // Light status bar text over the dark launch screen
-    expect(_read('ios/Runner/Info.plist'),
-        contains('<string>UIStatusBarStyleLightContent</string>'));
+    final plist = _read('ios/Runner/Info.plist');
+    expect(plist, contains('<string>UIStatusBarStyleLightContent</string>'));
+    // The launch screen view under the image is the board, not white
+    expect(_read('ios/Runner/Base.lproj/LaunchScreen.storyboard'),
+        isNot(contains('red="1" green="1" blue="1"')));
+    // The brand name, and what the location is for
+    expect(plist,
+        contains('<key>CFBundleName</key>\n\t\t<string>Timbre MVD</string>'));
+    const location = '<string>Timbre MVD usa tu ubicación para mostrarte '
+        'las paradas cercanas.</string>';
+    for (final key in [
+      'NSLocationWhenInUseUsageDescription',
+      // geolocator references it: App Store review wants it present
+      'NSLocationAlwaysAndWhenInUseUsageDescription',
+    ]) {
+      expect(plist, contains('<key>$key</key>\n\t\t$location'),
+          reason: key);
+    }
     const set = 'ios/Runner/Assets.xcassets/AppIcon.appiconset';
     for (final name in [
       'Icon-App-1024x1024@1x.png',

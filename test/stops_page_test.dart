@@ -5,6 +5,7 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/semantics.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -102,6 +103,14 @@ void main() {
 
       // Nearest first, with stop number, distance and lines
       expect(find.text('ANDES y AV 18 DE JULIO'), findsOneWidget);
+      // One phrase per tile, the street names in words
+      final handle = tester.ensureSemantics();
+      expect(
+          tester.getSemantics(find.bySemanticsLabel(RegExp(
+              r'^Parada 5109, Andes y Av 18 de Julio, a 48 metros, '
+              r'líneas 124, 124 SD, 125'))),
+          isSemantics(isButton: true, hasTapAction: true));
+      handle.dispose();
       expect(find.textContaining('#5109 · 48 m · 124, 124 SD, 125'),
           findsOneWidget);
       // In the app font, not the platform one
@@ -118,13 +127,14 @@ void main() {
           () => Future<void>.delayed(const Duration(milliseconds: 100)));
       await tester.pumpAndSettle();
 
-      // Saved through resolveStop (transporteRest/lineas)
+      // Saved as listed, with the lines geoserver gives: no lookup
       expect(requests.map((u) => u.path),
-          contains('/transporteRest/lineas/574'));
+          isNot(contains('/transporteRest/lineas/574')));
       final saved = CacheService.getStop(574);
       expect(saved, isNotNull);
       expect(saved!.name, 'SAN JOSE y ANDES');
-      expect(saved.lines, ['116', '117', '121']);
+      expect(saved.lines, ['116', '117', '121', '141', '142', '144', '538']);
+      expect(find.text('Buscando parada…'), findsNothing);
       expect(find.text('#574'), findsOneWidget);
     }, () => client);
   });
@@ -286,6 +296,7 @@ void main() {
             (w) => w is PixelIcon && w.glyph == PixelGlyphs.bellRing));
 
     await http.runWithClient(() async {
+      final handle = tester.ensureSemantics();
       await tester.pumpWidget(app());
       await tester.pump();
 
@@ -310,6 +321,15 @@ void main() {
               w.etaMinutes == 9),
           findsOneWidget);
       expect(find.text('SAN JOSE y ANDES · con GPS'), findsOneWidget);
+      // Words for screen readers, not the uppercase sign
+      expect(
+          find.descendant(
+              of: find.byType(CartelTira),
+              matching: find.bySemanticsLabel(
+                  'Línea 116 a Pocitos, llega en 9 minutos, con GPS')),
+          findsOneWidget);
+      expect(find.bySemanticsLabel('San Jose y Andes, con GPS'),
+          findsOneWidget);
       await tester.tap(find.text('3 min'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Avisarme cuando llegue'));
@@ -331,6 +351,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(fake.stopped, isTrue);
       expect(bell('116'), findsNothing);
+      handle.dispose();
     }, () => etaClient);
   });
 
@@ -343,7 +364,9 @@ void main() {
       await tester.tap(find.text('Paradas cercanas'));
       await tester.pumpAndSettle();
 
-      expect(find.text('El permiso de ubicación está desactivado para la app.'),
+      expect(
+          find.text('El permiso de ubicación está desactivado para la app. '
+              'Activalo en Ajustes.'),
           findsOneWidget);
       expect(find.text('Abrir ajustes'), findsOneWidget);
       expect(requests.where((u) => u.host == 'geoserver.montevideo.gub.uy'),
@@ -369,6 +392,10 @@ void main() {
 
       await tester.tap(find.text('Aviso 5 min antes · Siempre'));
       await tester.pumpAndSettle();
+      // Day chips are said in full
+      final handle = tester.ensureSemantics();
+      expect(find.bySemanticsLabel(RegExp(r'^Sábado')), findsOneWidget);
+      handle.dispose();
       await tester.tap(find.text('10 min'));
       await tester.tap(find.text('Sá'));
       await tester.tap(find.text('Do'));
@@ -417,11 +444,11 @@ void main() {
       if (request.url.path == '/transporteRest/siguientesParada/574') {
         return http.Response(
             '[{"linea":"121","destino":"CENTRO","minutos":2,"real":true,'
-            '"idEmpresa":50,"horaDesc":"8:00"},'
+            '"idEmpresa":50,"horaDesc":"8:00","variante":7884},'
             '{"linea":"116","destino":"POCITOS","minutos":9,"real":true,'
-            '"idEmpresa":50,"horaDesc":"8:07"},'
+            '"idEmpresa":50,"horaDesc":"8:07","variante":630},'
             '{"linea":"116","destino":"CIUDAD VIEJA","minutos":14,'
-            '"real":true,"idEmpresa":50,"horaDesc":"8:12"}]',
+            '"real":true,"idEmpresa":50,"horaDesc":"8:12","variante":631}]',
             200);
       }
       return http.Response('[]', 200);
@@ -439,6 +466,12 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.byTooltip('Agregar ruta'));
       await tester.pumpAndSettle();
+      final handle = tester.ensureSemantics();
+      // "obligatorio", not "asterisco"
+      expect(find.bySemanticsLabel(RegExp('Parada de origen, obligatorio')),
+          findsOneWidget);
+      expect(find.bySemanticsLabel(RegExp('Destino, obligatorio')),
+          findsOneWidget);
 
       await tester.enterText(
           find.widgetWithText(TextField, 'Parada de origen *'), '574');
@@ -452,7 +485,8 @@ void main() {
       for (final line in ['116', '117', '121']) {
         expect(chip(line), findsOneWidget);
       }
-      // Directions of the upcoming buses, narrowed to the picked lines
+      // Without the proxy the stop has no directions: those of the
+      // upcoming buses, narrowed to the picked lines
       expect(chip('CENTRO'), findsOneWidget);
       await tester.tap(chip('116'));
       await tester.pumpAndSettle();
@@ -478,14 +512,55 @@ void main() {
           (574, 'SAN JOSE y ANDES', 'Trabajo'));
       expect(route.preferredLines, ['116', '121']);
       expect(route.preferredDestinations, ['POCITOS']);
+      // The variant of the picked direction's bus, too
+      expect(route.preferredVariantIds, [630]);
       // The dialog already resolved the stop
       expect(requests.map((u) => u.path),
           isNot(contains('/transporteRest/lineas/574')));
       expect(find.text('Líneas: 116, 121 · Hacia: POCITOS'), findsOneWidget);
       expect(find.text('Aviso 5 min antes · Siempre'), findsOneWidget);
+      // The card is one phrase
+      expect(
+          find.bySemanticsLabel(
+              'De San Jose y Andes a Trabajo, líneas 116, 121, hacia Pocitos'),
+          findsOneWidget);
+      handle.dispose();
     }, () => routeClient);
 
     CacheService.deleteRoute(CacheService.getAllRoutes().single.id);
+    await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 100)));
+  });
+
+  testWidgets('A card is one phrase; screen readers delete it without a swipe',
+      (tester) async {
+    CacheService.saveStop(BusStop(
+        id: 574, name: 'SAN JOSE y ANDES', notificationsEnabled: true));
+    await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 100)));
+    await tester.pump();
+    const delete = CustomSemanticsAction(label: 'Borrar');
+
+    await http.runWithClient(() async {
+      final handle = tester.ensureSemantics();
+      await tester.pumpWidget(app());
+      await tester.pump();
+
+      const header = 'Parada 574, San Jose y Andes';
+      expect(tester.getSemantics(find.bySemanticsLabel(header)),
+          isSemantics(customActions: const [delete]));
+      // The alert settings under the bell open like a button
+      expect(
+          tester.getSemantics(
+              find.bySemanticsLabel('Aviso 5 min antes · Siempre')),
+          isSemantics(isButton: true, hasTapAction: true));
+
+      tester.semantics.customAction(find.semantics.byLabel(header), delete);
+      await tester.pump();
+      expect(find.text('#574'), findsNothing);
+      expect(find.text('SIN PARADAS'), findsOneWidget);
+      handle.dispose();
+    }, () => client);
     await tester.runAsync(
         () => Future<void>.delayed(const Duration(milliseconds: 100)));
   });

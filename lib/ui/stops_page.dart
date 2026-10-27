@@ -1,26 +1,33 @@
 import 'dart:async';
+import 'dart:collection';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/semantics.dart';
 import 'package:flutter/services.dart';
 import '../models/alert_schedule.dart';
+import '../models/arrivals_board.dart';
 import '../models/bus_arrival.dart';
 import '../models/bus_stop.dart';
 import '../models/bus_wait.dart';
 import '../models/catalog_stop.dart';
 import '../models/nearby_stop.dart';
 import '../models/route_alert.dart';
+import '../models/stop_details.dart';
 import '../models/transport_news.dart';
+import '../services/api/api_result.dart';
 import '../services/background_worker.dart';
 import '../services/bus_status_service.dart';
 import '../services/bus_wait_service.dart';
 import '../services/cache_service.dart';
+import '../services/home_widget_feed.dart';
 import '../services/mvd_api_service.dart';
 import '../services/nearby_stops_service.dart';
 import '../services/notification_service.dart';
 import '../services/transport_news_service.dart';
 import 'news_list.dart';
 import 'schedule_page.dart';
+import 'spoken_text.dart';
 import 'theme/timbre_text.dart';
 import 'theme/timbre_tokens.dart';
 import 'widgets/arrival_row.dart';
@@ -33,10 +40,15 @@ class StopsPage extends StatefulWidget {
   /// Opens the stop in Cómo Ir (official deep link).
   final ValueChanged<int> onOpenStopInComoIr;
 
-  const StopsPage({super.key, required this.onOpenStopInComoIr});
+  /// Mis paradas is on screen: its tab is selected and no page covers it.
+  /// Arrivals are polled only then; becoming active refreshes them once.
+  final bool active;
+
+  const StopsPage(
+      {super.key, required this.onOpenStopInComoIr, this.active = true});
 
   /// Arrival times go stale within a minute: refresh this often while the
-  /// app is in the foreground.
+  /// page is on screen and the app in the foreground.
   static const autoRefreshInterval = Duration(seconds: 30);
 
   @override
@@ -46,21 +58,30 @@ class StopsPage extends StatefulWidget {
 class _StopsPageState extends State<StopsPage>
     with SingleTickerProviderStateMixin, WidgetsBindingObserver {
   late final TabController _tabController;
-  // null while the app is in the background
+  // null while not polling: app in the background or page not on screen
   Timer? _autoRefreshTimer;
   bool _autoRefreshing = false;
+  // The app is hidden or paused
+  bool _inBackground = false;
+  // After a busy answer (429), ticks are skipped until then
+  DateTime? _skipTicksUntil;
+
+  // After a failed refresh the last buses stay this long, as estimates;
+  // a bus due more than [_staleRowGrace] ago is dropped from them
+  static const _staleFor = Duration(minutes: 5);
+  static const _staleRowGrace = Duration(minutes: 1);
+  // Without a Retry-After
+  static const _busyDefault = Duration(seconds: 60);
 
   // --- Stops ---
   List<BusStop> _stops = [];
-  // null value = last request failed (network/server error)
-  final Map<int, List<BusArrival>?> _stopArrivals = {};
-  final Map<int, bool> _stopLoading = {};
 
   // --- Routes ---
   List<RouteAlert> _routes = [];
-  // key: routeId → arrivals filtered by preferred lines (null = failed)
-  final Map<int, List<BusArrival>?> _routeArrivals = {};
-  final Map<int, bool> _routeLoading = {};
+
+  // The board of every stop a card shows, saved stops and route origins
+  // alike: a stop is requested once, whatever the cards that show it
+  final Map<int, _BoardView> _boards = {};
 
   // GPS data quality per operator (null = unknown)
   List<OperatorGpsStatus>? _gpsStatus;
@@ -76,6 +97,9 @@ class _StopsPageState extends State<StopsPage>
 
   // Cards showing all their buses ("s574" stop, "r3" route)
   final Set<String> _expanded = {};
+
+  /// Deleting a card without the swipe, for screen readers.
+  static const _deleteAction = CustomSemanticsAction(label: 'Borrar');
 
   @override
   void initState() {
@@ -96,8 +120,19 @@ class _StopsPageState extends State<StopsPage>
     });
     _loadAll();
     WidgetsBinding.instance.addObserver(this);
-    _startAutoRefresh();
+    if (widget.active) _startAutoRefresh();
     BusWaitService.current.addListener(_onWaitChanged);
+  }
+
+  @override
+  void didUpdateWidget(StopsPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.active == oldWidget.active) return;
+    if (widget.active) {
+      _resumeAutoRefresh();
+    } else {
+      _stopAutoRefresh();
+    }
   }
 
   @override
@@ -115,15 +150,15 @@ class _StopsPageState extends State<StopsPage>
       case AppLifecycleState.resumed:
         // Back from the background (not from a system dialog, which only
         // makes the app inactive): what is on screen may be minutes old
-        if (_autoRefreshTimer == null) {
+        if (_inBackground) {
+          _inBackground = false;
           BusWaitService.sync();
-          _autoRefresh();
-          _startAutoRefresh();
+          _resumeAutoRefresh();
         }
       case AppLifecycleState.hidden:
       case AppLifecycleState.paused:
-        _autoRefreshTimer?.cancel();
-        _autoRefreshTimer = null;
+        _inBackground = true;
+        _stopAutoRefresh();
       case AppLifecycleState.inactive:
       case AppLifecycleState.detached:
         break;
@@ -136,44 +171,109 @@ class _StopsPageState extends State<StopsPage>
 
   void _startAutoRefresh() {
     _autoRefreshTimer?.cancel();
-    _autoRefreshTimer =
-        Timer.periodic(StopsPage.autoRefreshInterval, (_) => _autoRefresh());
+    _autoRefreshTimer = Timer.periodic(StopsPage.autoRefreshInterval, (_) {
+      // Busy (429): wait out the Retry-After, without a word
+      final skipUntil = _skipTicksUntil;
+      if (skipUntil != null && DateTime.now().isBefore(skipUntil)) return;
+      _autoRefresh();
+    });
   }
 
-  /// Refreshes stops and routes without spinners, so the chips do not
-  /// flicker. A stop that is also a route origin is requested once.
+  void _stopAutoRefresh() {
+    _autoRefreshTimer?.cancel();
+    _autoRefreshTimer = null;
+  }
+
+  /// On screen again: refreshed at once, then every 30 s.
+  void _resumeAutoRefresh() {
+    if (!widget.active || _inBackground || _autoRefreshTimer != null) return;
+    _autoRefresh();
+    _startAutoRefresh();
+  }
+
+  /// Refreshes every card without spinners, so the rows do not flicker.
   Future<void> _autoRefresh() async {
     if (_autoRefreshing) return; // slow network: don't pile up requests
     _autoRefreshing = true;
-    _loadGpsStatus();
-    final ids = {
-      ..._stops.map((s) => s.id),
-      ..._routes.map((r) => r.originStopId),
-    };
-    final results = <int, List<BusArrival>?>{};
-    await Future.wait(ids.map((id) async =>
-        results[id] = await MvdApiService.getNextArrivals(id)));
-    _autoRefreshing = false;
-    results.forEach(BusWaitService.onArrivals);
+    try {
+      _loadGpsStatus();
+      await _refresh(_shownStopIds);
+    } finally {
+      _autoRefreshing = false;
+    }
+  }
+
+  /// Every stop a card shows: the saved stops and the route origins.
+  Set<int> get _shownStopIds => {
+        ..._stops.map((s) => s.id),
+        ..._routes.map((r) => r.originStopId),
+      };
+
+  /// The one way boards are fetched: on open, every tick, back on screen,
+  /// on pull to refresh, and for a stop or route just added. Each stop
+  /// once, all in parallel. With [spinner] a card with no buses to show
+  /// yet says it is loading.
+  Future<void> _refresh(Set<int> ids, {bool spinner = false}) async {
+    if (ids.isEmpty) return;
+    if (spinner) {
+      setState(() {
+        for (final id in ids) {
+          final view = _boards[id];
+          _boards[id] = _BoardView(
+              lastGood: view?.lastGood, failure: view?.failure, loading: true);
+        }
+      });
+    }
+    final results = await MvdApiService.getBoards(ids);
+    results.forEach((id, result) =>
+        BusWaitService.onArrivals(id, result.valueOrNull?.arrivals));
+
+    Duration? busyFor;
+    for (final result in results.values) {
+      if (result case ApiError(failure: ApiFailure.busy, :final retryAfter)) {
+        final wait = retryAfter ?? _busyDefault;
+        if (busyFor == null || wait > busyFor) busyFor = wait;
+      }
+    }
+    if (busyFor != null) _skipTicksUntil = DateTime.now().add(busyFor);
+
+    // The home widget shows the first enabled route: fresher than the
+    // background check, at least 15 min apart. Not awaited: it catches
+    // its own errors
+    final enabledRoutes = CacheService.getEnabledRoutes();
+    final widgetRoute = enabledRoutes.firstOrNull;
+    if (widgetRoute != null && results.containsKey(widgetRoute.originStopId)) {
+      unawaited(WidgetFeed.update(
+          enabledRoutes: enabledRoutes, boards: results, now: DateTime.now()));
+    }
+
     if (!mounted) return;
-    // Stops added meanwhile are loaded by _loadStops/_loadRoutes
     setState(() {
-      for (final s in _stops) {
-        if (results.containsKey(s.id)) _stopArrivals[s.id] = results[s.id];
-      }
-      for (final r in _routes) {
-        if (!results.containsKey(r.originStopId)) continue;
-        _routeArrivals[r.id] =
-            results[r.originStopId]?.where(r.accepts).toList();
-      }
+      results.forEach((id, result) {
+        final view = _boards[id];
+        _boards[id] = switch (result) {
+          ApiOk(:final value) => _BoardView(lastGood: value),
+          // Nothing new and nothing to say: the next ticks wait
+          ApiError(failure: ApiFailure.busy) =>
+            _BoardView(lastGood: view?.lastGood, failure: view?.failure),
+          ApiError(:final failure) =>
+            _BoardView(lastGood: view?.lastGood, failure: failure),
+        };
+      });
     });
   }
 
   void _loadAll() {
     _loadStops();
     _loadRoutes();
+    _refresh(_shownStopIds, spinner: true);
     _loadNews();
     _loadGpsStatus();
+    // Stops saved offline as "Parada N" get their name and lines; not
+    // awaited, the cards show at once
+    MvdApiService.healPlaceholderStops().then((healed) {
+      if (healed > 0 && mounted) _loadStops();
+    });
   }
 
   /// Rate-limited inside the service (once a minute at most).
@@ -196,7 +296,7 @@ class _StopsPageState extends State<StopsPage>
     messenger.showSnackBar(SnackBar(
       content: Row(children: [
         const PixelIcon(PixelGlyphs.warning,
-            size: 18, color: TimbreColors.rojoLed),
+            size: TimbreIconSize.row, color: TimbreColors.rojoLed),
         const SizedBox(width: 10),
         Expanded(child: Text(message)),
       ]),
@@ -205,29 +305,18 @@ class _StopsPageState extends State<StopsPage>
 
   // ---------------------------------------------------------------- Stops ---
 
-  void _loadStops() {
-    setState(() => _stops = CacheService.getAllStops());
-    for (final s in _stops) {
-      _refreshStopArrivals(s.id);
-    }
-  }
-
-  Future<void> _refreshStopArrivals(int stopId) async {
-    setState(() => _stopLoading[stopId] = true);
-    final arrivals = await MvdApiService.getNextArrivals(stopId);
-    BusWaitService.onArrivals(stopId, arrivals);
-    if (mounted) {
-      setState(() {
-        _stopArrivals[stopId] = arrivals;
-        _stopLoading[stopId] = false;
-      });
-    }
-  }
+  void _loadStops() => setState(() => _stops = CacheService.getAllStops());
 
   Future<void> _addStop() async {
-    final stopId = await _showAddStopDialog();
-    if (stopId == null || !mounted) return;
+    final choice = await _showAddStopDialog();
+    if (choice == null || !mounted) return;
+    final stopId = choice.id;
 
+    // 0 or more than 7 digits: no request, it cannot exist
+    if (!MvdApiService.isValidStopId(stopId)) {
+      _showError('No existe la parada $stopId. Revisá el número.');
+      return;
+    }
     // Re-adding would overwrite the saved alert settings
     if (CacheService.getStop(stopId) != null) {
       _showError('La parada $stopId ya está guardada');
@@ -235,26 +324,31 @@ class _StopsPageState extends State<StopsPage>
     }
 
     final snack = ScaffoldMessenger.of(context);
-    snack.showSnackBar(const SnackBar(content: Text('Buscando parada…')));
-
-    final BusStop? resolved;
-    try {
-      resolved = await MvdApiService.resolveStop(stopId);
-    } on StopNotFoundException {
-      _showError('No existe la parada $stopId');
-      return;
+    // Picked from the catalog or the nearby stops: already known
+    var stop = choice.stop;
+    if (stop == null) {
+      snack.showSnackBar(const SnackBar(content: Text('Buscando parada…')));
+      switch (await MvdApiService.getStopDetails(stopId)) {
+        case ApiOk(:final value):
+          stop = value.toBusStop();
+        case ApiError(failure: ApiFailure.notFound):
+          _showError('No existe la parada $stopId. Revisá el número.');
+          return;
+        case ApiError():
+          // Offline: kept with a placeholder name, healed on a later start
+          stop = BusStop(id: stopId, name: 'Parada $stopId');
+      }
     }
-    // Offline: keep the stop with a placeholder name
-    final stop = resolved ?? BusStop(id: stopId, name: 'Parada $stopId');
     await CacheService.saveStop(stop);
 
     if (mounted) {
       snack.clearSnackBars();
       _loadStops();
+      _refresh({stop.id}, spinner: true);
     }
   }
 
-  Future<int?> _showAddStopDialog() => showDialog<int>(
+  Future<_StopChoice?> _showAddStopDialog() => showDialog<_StopChoice>(
         context: context,
         builder: (_) => const _AddStopDialog(),
       );
@@ -267,8 +361,8 @@ class _StopsPageState extends State<StopsPage>
   }
 
   Future<void> _editStopAlert(BusStop stop) async {
-    final settings = await _showAlertSettings(
-        stop.name, stop.etaAlertMinutes, stop.schedule);
+    final settings = await _showAlertSettings(stop.name,
+        _stopPhrase(stop.id, stop.name), stop.etaAlertMinutes, stop.schedule);
     if (settings == null || !mounted) return;
     final (minutes, schedule) = settings;
     setState(() => stop
@@ -281,64 +375,56 @@ class _StopsPageState extends State<StopsPage>
     // Dismissible requires the item to leave the list synchronously
     setState(() {
       _stops.removeWhere((s) => s.id == stop.id);
-      _stopArrivals.remove(stop.id);
+      _forgetUnshownBoard(stop.id);
     });
     CacheService.deleteStop(stop.id).then((_) => _syncAlerts());
   }
 
+  /// Drops the board of [stopId] once no card shows it any more.
+  void _forgetUnshownBoard(int stopId) {
+    if (!_shownStopIds.contains(stopId)) _boards.remove(stopId);
+  }
+
   // ---------------------------------------------------------------- Routes --
 
-  void _loadRoutes() {
-    setState(() => _routes = CacheService.getAllRoutes());
-    for (final r in _routes) {
-      _refreshRouteArrivals(r);
-    }
-  }
-
-  Future<void> _refreshRouteArrivals(RouteAlert route) async {
-    setState(() => _routeLoading[route.id] = true);
-    final all = await MvdApiService.getNextArrivals(route.originStopId);
-    BusWaitService.onArrivals(route.originStopId, all);
-    final filtered = all?.where(route.accepts).toList();
-
-    if (mounted) {
-      setState(() {
-        _routeArrivals[route.id] = filtered;
-        _routeLoading[route.id] = false;
-      });
-    }
-  }
+  void _loadRoutes() => setState(() => _routes = CacheService.getAllRoutes());
 
   Future<void> _addRouteManually() async {
     final result = await _showAddRouteDialog();
     if (result == null || !mounted) return;
 
     final snack = ScaffoldMessenger.of(context);
-    // Already resolved if the dialog listed the stop's lines
-    var resolved = result.origin;
-    if (resolved == null) {
+    // Already looked up if the dialog listed the stop's lines
+    var origin = result.origin;
+    if (origin == null) {
       snack.showSnackBar(const SnackBar(content: Text('Buscando parada…')));
-      try {
-        resolved = await MvdApiService.resolveStop(result.originStopId);
-      } on StopNotFoundException {
-        _showError('No existe la parada ${result.originStopId}');
-        return;
+      switch (await MvdApiService.getStopDetails(result.originStopId)) {
+        case ApiOk(:final value):
+          origin = value;
+        case ApiError(failure: ApiFailure.notFound):
+          _showError(
+              'No existe la parada ${result.originStopId}. Revisá el número.');
+          return;
+        case ApiError():
+          break; // offline: a placeholder name
       }
     }
     final id = CacheService.nextRouteId();
     final route = RouteAlert(
       id: id,
       originStopId: result.originStopId,
-      originName: resolved?.name ?? 'Parada ${result.originStopId}',
+      originName: origin?.displayName ?? 'Parada ${result.originStopId}',
       destinationName: result.destinationName,
       preferredLines: result.preferredLines,
       preferredDestinations: result.preferredDestinations,
+      preferredVariantIds: result.preferredVariantIds,
     );
     await CacheService.saveRoute(route);
 
     if (mounted) {
       snack.clearSnackBars();
       _loadRoutes();
+      _refresh({route.originStopId}, spinner: true);
       await _syncAlerts(enabling: true);
     }
   }
@@ -358,6 +444,7 @@ class _StopsPageState extends State<StopsPage>
   Future<void> _editRouteAlert(RouteAlert route) async {
     final settings = await _showAlertSettings(
         '${route.originName} → ${route.destinationName}',
+        _routeName(route),
         route.alertMinutes,
         route.schedule);
     if (settings == null || !mounted) return;
@@ -370,21 +457,25 @@ class _StopsPageState extends State<StopsPage>
 
   // ------------------------------------------------------- Alert settings --
 
-  /// Threshold and schedule of a stop or route alert.
-  Future<(int, AlertSchedule)?> _showAlertSettings(
-          String title, int minutes, AlertSchedule schedule) =>
+  /// Threshold and schedule of a stop or route alert. [spokenTitle] is
+  /// what screen readers hear instead of the uppercase [title].
+  Future<(int, AlertSchedule)?> _showAlertSettings(String title,
+          String spokenTitle, int minutes, AlertSchedule schedule) =>
       showModalBottomSheet<(int, AlertSchedule)>(
         context: context,
         isScrollControlled: true,
         builder: (_) => _AlertSettingsSheet(
-            title: title, minutes: minutes, schedule: schedule),
+            title: title,
+            spokenTitle: spokenTitle,
+            minutes: minutes,
+            schedule: schedule),
       );
 
   void _deleteRoute(RouteAlert route) {
     // Dismissible requires the item to leave the list synchronously
     setState(() {
       _routes.removeWhere((r) => r.id == route.id);
-      _routeArrivals.remove(route.id);
+      _forgetUnshownBoard(route.originStopId);
     });
     CacheService.deleteRoute(route.id).then((_) => _syncAlerts());
   }
@@ -439,34 +530,46 @@ class _StopsPageState extends State<StopsPage>
                     etaMinutes: trip.etaMinutes,
                   )
                 else
-                  Text(
-                    trip.destination.isEmpty
+                  Semantics(
+                    label: trip.destination.isEmpty
                         ? 'Línea ${trip.line}'
-                        : '${trip.line} → ${trip.destination}',
-                    style: TimbreText.destination.copyWith(fontSize: 20),
+                        : 'Línea ${trip.line} a '
+                            '${spokenName(trip.destination)}',
+                    excludeSemantics: true,
+                    child: Text(
+                      trip.destination.isEmpty
+                          ? 'Línea ${trip.line}'
+                          : '${trip.line} → ${trip.destination}',
+                      style: TimbreText.destination.copyWith(fontSize: 20),
+                    ),
                   ),
                 const SizedBox(height: 8),
-                Text(
-                  trip.isRealTime
-                      ? '$stopName · con GPS'
-                      : 'Según horario ${trip.etaLabel}, sin GPS todavía · '
-                          '$stopName',
-                  style: const TextStyle(
-                      fontSize: 14, color: TimbreColors.etiquetaCartel),
+                Semantics(
+                  label: trip.isRealTime
+                      ? '${spokenName(stopName)}, con GPS'
+                      : 'Según horario ${trip.etaLabel}, sin GPS todavía, '
+                          '${spokenName(stopName)}',
+                  excludeSemantics: true,
+                  child: Text(
+                    trip.isRealTime
+                        ? '$stopName · con GPS'
+                        : 'Según horario ${trip.etaLabel}, sin GPS '
+                            'todavía · $stopName',
+                    style: TimbreText.subtitle,
+                  ),
                 ),
                 const SizedBox(height: 18),
                 if (waiting)
                   OutlinedButton.icon(
                     onPressed: () => Navigator.pop(ctx, -1),
-                    icon: const PixelIcon(PixelGlyphs.bell, size: 20),
+                    icon: const PixelIcon(PixelGlyphs.bell,
+                        size: TimbreIconSize.row),
                     label: const Text('Dejar de esperar'),
                   )
                 else ...[
-                  const Text('Avisarme cuando falten',
-                      style: TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w600,
-                          color: TimbreColors.papel)),
+                  Text('Avisarme cuando falten',
+                      style: TimbreText.body
+                          .copyWith(fontWeight: FontWeight.w600)),
                   const SizedBox(height: 8),
                   TimbreSegmented<int>(
                     values: const [3, 5, 10],
@@ -478,7 +581,8 @@ class _StopsPageState extends State<StopsPage>
                   const SizedBox(height: 16),
                   FilledButton.icon(
                     onPressed: () => Navigator.pop(ctx, alertMinutes),
-                    icon: const PixelIcon(PixelGlyphs.bellRing, size: 20),
+                    icon: const PixelIcon(PixelGlyphs.bellRing,
+                        size: TimbreIconSize.row),
                     label: const Text('Avisarme cuando llegue'),
                   ),
                   const SizedBox(height: 10),
@@ -489,10 +593,7 @@ class _StopsPageState extends State<StopsPage>
                             'Avisa cuando el ómnibus tiene GPS.'
                         : 'Te avisamos a la hora estimada. Si abrís la app '
                             'mientras esperás, el aviso se ajusta al GPS.',
-                    style: const TextStyle(
-                        fontSize: 12.5,
-                        height: 1.4,
-                        color: TimbreColors.etiquetaCartel),
+                    style: TimbreText.caption.copyWith(height: 1.4),
                   ),
                 ],
               ],
@@ -527,7 +628,8 @@ class _StopsPageState extends State<StopsPage>
             content: Text(
                 'El ${trip.line} ya está a ${trip.etaMinutes} min')));
       case WaitStart.failed:
-        _showError('No se pudo activar el aviso');
+        _showError('No se pudo activar el aviso. Revisá que las '
+            'notificaciones estén permitidas y probá de nuevo.');
     }
   }
 
@@ -555,7 +657,10 @@ class _StopsPageState extends State<StopsPage>
             Tab(
               icon: Badge(
                 isLabelVisible: unread > 0,
-                label: Text('$unread'),
+                label: Text('$unread',
+                    semanticsLabel: unread == 1
+                        ? '1 novedad sin leer'
+                        : '$unread novedades sin leer'),
                 child: const PixelIcon(PixelGlyphs.news, size: 22),
               ),
               text: 'Novedades',
@@ -586,7 +691,8 @@ class _StopsPageState extends State<StopsPage>
               tooltip: _tabController.index == 0
                   ? 'Agregar parada'
                   : 'Agregar ruta',
-              child: const PixelIcon(PixelGlyphs.plus, size: 26),
+              child: const PixelIcon(PixelGlyphs.plus,
+                  size: TimbreIconSize.rowLarge),
             ),
     );
   }
@@ -603,11 +709,9 @@ class _StopsPageState extends State<StopsPage>
       );
     }
     return RefreshIndicator(
-      onRefresh: () async {
+      onRefresh: () {
         _loadGpsStatus();
-        for (final s in _stops) {
-          await _refreshStopArrivals(s.id);
-        }
+        return _refresh({for (final s in _stops) s.id});
       },
       child: ListView.builder(
         padding: const EdgeInsets.only(top: 6, bottom: 96),
@@ -621,10 +725,6 @@ class _StopsPageState extends State<StopsPage>
   /// A saved stop as a small board: name and number, the timetable and the
   /// alert, then its next buses.
   Widget _buildStopCard(BusStop stop) {
-    final arrivals = _stopArrivals[stop.id];
-    final failed = _stopArrivals.containsKey(stop.id) && arrivals == null;
-    final isLoading = _stopLoading[stop.id] ?? false;
-
     return Dismissible(
       key: Key('stop_${stop.id}'),
       direction: DismissDirection.endToStart,
@@ -636,16 +736,26 @@ class _StopsPageState extends State<StopsPage>
             padding: const EdgeInsets.fromLTRB(14, 10, 4, 8),
             child: Row(children: [
               Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(stop.name, style: TimbreText.stopName),
-                    const SizedBox(height: 3),
-                    Text('#${stop.id}',
-                        style: const TextStyle(
-                            fontSize: 13,
-                            color: TimbreColors.etiquetaCartel)),
-                  ],
+                // One phrase for screen readers, with the swipe to delete
+                // as an action
+                child: Semantics(
+                  container: true,
+                  label: _stopPhrase(stop.id, stop.name),
+                  customSemanticsActions: {
+                    _deleteAction: () => _deleteStop(stop),
+                  },
+                  excludeSemantics: true,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(stop.name, style: TimbreText.stopName),
+                      const SizedBox(height: 3),
+                      Text('#${stop.id}',
+                          style: const TextStyle(
+                              fontSize: 13,
+                              color: TimbreColors.etiquetaCartel)),
+                    ],
+                  ),
                 ),
               ),
               IconButton(
@@ -665,8 +775,7 @@ class _StopsPageState extends State<StopsPage>
             _buildAlertSettingsRow(stop.etaAlertMinutes, stop.schedule,
                 () => _editStopAlert(stop)),
           const Divider(),
-          _buildArrivals('s${stop.id}', arrivals, isLoading, failed, stop.id,
-              stop.name),
+          _buildArrivals('s${stop.id}', stop.id, stop.name),
           const Divider(),
           Align(
             alignment: Alignment.centerRight,
@@ -674,7 +783,8 @@ class _StopsPageState extends State<StopsPage>
               padding: const EdgeInsets.only(right: 6),
               child: TextButton.icon(
                 onPressed: () => widget.onOpenStopInComoIr(stop.id),
-                icon: const PixelIcon(PixelGlyphs.map, size: 18),
+                icon: const PixelIcon(PixelGlyphs.map,
+                    size: TimbreIconSize.row),
                 label: const Text('Ver en Cómo Ir'),
               ),
             ),
@@ -695,11 +805,9 @@ class _StopsPageState extends State<StopsPage>
       );
     }
     return RefreshIndicator(
-      onRefresh: () async {
+      onRefresh: () {
         _loadGpsStatus();
-        for (final r in _routes) {
-          await _refreshRouteArrivals(r);
-        }
+        return _refresh({for (final r in _routes) r.originStopId});
       },
       child: ListView(
         padding: const EdgeInsets.only(top: 6, bottom: 96),
@@ -711,11 +819,8 @@ class _StopsPageState extends State<StopsPage>
     );
   }
 
+  /// A route reads its origin's board, through its lines and directions.
   Widget _buildRouteCard(RouteAlert route) {
-    final arrivals = _routeArrivals[route.id];
-    final failed = _routeArrivals.containsKey(route.id) && arrivals == null;
-    final isLoading = _routeLoading[route.id] ?? false;
-
     return Dismissible(
       key: Key('route_${route.id}'),
       direction: DismissDirection.endToStart,
@@ -727,37 +832,49 @@ class _StopsPageState extends State<StopsPage>
             padding: const EdgeInsets.fromLTRB(14, 10, 4, 8),
             child: Row(children: [
               Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(children: [
-                      const PixelIcon(PixelGlyphs.stop,
-                          size: 14, color: TimbreColors.etiquetaCartel),
-                      const SizedBox(width: 6),
-                      Expanded(
-                        child: Text(route.originName,
-                            style: const TextStyle(
-                                fontSize: 13,
-                                color: TimbreColors.etiquetaCartel)),
-                      ),
-                    ]),
-                    const SizedBox(height: 4),
-                    Text('→ ${route.destinationName}',
-                        style: TimbreText.stopName),
-                    if (route.preferredLines.isNotEmpty ||
-                        route.preferredDestinations.isNotEmpty) ...[
-                      const SizedBox(height: 3),
-                      Text(
-                          [
-                            if (route.preferredLines.isNotEmpty)
-                              'Líneas: ${route.preferredLines.join(", ")}',
-                            if (route.preferredDestinations.isNotEmpty)
-                              'Hacia: ${route.preferredDestinations.join(", ")}',
-                          ].join(' · '),
-                          style: const TextStyle(
-                              fontSize: 12.5, color: TimbreColors.tenue)),
+                // One phrase for screen readers, with the swipe to delete
+                // as an action
+                child: Semantics(
+                  container: true,
+                  label: _routePhrase(route),
+                  customSemanticsActions: {
+                    _deleteAction: () => _deleteRoute(route),
+                  },
+                  excludeSemantics: true,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(children: [
+                        const PixelIcon(PixelGlyphs.stop,
+                            size: TimbreIconSize.mark,
+                            color: TimbreColors.etiquetaCartel),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(route.originName,
+                              style: const TextStyle(
+                                  fontSize: 13,
+                                  color: TimbreColors.etiquetaCartel)),
+                        ),
+                      ]),
+                      const SizedBox(height: 4),
+                      Text('→ ${route.destinationName}',
+                          style: TimbreText.stopName),
+                      if (route.preferredLines.isNotEmpty ||
+                          route.preferredDestinations.isNotEmpty) ...[
+                        const SizedBox(height: 3),
+                        Text(
+                            [
+                              if (route.preferredLines.isNotEmpty)
+                                'Líneas: ${route.preferredLines.join(", ")}',
+                              if (route.preferredDestinations.isNotEmpty)
+                                'Hacia: '
+                                    '${route.preferredDestinations.join(", ")}',
+                            ].join(' · '),
+                            style: TimbreText.caption
+                                .copyWith(color: TimbreColors.tenue)),
+                      ],
                     ],
-                  ],
+                  ),
                 ),
               ),
               _AlertButton(
@@ -770,8 +887,8 @@ class _StopsPageState extends State<StopsPage>
             _buildAlertSettingsRow(route.alertMinutes, route.schedule,
                 () => _editRouteAlert(route)),
           const Divider(),
-          _buildArrivals('r${route.id}', arrivals, isLoading, failed,
-              route.originStopId, route.originName),
+          _buildArrivals('r${route.id}', route.originStopId, route.originName,
+              accepts: route.accepts),
         ],
       ),
     );
@@ -784,7 +901,8 @@ class _StopsPageState extends State<StopsPage>
     final text = BusStatusService.partialWarning(_gpsStatus);
     if (text == null) return const SizedBox.shrink();
     return Container(
-      margin: const EdgeInsets.fromLTRB(12, 6, 12, 6),
+      margin:
+          const EdgeInsets.symmetric(horizontal: TimbreSpace.l, vertical: 6),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: TimbreColors.avisoNoche,
@@ -795,7 +913,7 @@ class _StopsPageState extends State<StopsPage>
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const PixelIcon(PixelGlyphs.signal,
-              size: 18, color: TimbreColors.ambar),
+              size: TimbreIconSize.row, color: TimbreColors.ambar),
           const SizedBox(width: 10),
           Expanded(
             child: Text(text,
@@ -808,39 +926,50 @@ class _StopsPageState extends State<StopsPage>
   }
 
   /// Under an enabled alert: "Aviso 5 min antes · Lun a Vie 7:30–8:30".
-  /// Opens the threshold and schedule settings.
+  /// Opens the threshold and schedule settings. A setting, not live data:
+  /// only the bell is lit.
   Widget _buildAlertSettingsRow(
       int minutes, AlertSchedule schedule, VoidCallback onTap) {
-    return InkWell(
-      onTap: onTap,
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(minHeight: TimbreSpace.touch),
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(14, 0, 14, 4),
-          child: Row(children: [
-            const PixelIcon(PixelGlyphs.bellRing,
-                size: 14, color: TimbreColors.ambar),
-            const SizedBox(width: TimbreSpace.s),
-            Expanded(
-              child: Text('Aviso $minutes min antes · ${schedule.label}',
-                  style: const TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w700,
-                      color: TimbreColors.ambar)),
-            ),
-            const PixelIcon(PixelGlyphs.chevronRight,
-                size: 14, color: TimbreColors.etiquetaCartel),
-          ]),
+    return Semantics(
+      container: true,
+      button: true,
+      child: InkWell(
+        onTap: onTap,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minHeight: TimbreSpace.touch),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(14, 0, 14, 4),
+            child: Row(children: [
+              const PixelIcon(PixelGlyphs.bellRing,
+                  size: TimbreIconSize.mark, color: TimbreColors.ambar),
+              const SizedBox(width: TimbreSpace.s),
+              Expanded(
+                child: Text('Aviso $minutes min antes · ${schedule.label}',
+                    style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: TimbreColors.etiquetaCartel)),
+              ),
+              const PixelIcon(PixelGlyphs.chevronRight,
+                  size: TimbreIconSize.mark,
+                  color: TimbreColors.etiquetaCartel),
+            ]),
+          ),
         ),
       ),
     );
   }
 
-  /// The next buses of a stop: three rows, all of them (up to six) on
-  /// request.
-  Widget _buildArrivals(String key, List<BusArrival>? arrivals,
-      bool isLoading, bool failed, int stopId, String stopName) {
-    if (isLoading) {
+  /// The next buses of [stopId] that [accepts] lets through: three rows,
+  /// all of them (up to six) on request. After a failed refresh the last
+  /// buses stay for a while under the error, as estimates.
+  Widget _buildArrivals(String key, int stopId, String stopName,
+      {bool Function(BusArrival)? accepts}) {
+    final view = _boards[stopId];
+    final board = view?.lastGood;
+    final failure = view?.failure;
+    // Nothing to show yet: loading, or busy before the first board
+    if (board == null && (failure == null || view!.loading)) {
       return const Padding(
         padding: EdgeInsets.all(16),
         child: Center(
@@ -851,28 +980,77 @@ class _StopsPageState extends State<StopsPage>
         ),
       );
     }
-    // Offline must not look like "no buses are coming"
-    if (failed) {
+    // An error inside a card is a red LED; a warning over a list is the
+    // avisoNoche panel
+    if (failure == ApiFailure.notFound) {
       return const _BoardNote(
         icon: PixelGlyphs.warning,
-        color: TimbreColors.ambar,
-        text: 'No se pudo actualizar. Deslizá para reintentar',
+        color: TimbreColors.rojoLed,
+        text: 'Esta parada ya no existe. Deslizá la tarjeta para borrarla.',
       );
     }
-    if (arrivals == null || arrivals.isEmpty) {
+    List<BusArrival> accepted(ArrivalsBoard b) =>
+        accepts == null ? b.arrivals : b.arrivals.where(accepts).toList();
+    final now = DateTime.now();
+    if (failure != null) {
+      // Offline must not look like "no buses are coming", and old minutes
+      // must not look live
+      if (board == null || now.difference(board.fetchedAt) >= _staleFor) {
+        return const _BoardNote(
+          icon: PixelGlyphs.warning,
+          color: TimbreColors.rojoLed,
+          text: 'No se pudo actualizar. Deslizá para reintentar',
+        );
+      }
+      final cutoff = now.subtract(_staleRowGrace);
+      final stale = accepted(board)
+          .where((a) => !a.expectedAt.isBefore(cutoff))
+          .toList();
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _BoardNote(
+            icon: PixelGlyphs.warning,
+            color: TimbreColors.rojoLed,
+            text: 'No se pudo actualizar. Datos de las '
+                '${MvdApiService.montevideoClock(board.fetchedAt)}. '
+                'Deslizá para reintentar.',
+          ),
+          if (stale.isNotEmpty)
+            _buildRows(key, stale, board.arrivals, stopId, stopName,
+                stale: true),
+        ],
+      );
+    }
+    final arrivals = accepted(board!);
+    if (arrivals.isEmpty) {
       return const _BoardNote(
         icon: PixelGlyphs.bus,
         color: TimbreColors.tenue,
         text: 'Sin ómnibus próximos',
       );
     }
+    return _buildRows(key, arrivals, board.arrivals, stopId, stopName);
+  }
+
+  /// [arrivals] of a board whose buses are [all]. A [stale] row is an
+  /// estimate from the last board: not lit, not followed, not tappable.
+  Widget _buildRows(String key, List<BusArrival> arrivals,
+      List<BusArrival> all, int stopId, String stopName,
+      {bool stale = false}) {
     final wait = BusWaitService.current.value;
-    final waited = wait != null && wait.stopId == stopId
-        ? wait.findTrip(arrivals, DateTime.now())
-        : null;
-    final all = arrivals.take(6).toList();
-    final open = _expanded.contains(key) || all.length <= 3;
-    final shown = open ? all : all.take(3).toList();
+    final now = DateTime.now();
+    final rows = arrivals.take(6).toList();
+    final open = _expanded.contains(key) || rows.length <= 3;
+    final shown = open ? rows : rows.take(3).toList();
+    // The followed trip, by its id, among all the buses of the stop
+    final waited = [
+      for (final a in shown)
+        !stale &&
+            wait != null &&
+            wait.stopId == stopId &&
+            wait.follows(a, all, now),
+    ];
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -880,12 +1058,15 @@ class _StopsPageState extends State<StopsPage>
           if (i > 0) const Divider(indent: 14, endIndent: 14),
           ArrivalRow(
             arrival: shown[i],
-            waited: identical(shown[i], waited),
-            onTap: () => _showWaitSheet(stopId, stopName, shown[i],
-                waiting: identical(shown[i], waited)),
+            waited: waited[i],
+            stale: stale,
+            onTap: stale
+                ? null
+                : () => _showWaitSheet(stopId, stopName, shown[i],
+                    waiting: waited[i]),
           ),
         ],
-        if (all.length > 3)
+        if (rows.length > 3)
           Align(
             alignment: Alignment.centerLeft,
             child: Padding(
@@ -895,8 +1076,8 @@ class _StopsPageState extends State<StopsPage>
                     open ? _expanded.remove(key) : _expanded.add(key)),
                 icon: PixelIcon(
                     open ? PixelGlyphs.minus : PixelGlyphs.chevronDown,
-                    size: 16),
-                label: Text(open ? 'Ver menos' : 'Ver las ${all.length}'),
+                    size: TimbreIconSize.row),
+                label: Text(open ? 'Ver menos' : 'Ver las ${rows.length}'),
               ),
             ),
           ),
@@ -905,7 +1086,8 @@ class _StopsPageState extends State<StopsPage>
   }
 
   Widget _deleteBackground() => Container(
-        margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        margin:
+            const EdgeInsets.symmetric(horizontal: TimbreSpace.l, vertical: 6),
         alignment: Alignment.centerRight,
         padding: const EdgeInsets.only(right: 22),
         decoration: BoxDecoration(
@@ -917,6 +1099,21 @@ class _StopsPageState extends State<StopsPage>
       );
 }
 
+/// What the cards of one stop show: the last board that arrived, and why
+/// the latest refresh failed, if it did.
+class _BoardView {
+  const _BoardView({this.lastGood, this.failure, this.loading = false});
+
+  final ArrivalsBoard? lastGood;
+
+  /// The latest refresh failed; null after a good one. A busy answer
+  /// changes nothing.
+  final ApiFailure? failure;
+
+  /// Being fetched with a spinner, for a card with nothing to show yet.
+  final bool loading;
+}
+
 /// A card of the stops and routes tabs: an ink panel on the board.
 class _Board extends StatelessWidget {
   const _Board({required this.children});
@@ -926,7 +1123,8 @@ class _Board extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      padding:
+          const EdgeInsets.symmetric(horizontal: TimbreSpace.l, vertical: 6),
       child: Card(
         clipBehavior: Clip.antiAlias,
         child: Column(
@@ -952,10 +1150,10 @@ class _BoardNote extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
       child: Row(children: [
-        PixelIcon(icon, size: 16, color: color),
+        PixelIcon(icon, size: TimbreIconSize.row, color: color),
         const SizedBox(width: 10),
         Expanded(
-          child: Text(text, style: TextStyle(fontSize: 14, color: color)),
+          child: Text(text, style: TimbreText.subtitle.copyWith(color: color)),
         ),
       ]),
     );
@@ -1020,14 +1218,18 @@ class _FieldIcon extends StatelessWidget {
         dimension: 44,
         child: Center(
           child: PixelIcon(glyph,
-              size: 20, color: TimbreColors.etiquetaCartel),
+              size: TimbreIconSize.row, color: TimbreColors.etiquetaCartel),
         ),
       );
 }
 
+/// What the add-stop dialog pops: a typed number to look up, or a stop
+/// picked from the catalog or the nearby stops, saved as it is.
+typedef _StopChoice = ({int id, BusStop? stop});
+
 /// Add-stop dialog: type the stop number, search by street names (through
 /// the proxy only) or pick one of the stops around the user ("Paradas
-/// cercanas"). Pops with the chosen stop ID.
+/// cercanas"). Pops with a [_StopChoice].
 class _AddStopDialog extends StatefulWidget {
   const _AddStopDialog();
 
@@ -1117,9 +1319,10 @@ class _AddStopDialogState extends State<_AddStopDialog> {
         NearbyStopsError.serviceDisabled =>
           'Activá la ubicación del teléfono para buscar paradas cercanas.',
         NearbyStopsError.permissionDenied =>
-          'Sin permiso de ubicación no se pueden buscar paradas cercanas.',
+          'Permití la ubicación para buscar paradas cercanas.',
         NearbyStopsError.permissionDeniedForever =>
-          'El permiso de ubicación está desactivado para la app.',
+          'El permiso de ubicación está desactivado para la app. '
+              'Activalo en Ajustes.',
         NearbyStopsError.locationUnavailable =>
           'No se pudo obtener tu ubicación. Probá de nuevo.',
         NearbyStopsError.network =>
@@ -1144,7 +1347,11 @@ class _AddStopDialogState extends State<_AddStopDialog> {
             TextField(
               controller: _controller,
               keyboardType: TextInputType.number,
-              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+              // Stop numbers have at most 7 digits
+              inputFormatters: [
+                FilteringTextInputFormatter.digitsOnly,
+                LengthLimitingTextInputFormatter(7),
+              ],
               decoration: const InputDecoration(
                 labelText: 'Número de parada',
                 hintText: 'Ej: 1234',
@@ -1209,7 +1416,7 @@ class _AddStopDialogState extends State<_AddStopDialog> {
             const SizedBox(height: 12),
             OutlinedButton.icon(
               onPressed: _searching ? null : _findNearby,
-              icon: const PixelIcon(PixelGlyphs.gps, size: 20),
+              icon: const PixelIcon(PixelGlyphs.gps, size: TimbreIconSize.row),
               label: const Text('Paradas cercanas'),
             ),
             if (_searching)
@@ -1258,54 +1465,84 @@ class _AddStopDialogState extends State<_AddStopDialog> {
             onPressed: () => Navigator.pop(context),
             child: const Text('Cancelar')),
         FilledButton(
-          onPressed: () =>
-              Navigator.pop(context, int.tryParse(_controller.text)),
+          onPressed: () {
+            final id = int.tryParse(_controller.text);
+            Navigator.pop<_StopChoice>(
+                context, id == null ? null : (id: id, stop: null));
+          },
           child: const Text('Agregar'),
         ),
       ],
     );
   }
 
-  Widget _buildNearbyTile(NearbyStop stop) => ListTile(
+  /// A listed stop is saved with the name and lines it is listed with:
+  /// nothing more to look up.
+  void _pick(int id, String name, List<String> lines) =>
+      Navigator.pop<_StopChoice>(context,
+          (id: id, stop: BusStop(id: id, name: name, lines: [...lines])));
+
+  /// A stop around the user. Without lines (the catalog could not get
+  /// them) the line ends at the distance.
+  Widget _buildNearbyTile(NearbyStop stop) {
+    final meters = stop.distanceMeters.round();
+    void pick() => _pick(stop.id, stop.name, stop.lines);
+    return Semantics(
+      button: true,
+      label: '${_stopPhrase(stop.id, stop.name)}, a $meters metros'
+          '${stop.lines.isEmpty ? '' : ', líneas ${stop.lines.join(', ')}'}',
+      onTap: pick,
+      excludeSemantics: true,
+      child: ListTile(
         contentPadding: EdgeInsets.zero,
         dense: true,
+        // A passive mark: not lit
         leading: const PixelIcon(PixelGlyphs.stop,
-            size: 22, color: TimbreColors.ambar),
+            size: 22, color: TimbreColors.etiquetaCartel),
         title: Text(stop.name,
             style: const TextStyle(
                 fontWeight: FontWeight.w600, color: TimbreColors.papel)),
         // Merged into the tile's style, so it keeps the app font
         subtitle: Text(
-          '#${stop.id} · ${stop.distanceMeters.round()} m'
+          '#${stop.id} · $meters m'
           '${stop.lines.isEmpty ? '' : ' · ${stop.lines.join(', ')}'}',
           maxLines: 2,
           overflow: TextOverflow.ellipsis,
-          style: const TextStyle(
-              fontSize: 12.5, color: TimbreColors.etiquetaCartel),
+          style: TimbreText.caption,
         ),
-        onTap: () => Navigator.pop(context, stop.id),
-      );
+        onTap: pick,
+      ),
+    );
+  }
 
   /// A stop found by its streets: the same tile as a nearby one, with
   /// the number under the name.
-  Widget _buildMatchTile(CatalogStop stop) => ListTile(
+  Widget _buildMatchTile(CatalogStop stop) {
+    void pick() => _pick(stop.id, stop.name, stop.lines);
+    return Semantics(
+      button: true,
+      label: _stopPhrase(stop.id, stop.name),
+      onTap: pick,
+      excludeSemantics: true,
+      child: ListTile(
         contentPadding: EdgeInsets.zero,
         dense: true,
         leading: const PixelIcon(PixelGlyphs.stop,
-            size: 22, color: TimbreColors.ambar),
+            size: 22, color: TimbreColors.etiquetaCartel),
         title: Text(stop.name,
             style: const TextStyle(
                 fontWeight: FontWeight.w600, color: TimbreColors.papel)),
-        subtitle: Text('#${stop.id}',
-            style: const TextStyle(
-                fontSize: 12.5, color: TimbreColors.etiquetaCartel)),
-        onTap: () => Navigator.pop(context, stop.id),
-      );
+        subtitle: Text('#${stop.id}', style: TimbreText.caption),
+        onTap: pick,
+      ),
+    );
+  }
 }
 
 /// Add-route dialog: origin stop and destination label. Once the stop is
-/// looked up, its lines (`transporteRest/lineas`) and the directions of its
-/// upcoming buses (`destino`) are picked as chips; none picked = all.
+/// looked up, its lines and where they go are picked as chips; none
+/// picked = all. Where a line goes comes from the stop's directions, or,
+/// for a line without any, from its upcoming buses (`destino`).
 class _AddRouteDialog extends StatefulWidget {
   const _AddRouteDialog();
 
@@ -1318,9 +1555,9 @@ class _AddRouteDialogState extends State<_AddRouteDialog> {
   final _destCtrl = TextEditingController();
   bool _loading = false;
   String? _error;
-  // Looked-up stop with its lines (null = not looked up yet)
-  BusStop? _stop;
-  // Upcoming buses of the stop: where each line is heading
+  // Looked-up stop with its lines and directions (null = not looked up yet)
+  StopDetails? _stop;
+  // Upcoming buses of the stop: where a line without directions is heading
   List<BusArrival> _arrivals = const [];
   final _lines = <String>{};
   final _directions = <String>{};
@@ -1352,18 +1589,19 @@ class _AddRouteDialogState extends State<_AddRouteDialog> {
       _loading = true;
       _error = null;
     });
-    final arrivals = MvdApiService.getNextArrivals(stopId);
-    BusStop? stop;
+    // In parallel: the directions may leave a line out
+    final board = MvdApiService.getBoard(stopId);
+    StopDetails? stop;
     String? error;
-    try {
-      stop = await MvdApiService.resolveStop(stopId);
-      if (stop == null) {
+    switch (await MvdApiService.getStopDetails(stopId)) {
+      case ApiOk(:final value):
+        stop = value;
+      case ApiError(failure: ApiFailure.notFound):
+        error = 'No existe la parada $stopId. Revisá el número.';
+      case ApiError():
         error = 'No se pudieron cargar las líneas. Revisá la conexión.';
-      }
-    } on StopNotFoundException {
-      error = 'No existe la parada $stopId';
     }
-    final upcoming = await arrivals;
+    final upcoming = (await board).valueOrNull?.arrivals;
     if (!mounted) return;
     setState(() {
       _loading = false;
@@ -1375,20 +1613,39 @@ class _AddRouteDialogState extends State<_AddRouteDialog> {
     });
   }
 
-  /// Directions of the upcoming buses of the picked lines (or of all).
-  List<String> get _visibleDirections => {
-        for (final a in _arrivals)
-          if (a.destination.isNotEmpty &&
-              (_lines.isEmpty || _lines.contains(a.line)))
-            a.destination,
-      }.toList()
-        ..sort();
+  /// Where the picked lines (or all) go, by destination, with the variants
+  /// of each: the stop's directions, and for a line without any, its
+  /// upcoming buses.
+  SplayTreeMap<String, Set<int>> get _visibleDirections {
+    final directions = _stop?.directions ?? const <StopDirection>[];
+    bool picked(String line) => _lines.isEmpty || _lines.contains(line);
+    final withDirections = {for (final d in directions) d.line};
+    final chips = SplayTreeMap<String, Set<int>>();
+    for (final d in directions) {
+      if (!picked(d.line)) continue;
+      chips.putIfAbsent(d.destination, () => {}).addAll(d.variantIds);
+    }
+    for (final a in _arrivals) {
+      if (a.destination.isEmpty ||
+          !picked(a.line) ||
+          withDirections.contains(a.line)) {
+        continue;
+      }
+      final variants = chips.putIfAbsent(a.destination, () => {});
+      if (a.variantId case final variant?) variants.add(variant);
+    }
+    return chips;
+  }
 
   void _save() {
     final stopId = int.tryParse(_stopCtrl.text);
     if (stopId == null || _destCtrl.text.trim().isEmpty) return;
     final stop = _stop;
     final directions = _visibleDirections;
+    final destinations = [
+      for (final d in directions.keys)
+        if (_directions.contains(d)) d,
+    ];
     Navigator.pop(
       context,
       _RouteFormData(
@@ -1400,10 +1657,12 @@ class _AddRouteDialogState extends State<_AddRouteDialog> {
           for (final l in stop?.lines ?? const <String>[])
             if (_lines.contains(l)) l,
         ],
-        preferredDestinations: [
-          for (final d in directions)
-            if (_directions.contains(d)) d,
-        ],
+        preferredDestinations: destinations,
+        // A bus of a picked variant matches whatever its label says
+        preferredVariantIds: {
+          for (final d in destinations) ...directions[d]!,
+        }.toList()
+          ..sort(),
       ),
     );
   }
@@ -1428,7 +1687,7 @@ class _AddRouteDialogState extends State<_AddRouteDialog> {
     const label = TimbreText.sectionLabel;
     final stop = _stop;
     final error = _error;
-    final directions = _visibleDirections;
+    final directions = _visibleDirections.keys.toList();
 
     return AlertDialog(
       title: const Text('Agregar ruta'),
@@ -1447,13 +1706,16 @@ class _AddRouteDialogState extends State<_AddRouteDialog> {
                 onChanged: (_) => _reset(),
                 onSubmitted: (_) => _lookUp(),
                 decoration: InputDecoration(
-                  labelText: 'Parada de origen *',
+                  // Screen readers say "obligatorio", not "asterisco"
+                  label: const Text('Parada de origen *',
+                      semanticsLabel: 'Parada de origen, obligatorio'),
                   hintText: 'Ej: 1234',
                   prefixIcon: const _FieldIcon(PixelGlyphs.stop),
                   suffixIcon: IconButton(
                     onPressed: _loading ? null : _lookUp,
                     tooltip: 'Ver líneas',
-                    icon: const PixelIcon(PixelGlyphs.search, size: 20),
+                    icon: const PixelIcon(PixelGlyphs.search,
+                        size: TimbreIconSize.row),
                   ),
                 ),
               ),
@@ -1461,7 +1723,8 @@ class _AddRouteDialogState extends State<_AddRouteDialog> {
               TextField(
                 controller: _destCtrl,
                 decoration: const InputDecoration(
-                  labelText: 'Destino *',
+                  label: Text('Destino *',
+                      semanticsLabel: 'Destino, obligatorio'),
                   hintText: 'Ej: Centro',
                   prefixIcon: _FieldIcon(PixelGlyphs.route),
                 ),
@@ -1477,7 +1740,11 @@ class _AddRouteDialogState extends State<_AddRouteDialog> {
                 const Text('Buscá la parada para elegir sus líneas',
                     style: hint)
               else ...[
-                Text(stop.name, style: TimbreText.stopName),
+                Semantics(
+                  label: _stopPhrase(stop.id, stop.displayName),
+                  excludeSemantics: true,
+                  child: Text(stop.displayName, style: TimbreText.stopName),
+                ),
                 const SizedBox(height: TimbreSpace.m),
                 const Text('LÍNEAS', style: label),
                 const SizedBox(height: TimbreSpace.xs),
@@ -1510,10 +1777,11 @@ class _AddRouteDialogState extends State<_AddRouteDialog> {
 class _RouteFormData {
   final int originStopId;
   final String destinationName;
-  // Resolved by the dialog (null = not looked up)
-  final BusStop? origin;
+  // Looked up by the dialog (null = not looked up)
+  final StopDetails? origin;
   final List<String> preferredLines;
   final List<String> preferredDestinations;
+  final List<int> preferredVariantIds;
 
   const _RouteFormData({
     required this.originStopId,
@@ -1521,6 +1789,7 @@ class _RouteFormData {
     this.origin,
     required this.preferredLines,
     required this.preferredDestinations,
+    required this.preferredVariantIds,
   });
 }
 
@@ -1528,11 +1797,17 @@ class _RouteFormData {
 /// Monday to Friday 7:30–8:30. Pops with the chosen values.
 class _AlertSettingsSheet extends StatefulWidget {
   final String title;
+
+  /// What screen readers hear instead of the uppercase [title].
+  final String spokenTitle;
   final int minutes;
   final AlertSchedule schedule;
 
   const _AlertSettingsSheet(
-      {required this.title, required this.minutes, required this.schedule});
+      {required this.title,
+      required this.spokenTitle,
+      required this.minutes,
+      required this.schedule});
 
   @override
   State<_AlertSettingsSheet> createState() => _AlertSettingsSheetState();
@@ -1540,6 +1815,16 @@ class _AlertSettingsSheet extends StatefulWidget {
 
 class _AlertSettingsSheetState extends State<_AlertSettingsSheet> {
   static const _dayChips = ['Lu', 'Ma', 'Mi', 'Ju', 'Vi', 'Sá', 'Do'];
+  // What screen readers say for each chip
+  static const _dayNames = [
+    'Lunes',
+    'Martes',
+    'Miércoles',
+    'Jueves',
+    'Viernes',
+    'Sábado',
+    'Domingo',
+  ];
   // Offered when "Todo el día" is turned off
   static const _defaultFrom = 7 * 60, _defaultTo = 9 * 60;
 
@@ -1597,23 +1882,22 @@ class _AlertSettingsSheetState extends State<_AlertSettingsSheet> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text(widget.title, style: TimbreText.stopName),
+            Semantics(
+              header: true,
+              label: widget.spokenTitle,
+              excludeSemantics: true,
+              child: Text(widget.title, style: TimbreText.stopName),
+            ),
             if (defaultTargetPlatform == TargetPlatform.android) ...[
               const SizedBox(height: TimbreSpace.xs),
-              const Text(
+              Text(
                   'Se revisa cada 15 min aprox. y avisa solo por ómnibus '
                   'con GPS.',
-                  style: TextStyle(
-                      fontSize: 12.5,
-                      height: 1.4,
-                      color: TimbreColors.etiquetaCartel)),
+                  style: TimbreText.caption.copyWith(height: 1.4)),
             ],
             const SizedBox(height: 18),
-            const Text('Avisarme cuando falten',
-                style: TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w600,
-                    color: TimbreColors.papel)),
+            Text('Avisarme cuando falten',
+                style: TimbreText.body.copyWith(fontWeight: FontWeight.w600)),
             const SizedBox(height: TimbreSpace.s),
             TimbreSegmented<int>(
               values: const [3, 5, 10],
@@ -1631,7 +1915,8 @@ class _AlertSettingsSheetState extends State<_AlertSettingsSheet> {
               children: [
                 for (var day = DateTime.monday; day <= DateTime.sunday; day++)
                   FilterChip(
-                    label: Text(_dayChips[day - 1]),
+                    label: Text(_dayChips[day - 1],
+                        semanticsLabel: _dayNames[day - 1]),
                     showCheckmark: false,
                     selected: _days.contains(day),
                     onSelected: (on) => setState(
@@ -1678,3 +1963,23 @@ class _AlertSettingsSheetState extends State<_AlertSettingsSheet> {
     );
   }
 }
+
+/// "Parada 574, San Jose y Andes": a stop for screen readers, the API name
+/// in words. A stop saved offline is just "Parada 574".
+String _stopPhrase(int id, String name) =>
+    name == 'Parada $id' ? name : 'Parada $id, ${spokenName(name)}';
+
+/// "De San Jose y Andes a Trabajo": the origin is an API name, the
+/// destination the user's own words.
+String _routeName(RouteAlert route) =>
+    'De ${spokenName(route.originName)} a ${route.destinationName}';
+
+/// The route card for screen readers: [_routeName] and the picked lines
+/// and directions.
+String _routePhrase(RouteAlert route) => [
+      _routeName(route),
+      if (route.preferredLines.isNotEmpty)
+        'líneas ${route.preferredLines.join(', ')}',
+      if (route.preferredDestinations.isNotEmpty)
+        'hacia ${route.preferredDestinations.map(spokenName).join(', ')}',
+    ].join(', ');

@@ -26,7 +26,7 @@ AppBar buildTimbreAppBar(
     // the title, so the text stays clean
     flexibleSpace: const LedMatrix(
       color: TimbreColors.ambar,
-      opacity: 0.1,
+      opacity: TimbreOpacity.ledUnlit,
       fadeFrom: AlignmentDirectional.centerEnd,
     ),
     actions: actions,
@@ -37,6 +37,7 @@ AppBar buildTimbreAppBar(
       subtitleStyle: subtitleStyle,
       semanticLabel: semanticLabel,
       textScaler: MediaQuery.textScalerOf(context),
+      width: MediaQuery.sizeOf(context).width,
     ),
   );
 }

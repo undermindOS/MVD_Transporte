@@ -35,12 +35,16 @@ void main() {
 
   testWidgets('Novedades: unread badge, newest first, detail sheet',
       (tester) async {
+    final handle = tester.ensureSemantics();
     await tester.pumpWidget(
         MaterialApp(home: StopsPage(onOpenStopInComoIr: (_) {})));
     await tester.pump();
 
-    // Never opened: all 10 unread
+    // Never opened: all 10 unread, said as such, not a bare number
     expect(find.text('10'), findsOneWidget);
+    expect(find.bySemanticsLabel(RegExp('10 novedades sin leer')),
+        findsOneWidget);
+    handle.dispose();
     expect(find.byType(FloatingActionButton), findsOneWidget);
 
     await tester.tap(find.text('Novedades'));

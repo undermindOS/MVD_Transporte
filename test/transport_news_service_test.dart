@@ -2,8 +2,11 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
 import 'package:stm_app/models/transport_news.dart';
 import 'package:stm_app/services/cache_service.dart';
+import 'package:stm_app/services/mvd_api_service.dart';
 import 'package:stm_app/services/transport_news_service.dart';
 
 // Live responses of /notificacion/mensajes?idApp=1&fromIdMessage=N,
@@ -77,6 +80,36 @@ void main() {
       expect(copy.body, n.body);
       expect(copy.link, n.link);
       expect(copy.date, n.date);
+    });
+  });
+
+  group('TransportNews.fromV1', () {
+    test('reads a /v1 item, the date in local time like the cache', () {
+      final n = TransportNews.fromV1({
+        'id': 182,
+        'title': 'Traslado definitivo de cuatro paradas',
+        'summary': 'Sobre Av. Rondeau, Paraguay y Gral. Aguilar',
+        'body': '<p>Por obras viales…</p>',
+        'link': 'https://montevideo.gub.uy/node/99018',
+        'publishedAt': '2026-10-26T18:28:02.591Z',
+      })!;
+      expect(n.id, 182);
+      expect(n.link, 'https://montevideo.gub.uy/node/99018');
+      expect(n.date, DateTime.fromMillisecondsSinceEpoch(1793039282591));
+      expect(n.date.isUtc, isFalse);
+      // The cache keeps the API shape
+      final copy = TransportNews.fromJson(n.toJson())!;
+      expect((copy.id, copy.body, copy.date), (n.id, n.body, n.date));
+    });
+
+    test('needs an id and a date; no link is null', () {
+      expect(TransportNews.fromV1({'id': 1}), isNull);
+      expect(TransportNews.fromV1({'publishedAt': '2026-10-26T18:28:02Z'}),
+          isNull);
+      expect(TransportNews.fromV1('garbage'), isNull);
+      final n = TransportNews.fromV1(
+          {'id': 1, 'publishedAt': '2026-10-26T18:28:02Z', 'link': null})!;
+      expect((n.title, n.link), ('', null));
     });
   });
 
@@ -168,6 +201,103 @@ void main() {
       // A real fetch would have moved the timestamp
       expect(
           CacheService.get<int>(CacheService.keyNewsFetchedAt), fetchedAt);
+    });
+
+    group('refresh', () {
+      // The contract's cold start (proxy/contract/v1, case news.cold): the
+      // proxy's answer, and the notificacion pages the direct mode climbs
+      const contract = 'proxy/contract/v1';
+      final golden =
+          File('$contract/responses/news_cold.json').readAsBytesSync();
+      final requests = <String>[];
+      http.Response? proxyFailure;
+      final client = MockClient((request) async {
+        requests.add('${request.url}');
+        if (request.url.host == 'proxy.test') {
+          return request.url.path == '/v1/news'
+              ? proxyFailure ?? http.Response.bytes(golden, 200)
+              : http.Response('{"error":"not_found"}', 404);
+        }
+        final from = request.url.queryParameters['fromIdMessage'];
+        final page =
+            File('$contract/upstream/notificacion/mensajes_from$from.json');
+        return page.existsSync()
+            ? http.Response.bytes(page.readAsBytesSync(), 200)
+            : http.Response('', 500);
+      });
+      Future<List<TransportNews>?> refresh() =>
+          http.runWithClient(TransportNewsService.refresh, () => client);
+      List<int> ids(List<TransportNews>? news) => [...?news?.map((n) => n.id)];
+
+      setUp(() async {
+        for (final key in [
+          CacheService.keyNewsCache,
+          CacheService.keyNewsFromId,
+          CacheService.keyNewsFetchedAt,
+        ]) {
+          await CacheService.remove(key);
+        }
+        requests.clear();
+        proxyFailure = null;
+      });
+
+      tearDown(() => MvdApiService.proxyUrl = '');
+
+      test('through the proxy: one request, merged into the cache', () async {
+        MvdApiService.proxyUrl = 'https://proxy.test';
+        final older = _page(170)!.messages; // 171…180
+        await CacheService.set(CacheService.keyNewsCache,
+            jsonEncode(older.map((n) => n.toJson()).toList()));
+        // A paging start left by a build without the proxy stays as is
+        await CacheService.set(CacheService.keyNewsFromId, 170);
+
+        final news = await refresh();
+        expect(requests, ['https://proxy.test/v1/news']);
+        expect(ids(news), [182, 181, 180, 179, 178, 177, 176, 175, 174, 173,
+            172, 171]);
+        expect(ids(TransportNewsService.cached()), ids(news));
+        expect(CacheService.get<int>(CacheService.keyNewsFromId), 170);
+        expect(CacheService.get<int>(CacheService.keyNewsFetchedAt),
+            isNotNull);
+      });
+
+      test('through the proxy: a failure keeps the cache', () async {
+        MvdApiService.proxyUrl = 'https://proxy.test';
+        final older = _page(170)!.messages;
+        await CacheService.set(CacheService.keyNewsCache,
+            jsonEncode(older.map((n) => n.toJson()).toList()));
+        proxyFailure = http.Response('{"error":"upstream_error"}', 502);
+
+        expect(await refresh(), isNull);
+        expect(requests, ['https://proxy.test/v1/news']);
+        expect(ids(TransportNewsService.cached()), ids(older));
+        // Not throttled: the next refresh asks again
+        expect(CacheService.get<int>(CacheService.keyNewsFetchedAt), isNull);
+        expect(CacheService.get<int>(CacheService.keyNewsFromId), isNull);
+      });
+
+      test('a cold start gives the same list with and without the proxy',
+          () async {
+        MvdApiService.proxyUrl = 'https://proxy.test';
+        final viaProxy = (await refresh())!;
+        expect(requests, hasLength(1));
+
+        await CacheService.remove(CacheService.keyNewsCache);
+        await CacheService.remove(CacheService.keyNewsFetchedAt);
+        MvdApiService.proxyUrl = '';
+        requests.clear();
+        final direct = (await refresh())!;
+        expect(requests, [
+          for (final from in [0, 136, 168, 172])
+            'https://api.montevideo.gub.uy/notificacion/mensajes'
+                '?idApp=1&fromIdMessage=$from',
+        ]);
+        expect(CacheService.get<int>(CacheService.keyNewsFromId), 172);
+
+        expect(ids(direct), [182, 181, 180, 179, 178, 177, 176, 175, 174, 173]);
+        expect([for (final n in direct) n.toJson()],
+            [for (final n in viaProxy) n.toJson()]);
+      });
     });
   });
 }

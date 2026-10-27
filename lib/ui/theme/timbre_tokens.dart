@@ -69,3 +69,35 @@ abstract final class TimbreSpace {
   /// Minimum touch target.
   static const touch = 44.0;
 }
+
+/// How much of the amber light shows: the board texture and the press.
+abstract final class TimbreOpacity {
+  /// Unlit LEDs of the board ([TimbreColors.ambar] at 10 %): the header
+  /// and the icon tile.
+  static const ledUnlit = 0.1;
+
+  /// Tap ripple: the pressed surface lights up.
+  static const pressSplash = 0.16;
+
+  /// Pressed highlight under the ripple.
+  static const pressHighlight = 0.08;
+}
+
+/// Pixel icon sizes.
+abstract final class TimbreIconSize {
+  /// Marks in a row: accessible, air conditioning, zero emission.
+  static const mark = 14.0;
+
+  /// Rows, buttons and the navigation.
+  static const row = 20.0;
+  static const rowLarge = 24.0;
+
+  /// The Servicios tiles.
+  static const tile = 48.0;
+}
+
+/// The one shadow on the board: the light of a lit LED sign.
+abstract final class TimbreShadow {
+  /// "LLEGANDO": [TimbreColors.ambar] at 35 %, blurred 12 px.
+  static const ledGlow = BoxShadow(color: Color(0x59FFB21E), blurRadius: 12);
+}

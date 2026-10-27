@@ -43,6 +43,30 @@ class TransportNews {
     );
   }
 
+  /// One item of /v1 `news` — the only reader of the network answers:
+  /// `{"id":182,"title":"…","summary":"…","body":"<p>…</p>",
+  ///   "link":"https://…","publishedAt":"2026-10-26T18:28:02.591Z"}`
+  /// Returns null without a usable id or date. [date] is local time, as
+  /// [fromJson] gives it.
+  static TransportNews? fromV1(Object? json) {
+    if (json is! Map) return null;
+    final id = json['id'];
+    final published = json['publishedAt'];
+    final date = published is String ? DateTime.tryParse(published) : null;
+    if (id is! int || date == null) return null;
+
+    String text(Object? value) => value is String ? value : '';
+    final link = json['link'];
+    return TransportNews(
+      id: id,
+      title: text(json['title']),
+      summary: text(json['summary']),
+      body: text(json['body']),
+      link: link is String && link.isNotEmpty ? link : null,
+      date: date.toLocal(),
+    );
+  }
+
   /// Same shape as the API, so the cache reuses [fromJson].
   Map<String, dynamic> toJson() => {
         'idMensaje': '$id',

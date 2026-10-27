@@ -133,8 +133,10 @@ class _SiteTile extends StatelessWidget {
         onTap: onTap,
         borderRadius: BorderRadius.circular(TimbreRadii.card),
         // Tapping lights the board up
-        splashColor: TimbreColors.ambar.withValues(alpha: 0.22),
-        highlightColor: TimbreColors.ambar.withValues(alpha: 0.10),
+        splashColor:
+            TimbreColors.ambar.withValues(alpha: TimbreOpacity.pressSplash),
+        highlightColor:
+            TimbreColors.ambar.withValues(alpha: TimbreOpacity.pressHighlight),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -158,7 +160,7 @@ class _SiteTile extends StatelessWidget {
                       Center(
                         child: PixelIcon(
                           site.icon,
-                          size: 48,
+                          size: TimbreIconSize.tile,
                           color: TimbreColors.ambar,
                           glow: true,
                         ),
@@ -168,7 +170,7 @@ class _SiteTile extends StatelessWidget {
                         right: 9,
                         child: PixelIcon(
                           PixelGlyphs.external,
-                          size: 16,
+                          size: TimbreIconSize.mark,
                           color: TimbreColors.ambarTenue,
                         ),
                       ),
@@ -216,26 +218,23 @@ class _BrowserNote extends StatelessWidget {
         borderRadius: BorderRadius.circular(TimbreRadii.button),
         border: Border.all(color: TimbreColors.lineaNoche),
       ),
-      child: const Padding(
-        padding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            PixelIcon(PixelGlyphs.external,
-                size: 22, color: TimbreColors.ambar),
-            SizedBox(width: 12),
+            // A note, not a lit LED
+            const PixelIcon(PixelGlyphs.external,
+                size: 22, color: TimbreColors.etiquetaCartel),
+            const SizedBox(width: 12),
             Expanded(
               child: Text(
                 'Se abren en tu navegador, en el sitio oficial de la '
                 'Intendencia de Montevideo. La app no tiene acceso a tu '
                 'usuario, tu contraseña ni tu saldo. Timbre MVD no es una '
                 'app oficial.',
-                style: TextStyle(
-                  fontFamily: TimbreFonts.fira,
-                  fontSize: 14,
-                  height: 1.45,
-                  color: TimbreColors.papel,
-                ),
+                style: TimbreText.subtitle
+                    .copyWith(height: 1.45, color: TimbreColors.papel),
               ),
             ),
           ],

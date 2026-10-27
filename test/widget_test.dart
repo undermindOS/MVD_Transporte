@@ -18,6 +18,7 @@ import 'package:stm_app/models/bus_stop.dart';
 import 'package:stm_app/services/cache_service.dart';
 import 'package:stm_app/services/official_sites.dart';
 import 'package:stm_app/ui/lock_screen.dart';
+import 'package:stm_app/ui/stops_page.dart';
 
 import 'support/layout.dart';
 
@@ -59,6 +60,34 @@ void main() {
     expect(find.text('Servicios'), findsOneWidget);
     expect(find.text('SIN PARADAS'), findsOneWidget);
     expect(find.byTooltip('Info'), findsOneWidget);
+  });
+
+  testWidgets('Mis paradas polls only while it is on screen',
+      (WidgetTester tester) async {
+    await tester.pumpWidget(const MiTransporteMVDApp());
+    await tester.pump();
+    bool polling() => tester
+        .widget<StopsPage>(find.byType(StopsPage, skipOffstage: false))
+        .active;
+    expect(polling(), isTrue);
+
+    // Another tab
+    await tester.tap(find.text('Servicios'));
+    await tester.pump();
+    expect(polling(), isFalse);
+    await tester.tap(find.text('Mis paradas'));
+    await tester.pump();
+    expect(polling(), isTrue);
+
+    // A page on top
+    await tester.tap(find.byTooltip('Info'));
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 1));
+    expect(polling(), isFalse);
+    await tester.pageBack();
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 1));
+    expect(polling(), isTrue);
   });
 
   testWidgets('Servicios lists the official sites',
@@ -119,7 +148,10 @@ void main() {
     await tester.tap(find.text('Avisos'));
     await tester.pump();
 
-    expect(find.text('No se pudo abrir el navegador'), findsOneWidget);
+    expect(
+        find.text(
+            'No se pudo abrir el navegador. Revisá que tengas uno activado.'),
+        findsOneWidget);
   });
 
   testWidgets('Ver en Cómo Ir opens the stop deep link',

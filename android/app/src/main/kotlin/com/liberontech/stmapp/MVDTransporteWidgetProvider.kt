@@ -18,6 +18,9 @@ class MVDTransporteWidgetProvider : AppWidgetProvider() {
             "https://stm.gub.uy/app/mistm/cuenta/pages/principal.xhtml"
         private const val RECARGA_URL =
             "https://stm.gub.uy/app/mistm/cuenta/recargaRapida.xhtml"
+
+        // The row is hidden this long after its bus was due
+        private const val EXPIRED_AFTER_MS = 2 * 60 * 1000L
     }
 
     override fun onUpdate(
@@ -57,8 +60,14 @@ class MVDTransporteWidgetProvider : AppWidgetProvider() {
         val routeDest = widgetData.getString("route_dest", null)
         // Absolute time stays correct between background refreshes (≥15 min)
         val routeEtaAt = widgetData.getString("route_eta_at", null)
+        // When the bus is due (ms since epoch, as text): a row the app
+        // could not refresh must not show a bus that has passed
+        val routeExpectedAtMs =
+            widgetData.getString("route_expected_at_ms", null)?.toLongOrNull()
+        val expired = routeExpectedAtMs != null &&
+            System.currentTimeMillis() > routeExpectedAtMs + EXPIRED_AFTER_MS
 
-        if (routeLine != null && routeEtaMin >= 0 && routeDest != null) {
+        if (!expired && routeLine != null && routeEtaMin >= 0 && routeDest != null) {
             val etaLabel = when {
                 routeEtaAt != null -> "~$routeEtaAt"
                 routeEtaMin == 0 -> "ahora"
@@ -80,7 +89,8 @@ class MVDTransporteWidgetProvider : AppWidgetProvider() {
             views.setViewVisibility(R.id.widget_route_section, View.VISIBLE)
             views.setViewVisibility(R.id.widget_route_empty, View.GONE)
         } else {
-            // No enabled route alert, or none of its lines is coming
+            // No enabled route alert, none of its lines is coming, or the
+            // bus shown last has passed
             views.setViewVisibility(R.id.widget_route_section, View.GONE)
             views.setViewVisibility(R.id.widget_route_empty, View.VISIBLE)
         }

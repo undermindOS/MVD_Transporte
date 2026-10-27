@@ -53,10 +53,15 @@ class TimbreEmptyState extends StatelessWidget {
                           height: 26, palette: TimbreBusPalette.led),
                       const SizedBox(width: 12),
                       Flexible(
-                        child: Text(
-                          sign,
-                          style: TimbreText.cartel(20)
-                              .copyWith(letterSpacing: 1, height: 1.15),
+                        // A small system font must not shrink the dots
+                        // below 19 px
+                        child: MediaQuery.withClampedTextScaling(
+                          minScaleFactor: 1,
+                          child: Text(
+                            sign,
+                            style: TimbreText.cartel(20)
+                                .copyWith(letterSpacing: 1, height: 1.15),
+                          ),
                         ),
                       ),
                     ]),
@@ -69,11 +74,7 @@ class TimbreEmptyState extends StatelessWidget {
             const SizedBox(height: 14),
             Text(detail!,
                 textAlign: TextAlign.center,
-                style: const TextStyle(
-                    fontFamily: TimbreFonts.fira,
-                    fontSize: 14,
-                    height: 1.4,
-                    color: TimbreColors.etiquetaCartel)),
+                style: TimbreText.subtitle.copyWith(height: 1.4)),
           ],
         ],
       ),

@@ -11,6 +11,8 @@ import 'pixel_icon.dart';
 /// One bus on the board: line badge, destination, comfort marks and, on
 /// the right, the minutes in lit digits (GPS) or the timetable time with a
 /// clock (no GPS). A followed bus ("Estoy esperando") is lifted and rings.
+/// A [stale] bus, kept from the last board after a failed refresh, is an
+/// estimate ("~20:01"): never lit, whatever it was.
 ///
 /// With large system fonts the time moves to its own line under the
 /// destination, so the destination keeps its room and nothing is cut.
@@ -19,33 +21,44 @@ class ArrivalRow extends StatelessWidget {
     super.key,
     required this.arrival,
     this.waited = false,
+    this.stale = false,
     this.onTap,
   });
 
   final BusArrival arrival;
   final bool waited;
+
+  /// From the last board that arrived, shown after a failed refresh.
+  final bool stale;
   final VoidCallback? onTap;
+
+  // A stale row is never lit, so it does not ring either
+  bool get _waited => waited && !stale;
 
   String get _sentence {
     final a = arrival;
     final to = a.destination.isEmpty ? '' : ' a ${spokenName(a.destination)}';
-    final when = !a.isRealTime
-        ? 'horario ${a.etaLabel}, sin GPS'
-        : a.etaMinutes <= 0
-            ? 'llegando, con GPS'
-            : 'llega en ${a.etaMinutes == 1 ? '1 minuto' : '${a.etaMinutes} minutos'}, con GPS';
+    final when = stale
+        ? 'alrededor de las ${a.clockTime}, estimado'
+        : !a.isRealTime
+            ? 'horario ${a.etaLabel}, sin GPS'
+            : a.etaMinutes <= 0
+                ? 'llegando, con GPS'
+                : 'llega en ${a.etaMinutes == 1 ? '1 minuto' : '${a.etaMinutes} minutos'}, con GPS';
     return [
       'Línea ${a.line}$to, $when',
       if (a.accessible) 'accesible',
       if (a.airConditioning == true) 'aire acondicionado',
       if (a.zeroEmission == true) 'cero emisiones',
-      if (waited) 'estás esperando este ómnibus',
+      if (_waited) 'estás esperando este ómnibus',
     ].join(', ');
   }
 
   @override
   Widget build(BuildContext context) {
     final a = arrival;
+    final waited = _waited;
+    final live = a.isRealTime && !stale;
     final marks = <Widget>[
       if (waited)
         const PixelIcon(PixelGlyphs.bellRing,
@@ -67,18 +80,18 @@ class ArrivalRow extends StatelessWidget {
             semanticLabel: 'Cero emisiones'),
     ];
 
-    final time = a.isRealTime
+    final time = live
         ? MinutosEnVivo(minutes: a.etaMinutes, size: 26)
         : Row(mainAxisSize: MainAxisSize.min, children: [
             const PixelIcon(PixelGlyphs.clock,
                 size: 14, color: TimbreColors.tenue),
             const SizedBox(width: 5),
-            Text(a.etaLabel,
+            Text(stale ? '~${a.clockTime}' : a.etaLabel,
                 style: TimbreText.scheduleTime.copyWith(fontSize: 20)),
           ]);
     final stacked = TimbreText.isLarge(context);
     final heading = Row(children: [
-      LineBadge(a.line, live: a.isRealTime),
+      LineBadge(a.line, live: live),
       const SizedBox(width: 10),
       Expanded(
         child: Column(

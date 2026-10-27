@@ -1,6 +1,7 @@
 // "Agregar parada" → "Buscar por calles": the stop catalog of the proxy,
-// searched by street names, and the picked stop saved like a typed number.
-// HTTP is faked with live proxy answers (test/fixtures, 2026-10-19).
+// searched by street names, and the picked stop saved as listed, with no
+// lookup. HTTP is faked with live proxy answers (test/fixtures,
+// 2026-10-19).
 //
 // A file of its own, not test/stops_page_test.dart: Hive serialises the
 // writes of a box on a future, and a future completed in an earlier test's
@@ -8,6 +9,7 @@
 // first test can wait for a write to the stops box, and saving the picked
 // stop does.
 
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -27,8 +29,20 @@ const _stop574 = '{"id":574,"name":"SAN JOSE y ANDES",'
 void main() {
   late Directory hiveDir;
   final requests = <Uri>[];
-  final catalog =
-      File('test/fixtures/proxy_catalog_stops.json').readAsBytesSync();
+  // The 2026-10-19 capture predates lines in the catalog: 574 gets those
+  // of the contract's golden (proxy/contract/v1/responses)
+  final catalog = () {
+    final body = jsonDecode(
+            File('test/fixtures/proxy_catalog_stops.json').readAsStringSync())
+        as Map<String, dynamic>;
+    body['linesAvailable'] = true;
+    for (final stop in body['stops'] as List) {
+      if (stop['id'] == 574) {
+        stop['lines'] = ['116', '117', '121', '141', '142', '144', '538'];
+      }
+    }
+    return utf8.encode(jsonEncode(body));
+  }();
 
   final client = MockClient((request) async {
     requests.add(request.url);
@@ -92,6 +106,13 @@ void main() {
       expect(inDialog(find.byType(ListTile)), findsOneWidget);
       expect(inDialog(find.text('SAN JOSE y ANDES')), findsOneWidget);
       expect(inDialog(find.text('#574')), findsOneWidget);
+      // One phrase per tile, the street names in words
+      final handle = tester.ensureSemantics();
+      expect(
+          tester.getSemantics(
+              find.bySemanticsLabel('Parada 574, San Jose y Andes')),
+          isSemantics(isButton: true, hasTapAction: true));
+      handle.dispose();
       // In the app font, not the platform one
       final number = tester.widget<RichText>(find.descendant(
           of: inDialog(find.text('#574')), matching: find.byType(RichText)));
@@ -116,8 +137,9 @@ void main() {
           () => Future<void>.delayed(const Duration(milliseconds: 100)));
       await tester.pumpAndSettle();
 
-      // Saved through resolveStop (/v1/stops/574), like a typed number
-      expect(requests.map((u) => u.path), contains('/v1/stops/574'));
+      // Saved as listed, with the catalog's lines: no /v1/stops/574
+      expect(requests.map((u) => u.path), isNot(contains('/v1/stops/574')));
+      expect(find.text('Buscando parada…'), findsNothing);
       final saved = CacheService.getStop(574);
       expect(saved, isNotNull);
       expect(saved!.name, 'SAN JOSE y ANDES');
@@ -129,7 +151,8 @@ void main() {
 
   testWidgets('a catalog that cannot be loaded is reported', (tester) async {
     // No copy on the device either. Not awaited (see the top of the file):
-    // Hive drops the key from memory at once.
+    // removing the catalog key drops the copy at once, before the lazy
+    // box reaches the disk.
     MvdApiService.clearCatalogMemory();
     CacheService.remove(CacheService.keyStopCatalog);
     final offline = MockClient((request) async {
