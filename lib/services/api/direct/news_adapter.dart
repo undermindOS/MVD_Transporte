@@ -103,7 +103,7 @@ abstract final class NewsAdapter {
         return byDate != 0 ? byDate : (b['id'] as int).compareTo(a['id'] as int);
       });
     return {
-      'fetchedAt': fetchedAt.toUtc().toIso8601String(),
+      'fetchedAt': ContractRules.isoUtc(fetchedAt),
       'news': sorted.take(maxNews).toList(),
     };
   }

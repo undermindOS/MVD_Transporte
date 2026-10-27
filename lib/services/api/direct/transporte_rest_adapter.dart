@@ -58,7 +58,7 @@ abstract final class TransporteRestAdapter {
     });
     return {
       'id': id,
-      'fetchedAt': fetchedAt.toUtc().toIso8601String(),
+      'fetchedAt': ContractRules.isoUtc(fetchedAt),
       'arrivals': [for (final r in rows) r.$1],
     };
   }

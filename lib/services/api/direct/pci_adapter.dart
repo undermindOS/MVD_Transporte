@@ -15,7 +15,7 @@ abstract final class PciAdapter {
     final operators = raw.map(ContractRules.gpsOperator).nonNulls.toList();
     if (operators.isEmpty) return null;
     return {
-      'fetchedAt': fetchedAt.toUtc().toIso8601String(),
+      'fetchedAt': ContractRules.isoUtc(fetchedAt),
       'operators': operators,
     };
   }

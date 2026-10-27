@@ -56,6 +56,15 @@ abstract final class ContractRules {
     return parts.isEmpty ? null : parts.join(' y ');
   }
 
+  /// [time] the way the contract writes times: ISO 8601 in UTC with
+  /// milliseconds ("2026-10-19T22:52:10.000Z"), as JS `toISOString` does.
+  /// Dart's `toIso8601String` adds microseconds when there are any, and
+  /// `DateTime.now()` has them on the VM.
+  static String isoUtc(DateTime time) =>
+      DateTime.fromMillisecondsSinceEpoch(time.millisecondsSinceEpoch,
+              isUtc: true)
+          .toIso8601String();
+
   /// [utc] on the Montevideo clock, "H:MM". Uruguay keeps UTC−3 all year.
   static String montevideoClock(DateTime utc) {
     final local = utc.toUtc().subtract(const Duration(hours: 3));
