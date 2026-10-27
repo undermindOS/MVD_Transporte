@@ -6,9 +6,9 @@ import worker, { ImGateway } from '../src/index.js';
 
 const UPSTREAM = 'https://api.montevideo.gub.uy/transporteRest';
 
-// Live transporteRest answers, 2026-10-19
+// Live upstream answers, 2026-10-19, shared with the app (../contract/v1)
 const fixture = (name) =>
-  readFileSync(new URL(`fixtures/${name}`, import.meta.url), 'utf8');
+  readFileSync(new URL(`../contract/v1/upstream/${name}`, import.meta.url), 'utf8');
 const NOT_FOUND_BODY = "No existe la ubicación de parada con código '99999999'.";
 
 const realFetch = globalThis.fetch;
@@ -67,7 +67,7 @@ function call(
 
 describe('GET /v1/stops/{id}', () => {
   it('returns name and lines, cached for a day', async () => {
-    const calls = mockUpstream(() => new Response(fixture('lineas_574.json')));
+    const calls = mockUpstream(() => new Response(fixture('transporte_rest/lineas_574.json')));
     const { response } = await call('/v1/stops/574');
 
     assert.equal(response.status, 200);
@@ -92,7 +92,7 @@ describe('GET /v1/stops/{id}', () => {
 
 describe('GET /v1/stops/{id}/arrivals', () => {
   it('maps arrivals soonest first, cached for 15 s', async () => {
-    const calls = mockUpstream(() => new Response(fixture('arrivals_3140.json')));
+    const calls = mockUpstream(() => new Response(fixture('transporte_rest/arrivals_3140.json')));
     const { response } = await call('/v1/stops/3140/arrivals');
 
     assert.equal(response.status, 200);
@@ -145,11 +145,13 @@ describe('GET /v1/stops/{id}/arrivals with comfort from the official API', () =>
   const IM = 'https://api.montevideo.gub.uy/api/transportepublico';
   function mockBoth() {
     const calls = mockUpstream((url) => {
-      if (url.startsWith(UPSTREAM)) return new Response(fixture('arrivals_574.json'));
+      if (url.startsWith(UPSTREAM)) {
+        return new Response(fixture('transporte_rest/arrivals_574.json'));
+      }
       if (url.includes('openid-connect/token')) {
         return Response.json({ access_token: 't', expires_in: 300 });
       }
-      if (url === `${IM}/buses`) return new Response(fixture('im_buses.json'));
+      if (url === `${IM}/buses`) return new Response(fixture('im_api/im_buses.json'));
       return assert.fail(`unexpected ${url}`);
     });
     return calls;
@@ -184,7 +186,7 @@ describe('GET /v1/stops/{id}/arrivals with comfort from the official API', () =>
   });
 
   it('serves arrivals without comfort when the gateway is busy', async () => {
-    mockUpstream(() => new Response(fixture('arrivals_574.json')));
+    mockUpstream(() => new Response(fixture('transporte_rest/arrivals_574.json')));
     const gateway = gatewayNamespace(() =>
       Response.json({ error: 'upstream_busy' }, { status: 503 }),
     );
@@ -197,7 +199,7 @@ describe('GET /v1/stops/{id}/arrivals with comfort from the official API', () =>
   });
 
   it('serves arrivals without comfort when the gateway throws', async () => {
-    mockUpstream(() => new Response(fixture('arrivals_574.json')));
+    mockUpstream(() => new Response(fixture('transporte_rest/arrivals_574.json')));
     const gateway = gatewayNamespace(() => {
       throw new Error('Durable Object overloaded');
     });
@@ -207,7 +209,7 @@ describe('GET /v1/stops/{id}/arrivals with comfort from the official API', () =>
   });
 
   it('does not wait more than 2 s for comfort', async () => {
-    mockUpstream(() => new Response(fixture('arrivals_574.json')));
+    mockUpstream(() => new Response(fixture('transporte_rest/arrivals_574.json')));
     const gateway = gatewayNamespace(() => new Promise(() => {}));
 
     const started = Date.now();
@@ -289,7 +291,7 @@ describe('routes served by ImGateway', () => {
 describe('GET /v1/stops/{id}/schedule/{day}/{H:MM}', () => {
   it('maps the timetable for the day type, cached for 6 h', async () => {
     const calls = mockUpstream(() =>
-      new Response(fixture('schedule_3140_habil_805.json')),
+      new Response(fixture('transporte_rest/schedule_3140_habil_805.json')),
     );
     const { response } = await call('/v1/stops/3140/schedule/weekday/8:05');
 
@@ -405,7 +407,7 @@ describe('requests that never reach transporteRest', () => {
 
 describe('IP limit', () => {
   it('counts every request by client IP', async () => {
-    mockUpstream(() => new Response(fixture('lineas_574.json')));
+    mockUpstream(() => new Response(fixture('transporte_rest/lineas_574.json')));
     const { keys } = await call('/v1/stops/574', { ip: '198.51.100.20' });
 
     assert.deepEqual(keys, ['198.51.100.20']);

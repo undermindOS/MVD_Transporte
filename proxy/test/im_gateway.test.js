@@ -10,7 +10,7 @@ const API = 'https://api.montevideo.gub.uy/api/transportepublico';
 
 // Live answers of the official API, 2026-10-19 19:52 (-03)
 const fixture = (name) =>
-  readFileSync(new URL(`fixtures/${name}`, import.meta.url), 'utf8');
+  readFileSync(new URL(`../contract/v1/upstream/im_api/${name}`, import.meta.url), 'utf8');
 
 const realFetch = globalThis.fetch;
 afterEach(() => {

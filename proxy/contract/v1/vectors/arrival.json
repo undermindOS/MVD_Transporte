@@ -1,0 +1,118 @@
+{
+  "rule": "arrival",
+  "notes": [
+    "in.row es un elemento crudo de transporteRest siguientesParada; in.fetchedAt es la hora del pedido. out es el elemento /v1 o null si la fila se descarta.",
+    "Los vectores no tienen datos de confort: airConditioning y zeroEmission son siempre null (como en modo directo).",
+    "real cuenta solo si es exactamente true. time cuenta solo si es un número JSON. destino nunca se recorta.",
+    "tripId sin ómnibus: sched-{variante ?? 0}-{hora ?? los dígitos de clockTime como entero}.",
+    "El orden de la lista (estable por etaMinutes) no se prueba acá: lo prueban las respuestas de responses/."
+  ],
+  "cases": [
+    {
+      "in": {"fetchedAt": "2026-10-19T22:52:10.000Z", "row": {"time": 1792450560000, "coordinates": [-56.207848, -34.909443], "destino": "PUNTA CARRETAS", "linea": "117", "accesibilidad": true, "hora": 1956, "variante": 2779, "dia_anterior": null, "tipoAccesibilidad": 2, "minutos": 4, "real": true, "parada_actual": "BUENOS AIRES y COLON", "idBus": 111, "idEmpresa": 50, "horaDesc": "19:56"}},
+      "out": {"tripId": "bus-50-111", "variantId": 2779, "line": "117", "destination": "PUNTA CARRETAS", "state": "live", "etaMinutes": 4, "expectedAt": "2026-10-19T22:56:00.000Z", "clockTime": "19:56", "accessible": true, "airConditioning": null, "zeroEmission": null}
+    },
+    {
+      "in": {"fetchedAt": "2026-10-19T22:52:10.000Z", "row": {"time": 1792450860000, "coordinates": null, "destino": "CEMENTERIO DEL NORTE", "linea": "144", "accesibilidad": false, "hora": 2001, "variante": 883, "dia_anterior": "N", "tipoAccesibilidad": 1, "minutos": 9, "real": false, "parada_actual": null, "idBus": null, "idEmpresa": null, "horaDesc": "20:01"}},
+      "out": {"tripId": "sched-883-2001", "variantId": 883, "line": "144", "destination": "CEMENTERIO DEL NORTE", "state": "scheduled", "etaMinutes": 9, "expectedAt": "2026-10-19T23:01:00.000Z", "clockTime": "20:01", "accessible": false, "airConditioning": null, "zeroEmission": null}
+    },
+    {
+      "in": {"fetchedAt": "2026-10-19T22:52:10.000Z", "row": {"linea": "117", "destino": "PUNTA CARRETAS", "minutos": 0, "real": true, "idEmpresa": 50, "idBus": 111, "variante": 2779, "hora": 1952, "horaDesc": "19:52", "time": 1792450320000, "accesibilidad": true}},
+      "out": {"tripId": "bus-50-111", "variantId": 2779, "line": "117", "destination": "PUNTA CARRETAS", "state": "arriving", "etaMinutes": 0, "expectedAt": "2026-10-19T22:52:00.000Z", "clockTime": "19:52", "accessible": true, "airConditioning": null, "zeroEmission": null}
+    },
+    {
+      "in": {"fetchedAt": "2026-10-19T22:52:10.000Z", "row": {"linea": "117", "destino": "PUNTA CARRETAS", "minutos": -1, "real": true, "idEmpresa": 50, "idBus": 111, "variante": 2779, "hora": 1952, "horaDesc": "19:52", "accesibilidad": true}},
+      "out": {"tripId": "bus-50-111", "variantId": 2779, "line": "117", "destination": "PUNTA CARRETAS", "state": "arriving", "etaMinutes": 0, "expectedAt": "2026-10-19T22:52:00.000Z", "clockTime": "19:52", "accessible": true, "airConditioning": null, "zeroEmission": null}
+    },
+    {
+      "in": {"fetchedAt": "2026-10-19T22:52:10.000Z", "row": {"linea": "144", "destino": "CEMENTERIO DEL NORTE", "minutos": 0, "real": false, "idEmpresa": null, "idBus": null, "variante": 883, "hora": 1952, "horaDesc": "19:52", "time": 1792450320000, "accesibilidad": false}},
+      "out": {"tripId": "sched-883-1952", "variantId": 883, "line": "144", "destination": "CEMENTERIO DEL NORTE", "state": "scheduled", "etaMinutes": 0, "expectedAt": "2026-10-19T22:52:00.000Z", "clockTime": "19:52", "accessible": false, "airConditioning": null, "zeroEmission": null}
+    },
+    {
+      "in": {"fetchedAt": "2026-10-19T22:52:10.000Z", "row": {"linea": "144", "destino": "CEMENTERIO DEL NORTE", "minutos": -3, "real": false, "variante": 883, "hora": 1949}},
+      "out": {"tripId": "sched-883-1949", "variantId": 883, "line": "144", "destination": "CEMENTERIO DEL NORTE", "state": "scheduled", "etaMinutes": 0, "expectedAt": "2026-10-19T22:52:00.000Z", "clockTime": "19:52", "accessible": false, "airConditioning": null, "zeroEmission": null}
+    },
+    {"in": {"fetchedAt": "2026-10-19T22:52:10.000Z", "row": {"linea": "", "minutos": 3, "real": true}}, "out": null},
+    {"in": {"fetchedAt": "2026-10-19T22:52:10.000Z", "row": {"linea": null, "minutos": 3}}, "out": null},
+    {"in": {"fetchedAt": "2026-10-19T22:52:10.000Z", "row": {"minutos": 3}}, "out": null},
+    {"in": {"fetchedAt": "2026-10-19T22:52:10.000Z", "row": {"linea": "145", "minutos": null, "real": false}}, "out": null},
+    {"in": {"fetchedAt": "2026-10-19T22:52:10.000Z", "row": {"linea": "145", "minutos": "abc"}}, "out": null},
+    {"in": {"fetchedAt": "2026-10-19T22:52:10.000Z", "row": {"linea": "145", "minutos": "5.0"}}, "out": null},
+    {"in": {"fetchedAt": "2026-10-19T22:52:10.000Z", "row": {"linea": "145"}}, "out": null},
+    {
+      "in": {"fetchedAt": "2026-10-19T22:52:10.000Z", "row": {"linea": "G8", "destino": "CASABÓ", "minutos": "4", "real": true, "idEmpresa": 10, "idBus": 22, "variante": 5010, "hora": 1956, "horaDesc": "19:56", "time": 1792450560000, "accesibilidad": false}},
+      "out": {"tripId": "bus-10-22", "variantId": 5010, "line": "G8", "destination": "CASABÓ", "state": "live", "etaMinutes": 4, "expectedAt": "2026-10-19T22:56:00.000Z", "clockTime": "19:56", "accessible": false, "airConditioning": null, "zeroEmission": null}
+    },
+    {
+      "in": {"fetchedAt": "2026-10-19T22:52:10.000Z", "row": {"linea": "G8", "destino": "CASABÓ", "minutos": 4.7, "real": true, "idEmpresa": 10, "idBus": 22, "variante": 5010, "hora": 1956, "horaDesc": "19:56", "time": 1792450560000}},
+      "out": {"tripId": "bus-10-22", "variantId": 5010, "line": "G8", "destination": "CASABÓ", "state": "live", "etaMinutes": 4, "expectedAt": "2026-10-19T22:56:00.000Z", "clockTime": "19:56", "accessible": false, "airConditioning": null, "zeroEmission": null}
+    },
+    {
+      "in": {"fetchedAt": "2026-10-19T22:52:10.000Z", "row": {"linea": "144", "destino": "CEMENTERIO DEL NORTE", "minutos": 9, "real": false, "variante": 883}},
+      "out": {"tripId": "sched-883-2001", "variantId": 883, "line": "144", "destination": "CEMENTERIO DEL NORTE", "state": "scheduled", "etaMinutes": 9, "expectedAt": "2026-10-19T23:01:00.000Z", "clockTime": "20:01", "accessible": false, "airConditioning": null, "zeroEmission": null}
+    },
+    {
+      "in": {"fetchedAt": "2026-10-19T22:52:10.000Z", "row": {"linea": "144", "destino": "CEMENTERIO DEL NORTE", "minutos": 9, "real": false, "variante": 883, "hora": null, "horaDesc": "", "time": 1792450920000}},
+      "out": {"tripId": "sched-883-2002", "variantId": 883, "line": "144", "destination": "CEMENTERIO DEL NORTE", "state": "scheduled", "etaMinutes": 9, "expectedAt": "2026-10-19T23:02:00.000Z", "clockTime": "20:02", "accessible": false, "airConditioning": null, "zeroEmission": null}
+    },
+    {
+      "in": {"fetchedAt": "2026-10-19T11:02:30.000Z", "row": {"linea": "145", "destino": "PLAZA ESPAÑA", "minutos": 3, "real": false, "variante": 8403, "hora": 805, "horaDesc": "08:05"}},
+      "out": {"tripId": "sched-8403-805", "variantId": 8403, "line": "145", "destination": "PLAZA ESPAÑA", "state": "scheduled", "etaMinutes": 3, "expectedAt": "2026-10-19T11:05:00.000Z", "clockTime": "8:05", "accessible": false, "airConditioning": null, "zeroEmission": null}
+    },
+    {
+      "in": {"fetchedAt": "2026-10-19T22:52:10.000Z", "row": {"linea": "117", "destino": "PUNTA CARRETAS", "minutos": 4, "real": false, "variante": 2779, "hora": 1956, "horaDesc": " 19:56 ", "time": 1792450560000}},
+      "out": {"tripId": "sched-2779-1956", "variantId": 2779, "line": "117", "destination": "PUNTA CARRETAS", "state": "scheduled", "etaMinutes": 4, "expectedAt": "2026-10-19T22:56:00.000Z", "clockTime": "19:56", "accessible": false, "airConditioning": null, "zeroEmission": null}
+    },
+    {
+      "in": {"fetchedAt": "2026-10-20T03:10:00.000Z", "row": {"linea": "144", "destino": "CEMENTERIO DEL NORTE", "minutos": 5, "real": false, "variante": 883, "hora": 15, "horaDesc": "00:15", "time": 1792466100000}},
+      "out": {"tripId": "sched-883-15", "variantId": 883, "line": "144", "destination": "CEMENTERIO DEL NORTE", "state": "scheduled", "etaMinutes": 5, "expectedAt": "2026-10-20T03:15:00.000Z", "clockTime": "0:15", "accessible": false, "airConditioning": null, "zeroEmission": null}
+    },
+    {
+      "in": {"fetchedAt": "2026-10-20T03:00:00.000Z", "row": {"linea": "144", "destino": "CEMENTERIO DEL NORTE", "minutos": 5, "real": false, "variante": 883, "time": 1792465500000}},
+      "out": {"tripId": "sched-883-5", "variantId": 883, "line": "144", "destination": "CEMENTERIO DEL NORTE", "state": "scheduled", "etaMinutes": 5, "expectedAt": "2026-10-20T03:05:00.000Z", "clockTime": "0:05", "accessible": false, "airConditioning": null, "zeroEmission": null}
+    },
+    {
+      "in": {"fetchedAt": "2026-10-19T22:52:10.000Z", "row": {"linea": "145", "destino": "PLAZA ESPAÑA", "minutos": 6, "real": true, "idEmpresa": 50, "idBus": null, "variante": 8403, "hora": 1958, "horaDesc": "19:58", "time": 1792450680000, "accesibilidad": true}},
+      "out": {"tripId": "sched-8403-1958", "variantId": 8403, "line": "145", "destination": "PLAZA ESPAÑA", "state": "live", "etaMinutes": 6, "expectedAt": "2026-10-19T22:58:00.000Z", "clockTime": "19:58", "accessible": true, "airConditioning": null, "zeroEmission": null}
+    },
+    {
+      "in": {"fetchedAt": "2026-10-19T22:52:10.000Z", "row": {"linea": "117", "destino": "PUNTA CARRETAS", "minutos": 4, "real": "true", "idEmpresa": 50, "idBus": 111, "variante": 2779, "hora": 1956, "horaDesc": "19:56", "time": 1792450560000, "accesibilidad": true}},
+      "out": {"tripId": "sched-2779-1956", "variantId": 2779, "line": "117", "destination": "PUNTA CARRETAS", "state": "scheduled", "etaMinutes": 4, "expectedAt": "2026-10-19T22:56:00.000Z", "clockTime": "19:56", "accessible": true, "airConditioning": null, "zeroEmission": null}
+    },
+    {
+      "in": {"fetchedAt": "2026-10-19T22:52:10.000Z", "row": {"linea": "117", "destino": "PUNTA CARRETAS", "minutos": 4, "real": false, "variante": null, "hora": 1956, "horaDesc": "19:56", "time": 1792450560000}},
+      "out": {"tripId": "sched-0-1956", "variantId": null, "line": "117", "destination": "PUNTA CARRETAS", "state": "scheduled", "etaMinutes": 4, "expectedAt": "2026-10-19T22:56:00.000Z", "clockTime": "19:56", "accessible": false, "airConditioning": null, "zeroEmission": null}
+    },
+    {
+      "in": {"fetchedAt": "2026-10-19T22:52:10.000Z", "row": {"linea": "117", "destino": "PUNTA CARRETAS", "minutos": 4, "real": true, "idEmpresa": 50, "idBus": 111, "variante": "2779", "hora": 1956, "horaDesc": "19:56", "time": 1792450560000, "accesibilidad": true}},
+      "out": {"tripId": "bus-50-111", "variantId": 2779, "line": "117", "destination": "PUNTA CARRETAS", "state": "live", "etaMinutes": 4, "expectedAt": "2026-10-19T22:56:00.000Z", "clockTime": "19:56", "accessible": true, "airConditioning": null, "zeroEmission": null}
+    },
+    {
+      "in": {"fetchedAt": "2026-10-19T22:52:10.000Z", "row": {"linea": "117", "destino": null, "minutos": 4, "real": false, "variante": 2779, "hora": 1956, "horaDesc": "19:56", "time": 1792450560000}},
+      "out": {"tripId": "sched-2779-1956", "variantId": 2779, "line": "117", "destination": "", "state": "scheduled", "etaMinutes": 4, "expectedAt": "2026-10-19T22:56:00.000Z", "clockTime": "19:56", "accessible": false, "airConditioning": null, "zeroEmission": null}
+    },
+    {
+      "in": {"fetchedAt": "2026-10-19T22:52:10.000Z", "row": {"linea": "116", "destino": " POCITOS ", "minutos": 9, "real": false, "variante": 630, "hora": 2001, "horaDesc": "20:01", "time": 1792450860000}},
+      "out": {"tripId": "sched-630-2001", "variantId": 630, "line": "116", "destination": " POCITOS ", "state": "scheduled", "etaMinutes": 9, "expectedAt": "2026-10-19T23:01:00.000Z", "clockTime": "20:01", "accessible": false, "airConditioning": null, "zeroEmission": null}
+    },
+    {
+      "in": {"fetchedAt": "2026-10-19T22:52:10.000Z", "row": {"linea": "116", "destino": "POCITOS", "minutos": 9, "real": false, "variante": 630, "hora": 2001, "horaDesc": "20:01", "time": 1792450860000, "accesibilidad": "true"}},
+      "out": {"tripId": "sched-630-2001", "variantId": 630, "line": "116", "destination": "POCITOS", "state": "scheduled", "etaMinutes": 9, "expectedAt": "2026-10-19T23:01:00.000Z", "clockTime": "20:01", "accessible": false, "airConditioning": null, "zeroEmission": null}
+    },
+    {
+      "in": {"fetchedAt": "2026-10-19T22:52:10.000Z", "row": {"linea": "117", "destino": "PUNTA CARRETAS", "minutos": 4, "real": true, "idEmpresa": 50, "idBus": 111, "variante": 2779, "hora": 1956, "horaDesc": "19:56", "time": 1792450565000, "accesibilidad": true}},
+      "out": {"tripId": "bus-50-111", "variantId": 2779, "line": "117", "destination": "PUNTA CARRETAS", "state": "live", "etaMinutes": 4, "expectedAt": "2026-10-19T22:56:05.000Z", "clockTime": "19:56", "accessible": true, "airConditioning": null, "zeroEmission": null}
+    },
+    {
+      "in": {"fetchedAt": "2026-10-19T22:52:10.000Z", "row": {"linea": "117", "destino": "PUNTA CARRETAS", "minutos": 4, "real": false, "variante": 2779, "hora": 1956, "horaDesc": "", "time": "1792451340000"}},
+      "out": {"tripId": "sched-2779-1956", "variantId": 2779, "line": "117", "destination": "PUNTA CARRETAS", "state": "scheduled", "etaMinutes": 4, "expectedAt": "2026-10-19T22:56:00.000Z", "clockTime": "19:56", "accessible": false, "airConditioning": null, "zeroEmission": null}
+    },
+    {
+      "in": {"fetchedAt": "2026-10-19T22:52:59.999Z", "row": {"linea": "117", "destino": "PUNTA CARRETAS", "minutos": 1, "real": true, "idEmpresa": 50, "idBus": 111, "variante": 2779}},
+      "out": {"tripId": "bus-50-111", "variantId": 2779, "line": "117", "destination": "PUNTA CARRETAS", "state": "live", "etaMinutes": 1, "expectedAt": "2026-10-19T22:53:00.000Z", "clockTime": "19:53", "accessible": false, "airConditioning": null, "zeroEmission": null}
+    },
+    {"in": {"fetchedAt": "2026-10-19T22:52:10.000Z", "row": "garbage"}, "out": null},
+    {"in": {"fetchedAt": "2026-10-19T22:52:10.000Z", "row": null}, "out": null},
+    {"in": {"fetchedAt": "2026-10-19T22:52:10.000Z", "row": [1, 2]}, "out": null}
+  ]
+}
