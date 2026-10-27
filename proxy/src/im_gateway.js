@@ -398,6 +398,9 @@ export class ImGateway {
             ? new UpstreamError(`token refused: ${e.message}`)
             : e;
         })
+        // Kept before the load is forgotten: a call in between would
+        // otherwise find neither and ask for a second token
+        .then((token) => (this.token = token))
         .finally(() => this.loading.delete('token'));
       this.loading.set('token', pending);
     }

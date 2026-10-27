@@ -347,6 +347,26 @@ describe('token', () => {
     assert.equal(calls.filter((c) => c.includes('token')).length, 2);
   });
 
+  it('asks once when a call starts just as the token arrives', async () => {
+    const calls = mockIm({
+      '/buses': fleet,
+      '/buses/linevariants': () => new Response(fixture('im_linevariants.json')),
+    });
+    const g = gateway();
+    // The second call starts the moment the token load is over
+    let second;
+    const forget = g.loading.delete.bind(g.loading);
+    g.loading.delete = (key) => {
+      const forgotten = forget(key);
+      if (key === 'token') second ??= g.get_('/catalog/lines');
+      return forgotten;
+    };
+
+    assert.equal((await g.get_('/lines/116/buses')).status, 200);
+    assert.equal((await second).status, 200);
+    assert.equal(calls.filter((c) => c.includes('token')).length, 1);
+  });
+
   it('answers 502 when the client secret is refused', async () => {
     globalThis.fetch = async () =>
       Response.json({ error: 'unauthorized_client' }, { status: 401 });
