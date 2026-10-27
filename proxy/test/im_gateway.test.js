@@ -2,7 +2,8 @@ import { afterEach, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
-import { BUDGET_PER_MINUTE, ImGateway } from '../src/im_gateway.js';
+import { STOP_INDEX_URL } from '../src/geoserver.js';
+import { BUDGET_PER_MINUTE, ImGateway, STOP_META_BUCKETS } from '../src/im_gateway.js';
 
 const TOKEN_URL =
   'https://mvdapi-auth.montevideo.gub.uy/auth/realms/pci/protocol/openid-connect/token';
@@ -11,15 +12,23 @@ const API = 'https://api.montevideo.gub.uy/api/transportepublico';
 // Live answers of the official API, 2026-10-19 19:52 (-03)
 const fixture = (name) =>
   readFileSync(new URL(`../contract/v1/upstream/im_api/${name}`, import.meta.url), 'utf8');
+// Geoserver rows of the same four stops, 2026-10-27
+const stopIndexCsv = () =>
+  readFileSync(
+    new URL('../contract/v1/upstream/geoserver/stop_index_sample.csv', import.meta.url),
+    'utf8',
+  );
 
 const realFetch = globalThis.fetch;
+const realConsoleError = console.error;
 afterEach(() => {
   globalThis.fetch = realFetch;
+  console.error = realConsoleError;
 });
 
 /**
- * Fake IM API: tokens on TOKEN_URL, [routes] by path under API.
- * Records "METHOD url" of every call.
+ * Fake IM API: tokens on TOKEN_URL, [routes] by path under API; other
+ * hosts (geoserver) by full URL. Records "METHOD url" of every call.
  */
 function mockIm(routes = {}) {
   const calls = [];
@@ -31,7 +40,7 @@ function mockIm(routes = {}) {
       tokens++;
       return Response.json({ access_token: `token-${tokens}`, expires_in: 300 });
     }
-    const handler = routes[u.slice(API.length)];
+    const handler = routes[u.startsWith(API) ? u.slice(API.length) : u];
     if (!handler) return new Response('Not Found', { status: 404 });
     return handler(init);
   };
@@ -39,6 +48,8 @@ function mockIm(routes = {}) {
 }
 
 const fleet = () => new Response(fixture('im_buses.json'));
+const busstops = () => new Response(fixture('im_busstops.json'));
+const stopIndex = () => new Response(stopIndexCsv());
 
 /** Durable Object storage in memory; survives a "restarted" gateway. */
 function memoryStorage() {
@@ -393,7 +404,7 @@ describe('GET /lines/{line}/buses', () => {
 
 describe('catalogs', () => {
   it('maps stops with names like transporteRest', async () => {
-    mockIm({ '/buses/busstops': () => new Response(fixture('im_busstops.json')) });
+    mockIm({ '/buses/busstops': busstops, [STOP_INDEX_URL]: stopIndex });
     const g = gateway();
 
     const { stops } = await (await g.get_('/catalog/stops')).json();
@@ -401,6 +412,7 @@ describe('catalogs', () => {
       id: 574,
       name: 'SAN JOSE y ANDES',
       location: { lat: -34.90739436, lng: -56.198255 },
+      lines: ['116', '117', '121', '141', '142', '144', '538'],
     });
     // A stop with one street only
     assert.equal(stops[3].name, 'MATAOJO');
@@ -428,9 +440,202 @@ describe('catalogs', () => {
   });
 
   it('answers 502 on JSON of the wrong shape', async () => {
-    mockIm({ '/buses/busstops': () => Response.json({ unexpected: true }) });
+    mockIm({
+      '/buses/busstops': () => Response.json({ unexpected: true }),
+      [STOP_INDEX_URL]: stopIndex,
+    });
     const g = gateway();
 
     assert.equal((await g.get_('/catalog/stops')).status, 502);
+  });
+});
+
+describe('stop index (geoserver)', () => {
+  const linesById = async (response) =>
+    Object.fromEntries((await response.json()).stops.map((s) => [s.id, s.lines]));
+
+  it('joins the lines of each stop to the catalog, sorted like the app', async () => {
+    const calls = mockIm({ '/buses/busstops': busstops, [STOP_INDEX_URL]: stopIndex });
+    const g = gateway();
+
+    const response = await g.get_('/catalog/stops');
+    assert.equal(response.status, 200);
+    assert.equal(response.headers.get('X-Lines'), null);
+    const body = await response.json();
+    assert.equal(body.linesAvailable, true);
+    assert.deepEqual(
+      Object.fromEntries(body.stops.map((s) => [s.id, s.lines])),
+      {
+        546: ['144'],
+        574: ['116', '117', '121', '141', '142', '144', '538'],
+        3140: ['140', '143', '145', '494', '495'],
+        6325: ['21', '427'],
+      },
+    );
+    assert.deepEqual(calls.sort(), [
+      `GET ${API}/buses/busstops`,
+      `GET ${STOP_INDEX_URL}`,
+      `POST ${TOKEN_URL}`,
+    ]);
+  });
+
+  it('never sends the token to geoserver or spends the budget on it', async () => {
+    const storage = memoryStorage();
+    const headers = [];
+    mockIm({
+      '/buses/busstops': busstops,
+      [STOP_INDEX_URL]: (init) => {
+        headers.push(init.headers);
+        return stopIndex();
+      },
+    });
+    const g = gateway({ storage });
+
+    await g.get_('/catalog/stops');
+    assert.equal(headers.length, 1);
+    assert.equal(headers[0].Authorization, undefined);
+    // GET /buses/busstops only
+    assert.equal((await storage.get('budget')).used, 1);
+  });
+
+  it('builds even while the key is blocked', async () => {
+    const storage = memoryStorage();
+    // The API answered 429 a moment ago
+    await storage.put('budget', {
+      minute: -1,
+      used: 0,
+      blockedUntil: Date.parse('2026-10-19T22:53:00Z'),
+    });
+    const calls = mockIm({ '/buses/busstops': busstops, [STOP_INDEX_URL]: stopIndex });
+    const g = gateway({ storage });
+
+    const response = await g.get_('/catalog/stops');
+    await g.settle();
+
+    assert.equal(response.status, 503);
+    assert.deepEqual(calls.sort(), [`GET ${STOP_INDEX_URL}`, `POST ${TOKEN_URL}`]);
+    assert.ok(await storage.get('stopmeta:info'));
+  });
+
+  it(`saves the index in ${STOP_META_BUCKETS} buckets`, async () => {
+    const storage = memoryStorage();
+    mockIm({ '/buses/busstops': busstops, [STOP_INDEX_URL]: stopIndex });
+    const g = gateway({ storage });
+
+    await g.get_('/catalog/stops');
+
+    for (let i = 0; i < STOP_META_BUCKETS; i++) {
+      assert.equal(storage.puts[`stopmeta:${i}`], 1, `stopmeta:${i}`);
+    }
+    assert.equal(storage.puts['stopmeta:info'], 1);
+    assert.deepEqual(await storage.get('stopmeta:info'), {
+      builtAt: Date.parse('2026-10-19T22:52:10Z'),
+      complete: true,
+    });
+    // 574 % 64 = 62
+    assert.deepEqual(await storage.get('stopmeta:62'), {
+      byStop: { 574: { lines: ['116', '117', '121', '141', '142', '144', '538'] } },
+    });
+  });
+
+  it('a woken gateway reads the lines from storage, not from geoserver', async () => {
+    const storage = memoryStorage();
+    mockIm({ '/buses/busstops': busstops, [STOP_INDEX_URL]: stopIndex });
+    await gateway({ storage }).get_('/catalog/stops');
+
+    const calls = mockIm({ '/buses/busstops': busstops });
+    const g = gateway({ storage, start: '2026-10-20T10:00:00Z' });
+    const lines = await linesById(await g.get_('/catalog/stops'));
+    await g.settle();
+
+    assert.deepEqual(lines[574], ['116', '117', '121', '141', '142', '144', '538']);
+    assert.ok(!calls.some((c) => c.includes('geoserver')));
+  });
+
+  it('serves an index a day old while a new one is built', async () => {
+    const storage = memoryStorage();
+    mockIm({ '/buses/busstops': busstops, [STOP_INDEX_URL]: stopIndex });
+    const g = gateway({ storage });
+    await g.get_('/catalog/stops');
+
+    // Line 117 left stop 574
+    const calls = mockIm({
+      '/buses/busstops': busstops,
+      [STOP_INDEX_URL]: () =>
+        new Response('FID,cod_ubic_parada,desc_linea,cod_variante\r\nf,574,116,630\r\n'),
+    });
+    g.tick(25 * 3600 * 1000);
+    const old = await linesById(await g.get_('/catalog/stops'));
+    await g.settle();
+    const fresh = await linesById(await g.get_('/catalog/stops'));
+
+    assert.deepEqual(old[574], ['116', '117', '121', '141', '142', '144', '538']);
+    assert.deepEqual(fresh[574], ['116']);
+    assert.deepEqual(fresh[546], []);
+    assert.equal(calls.filter((c) => c.includes('geoserver')).length, 1);
+    assert.equal((await storage.get('stopmeta:info')).builtAt, Date.parse('2026-10-20T23:52:10Z'));
+  });
+
+  it('drops an index older than 7 days', async () => {
+    const logs = [];
+    console.error = (...args) => logs.push(args.join(' '));
+    const storage = memoryStorage();
+    mockIm({ '/buses/busstops': busstops, [STOP_INDEX_URL]: stopIndex });
+    await gateway({ storage }).get_('/catalog/stops');
+
+    mockIm({
+      '/buses/busstops': busstops,
+      [STOP_INDEX_URL]: () => new Response('', { status: 500 }),
+    });
+    const g = gateway({ storage, start: '2026-10-26T22:52:10Z' });
+    const response = await g.get_('/catalog/stops');
+    await g.settle();
+
+    assert.equal(response.headers.get('X-Lines'), '0');
+    assert.equal((await response.json()).linesAvailable, false);
+    assert.deepEqual(logs, ['geoserver: HTTP 500']);
+  });
+
+  it('builds once for concurrent requests', async () => {
+    const calls = mockIm({ '/buses/busstops': busstops, [STOP_INDEX_URL]: stopIndex });
+    const g = gateway();
+
+    const answers = await Promise.all(Array.from({ length: 10 }, () => g.get_('/catalog/stops')));
+
+    for (const response of answers) {
+      assert.equal((await response.json()).linesAvailable, true);
+    }
+    assert.equal(calls.filter((c) => c.includes('geoserver')).length, 1);
+  });
+
+  it('answers without lines when geoserver fails, and tries again after 15 min', async () => {
+    const logs = [];
+    console.error = (...args) => logs.push(args.join(' '));
+    const calls = mockIm({
+      '/buses/busstops': busstops,
+      [STOP_INDEX_URL]: () => new Response('', { status: 500 }),
+    });
+    const g = gateway();
+
+    const response = await g.get_('/catalog/stops');
+    await g.settle();
+    assert.equal(response.status, 200);
+    assert.equal(response.headers.get('X-Lines'), '0');
+    const body = await response.json();
+    assert.equal(body.linesAvailable, false);
+    assert.equal(body.stops.length, 4);
+    assert.ok(body.stops.every((s) => s.lines.length === 0));
+    assert.deepEqual(logs, ['geoserver: HTTP 500']);
+
+    g.tick(14 * 60 * 1000);
+    await g.get_('/catalog/stops');
+    await g.settle();
+    assert.equal(calls.filter((c) => c.includes('geoserver')).length, 1);
+
+    mockIm({ '/buses/busstops': busstops, [STOP_INDEX_URL]: stopIndex });
+    g.tick(60 * 1000);
+    const again = await g.get_('/catalog/stops');
+    assert.equal(again.headers.get('X-Lines'), null);
+    assert.equal((await again.json()).linesAvailable, true);
   });
 });

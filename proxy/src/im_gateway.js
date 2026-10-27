@@ -6,11 +6,15 @@
 // live here and are shared by every user. A stale copy is served while a
 // fresh one loads, so a 4 s `GET /buses` never holds a request up.
 //
+// It also keeps the stop index: the lines of every stop, from one geoserver
+// CSV a day. That request needs no key and never counts against the budget.
+//
 // Internal routes, called by the Worker (index.js), not by the app:
 //   GET /vehicles?ids=50:111,10:22  comfort of buses by operator:bus id
-//   GET /lines/{line}/buses         live buses of a line
-//   GET /catalog/stops, /catalog/lines
+//   GET /catalog/stops              stops with their lines
+//   GET /lines/{line}/buses, /catalog/lines  no public route reaches them
 
+import { getStopIndexCsv, toStopIndex } from './geoserver.js';
 import {
   fetchToken,
   getJson,
@@ -20,6 +24,7 @@ import {
   toStops,
   UnauthorizedError,
 } from './im_api.js';
+import { compareLines } from './rules.js';
 import { UpstreamError } from './transporte_rest.js';
 
 // The key allows 14 requests a minute (fixed window from :00); 2 are left
@@ -42,6 +47,17 @@ const CATALOG_MAX_AGE_MS = 7 * 24 * 3600 * 1000;
 // instead of waiting ~4 s for GET /buses.
 const COMFORT_MAX_AGE_MS = 24 * 3600 * 1000;
 const COMFORT_SAVE_EVERY_MS = 5 * 60 * 1000; // ≤ 288 storage writes a day
+
+// Stop index (geoserver.js): built at most once a day, served up to a week
+// old. Stored as STOP_META_BUCKETS values "stopmeta:{id % 64}" of ~80 stops
+// each, plus "stopmeta:info": a wake-up reads only the buckets it needs.
+const STOP_META_TTL_MS = 24 * 3600 * 1000;
+const STOP_META_MAX_AGE_MS = 7 * 24 * 3600 * 1000;
+// After a failed build; the Worker caches a catalog without lines as long
+const STOP_META_RETRY_MS = 15 * 60 * 1000;
+// How long the catalog waits for a first build before answering without lines
+const STOP_META_WAIT_MS = 20 * 1000;
+export const STOP_META_BUCKETS = 64;
 
 const RESOURCES = {
   fleet: { path: '/buses', map: toFleet, ttl: FLEET_TTL_MS },
@@ -72,6 +88,8 @@ export class ImGateway {
     this.loading = new Map(); // resource or 'token' → Promise
     this.comfort = null; // {byKey: Map "companyId:busId" → comfort, at}
     this.comfortSavedAt = 0;
+    this.stopMetaRead = null; // Promise of {info, buckets} or null, from storage
+    this.stopMetaFailedAt = -Infinity;
   }
 
   async fetch(request) {
@@ -82,10 +100,7 @@ export class ImGateway {
       }
       const line = /^\/lines\/([0-9A-Z]{1,6})\/buses$/.exec(url.pathname);
       if (line) return await this.lineBuses(line[1]);
-      if (url.pathname === '/catalog/stops') {
-        const { data, at } = await this.get('stops', CATALOG_MAX_AGE_MS);
-        return reply({ fetchedAt: iso(at), stops: data });
-      }
+      if (url.pathname === '/catalog/stops') return await this.catalogStops();
       if (url.pathname === '/catalog/lines') {
         const { data, at } = await this.get('lines', CATALOG_MAX_AGE_MS);
         return reply({ fetchedAt: iso(at), variants: data });
@@ -144,6 +159,130 @@ export class ImGateway {
       this.comfortSavedAt = fleet.at;
       await this.state.storage.put('comfort', { entries: [...byKey], at: fleet.at });
     }
+  }
+
+  /**
+   * The official stop catalog, each stop with its lines from the stop index
+   * (sorted like the app). Without an index it waits up to
+   * STOP_META_WAIT_MS for a build; if there is still none, every stop has
+   * `lines: []`, `linesAvailable` is false and `X-Lines: 0` tells the
+   * Worker to cache the answer briefly.
+   */
+  async catalogStops() {
+    const [{ data, at }, buckets] = await Promise.all([
+      this.get('stops', CATALOG_MAX_AGE_MS),
+      this.allStopMeta(),
+    ]);
+    const linesOf = (id) => buckets?.[id % STOP_META_BUCKETS][id]?.lines ?? [];
+    return reply(
+      {
+        fetchedAt: iso(at),
+        linesAvailable: buckets !== null,
+        stops: data.map((stop) => ({ ...stop, lines: linesOf(stop.id) })),
+      },
+      200,
+      buckets ? {} : { 'X-Lines': '0' },
+    );
+  }
+
+  /** Every bucket of the stop index, or null when there is none in time. */
+  async allStopMeta() {
+    const meta = (await this.stopMeta()) ?? (await this.waitForStopMeta());
+    if (!meta) return null;
+    return Promise.all(
+      Array.from({ length: STOP_META_BUCKETS }, (_, i) => this.stopMetaBucket(meta, i)),
+    );
+  }
+
+  /**
+   * The stop index from memory, else from storage, while it is younger than
+   * STOP_META_MAX_AGE_MS; otherwise null. One past its TTL is still served
+   * while a new one is built in the background.
+   */
+  async stopMeta() {
+    this.stopMetaRead ??= Promise.resolve(this.state?.storage?.get('stopmeta:info')).then(
+      (info) => (info ? { info, buckets: [] } : null),
+    );
+    const meta = await this.stopMetaRead;
+    const age = meta ? this.now() - meta.info.builtAt : Infinity;
+    if (age >= STOP_META_MAX_AGE_MS) return null;
+    if (age >= STOP_META_TTL_MS) this.buildStopMetaOnce();
+    return meta;
+  }
+
+  /** Bucket [i] of [meta], `{byStop}` by stop id, read from storage once. */
+  stopMetaBucket(meta, i) {
+    meta.buckets[i] ??= Promise.resolve(this.state?.storage?.get(`stopmeta:${i}`)).then(
+      (saved) => saved?.byStop ?? {},
+    );
+    return meta.buckets[i];
+  }
+
+  /** A first build, waited for at most STOP_META_WAIT_MS; null if none. */
+  async waitForStopMeta() {
+    const pending = this.buildStopMetaOnce();
+    if (!pending) return null;
+    let timer;
+    try {
+      return await Promise.race([
+        pending,
+        new Promise((resolve) => {
+          timer = setTimeout(resolve, STOP_META_WAIT_MS, null);
+        }),
+      ]);
+    } catch {
+      return null; // logged by buildStopMetaOnce()
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
+  /**
+   * Starts a build of the stop index, unless one is running (single
+   * flight) or the last one failed less than STOP_META_RETRY_MS ago.
+   * Returns it, or null when none runs. A failure is logged once, here.
+   */
+  buildStopMetaOnce() {
+    let pending = this.loading.get('stopMeta');
+    if (pending) return pending;
+    if (this.now() - this.stopMetaFailedAt < STOP_META_RETRY_MS) return null;
+
+    pending = this.buildStopMeta()
+      .catch((e) => {
+        this.stopMetaFailedAt = this.now();
+        throw e;
+      })
+      .finally(() => this.loading.delete('stopMeta'));
+    this.loading.set('stopMeta', pending);
+    const logged = pending.catch((e) =>
+      console.error(
+        e instanceof UpstreamError ? `${e.source}: ${e.message}` : `im-gateway: ${e.name}`,
+      ),
+    );
+    this.state?.waitUntil?.(logged);
+    return pending;
+  }
+
+  /** A new stop index from the whole geoserver layer, saved and kept. */
+  async buildStopMeta() {
+    // Straight to geoserver, never through call(): no token, no budget
+    const index = toStopIndex(await getStopIndexCsv());
+
+    const buckets = Array.from({ length: STOP_META_BUCKETS }, () => ({}));
+    for (const [id, { lines }] of index) {
+      buckets[id % STOP_META_BUCKETS][id] = { lines: [...lines].sort(compareLines) };
+    }
+    const info = { builtAt: this.now(), complete: true };
+
+    // No await in between: storage writes them together, all or none
+    const storage = this.state?.storage;
+    await Promise.all([
+      ...buckets.map((byStop, i) => storage?.put(`stopmeta:${i}`, { byStop })),
+      storage?.put('stopmeta:info', info),
+    ]);
+    const meta = { info, buckets: buckets.map((byStop) => Promise.resolve(byStop)) };
+    this.stopMetaRead = Promise.resolve(meta);
+    return meta;
   }
 
   async lineBuses(line) {

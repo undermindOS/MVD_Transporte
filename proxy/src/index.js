@@ -1,8 +1,9 @@
 // MVD Transporte proxy — the app's single backend address.
 //
-// Fixed /v1 routes over four sources: transporteRest (arrivals, stops,
-// timetables), notificacion (news), pci (GPS status) and the official IM
-// API, which only the ImGateway Durable Object calls (fleet, catalogs).
+// Fixed /v1 routes over five sources: transporteRest (arrivals, stops,
+// timetables), notificacion (news), pci (GPS status), and the official IM
+// API and geoserver, which only the ImGateway Durable Object calls (fleet,
+// catalogs, the lines of every stop).
 // Responses are cached by Workers Caching (wrangler.jsonc `cache`) for the
 // Cache-Control set here: on a hit Cloudflare answers without running this
 // code, so neither the IP limit nor the upstreams are touched. On a miss the
@@ -27,6 +28,9 @@ const MISSING_STOP_TTL = 3600; // a new stop may appear
 const ARRIVALS_TTL = 15; // the app refreshes every 30 s
 const SCHEDULE_TTL = 6 * 3600; // same as the app's own timetable cache
 const CATALOG_TTL = 24 * 3600;
+// Catalog without lines (X-Lines: 0): ImGateway tries the stop index again
+// after 15 min
+const CATALOG_NO_LINES_TTL = 900;
 const NEWS_TTL = 300; // new messages come every few days
 const GPS_TTL = 60; // the app asks at most once a minute
 
@@ -154,7 +158,9 @@ async function schedule(_env, id, day, hour, minute) {
 }
 
 function catalog(env) {
-  return fromGateway(env, '/catalog/stops', CATALOG_TTL);
+  return fromGateway(env, '/catalog/stops', (headers) =>
+    headers.get('X-Lines') === '0' ? CATALOG_NO_LINES_TTL : CATALOG_TTL,
+  );
 }
 
 async function news() {
@@ -167,7 +173,11 @@ async function gpsStatus() {
   return json({ fetchedAt: new Date().toISOString(), operators }, GPS_TTL);
 }
 
-/** Passes an ImGateway answer on, with this proxy's cache and error rules. */
+/**
+ * Passes an ImGateway answer on, with this proxy's cache and error rules.
+ * [maxAge] gives the TTL in seconds of a 200 from its headers, which are
+ * not passed on.
+ */
 async function fromGateway(env, path, maxAge) {
   if (!env.IM_GATEWAY) return error(503, 'not_configured');
 
@@ -182,7 +192,7 @@ async function fromGateway(env, path, maxAge) {
     return new Response(response.body, {
       headers: {
         'Content-Type': 'application/json; charset=utf-8',
-        'Cache-Control': `public, max-age=${maxAge}`,
+        'Cache-Control': `public, max-age=${maxAge(response.headers)}`,
       },
     });
   }

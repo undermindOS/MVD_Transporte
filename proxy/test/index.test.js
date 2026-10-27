@@ -329,6 +329,18 @@ describe('routes served by ImGateway', () => {
     assert.deepEqual(gateway.paths, []);
   });
 
+  it('GET /v1/catalog/stops without lines is cached for 15 min', async () => {
+    const body = { fetchedAt: '2026-10-19T22:52:10.000Z', linesAvailable: false, stops: [] };
+    const gateway = gatewayNamespace(() => Response.json(body, { headers: { 'X-Lines': '0' } }));
+
+    const { response } = await call('/v1/catalog/stops', { gateway });
+    assert.equal(response.status, 200);
+    assert.equal(response.headers.get('Cache-Control'), 'public, max-age=900');
+    // An internal header, not passed on
+    assert.equal(response.headers.get('X-Lines'), null);
+    assert.deepEqual(await response.json(), body);
+  });
+
   it('passes gateway errors on, not cached', async () => {
     const gateway = gatewayNamespace(() =>
       Response.json(
