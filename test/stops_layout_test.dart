@@ -1,6 +1,7 @@
-// "Mis paradas" with real fonts on a phone screen: the boards and the
-// "Estoy esperando" sheet keep every word visible with the largest system
-// fonts. Any overflow fails the test.
+// "Mis paradas" with real fonts on a phone screen: the boards, the error
+// after a failed refresh with the last buses as estimates, and the "Estoy
+// esperando" sheet keep every word visible with the largest system fonts.
+// Any overflow fails the test.
 
 import 'dart:io';
 
@@ -29,8 +30,11 @@ const _arrivals574 = '[{"linea":"494","destino":"DELTA DEL TIGRE","minutos":0,'
 
 void main() {
   late Directory hiveDir;
+  // The next refresh fails
+  var failing = false;
 
   final client = MockClient((request) async {
+    if (failing) return http.Response('', 500);
     if (request.url.path == '/transporteRest/siguientesParada/574') {
       return http.Response(_arrivals574, 200,
           headers: {'content-type': 'application/json; charset=utf-8'});
@@ -43,6 +47,8 @@ void main() {
     hiveDir = await Directory.systemTemp.createTemp('mvd_stops_layout');
     await CacheService.init(path: hiveDir.path);
   });
+
+  setUp(() => failing = false);
 
   tearDownAll(() async {
     await hiveDir.delete(recursive: true);
@@ -73,6 +79,31 @@ void main() {
         expect(find.byType(LlegandoChip), findsOneWidget);
         expect(find.text('20:17'), findsOneWidget);
         // The destinations are readable, not cut to a letter or two
+        for (final d in ['DELTA DEL TIGRE', 'PUNTA CARRETAS']) {
+          final text = tester.renderObject<RenderParagraph>(find.text(d));
+          expect(text.didExceedMaxLines, isFalse, reason: '$d at ${scale}x');
+        }
+      }, () => client);
+    });
+  }
+
+  for (final scale in [1.0, 1.3, 2.0]) {
+    testWidgets('Text at ${scale}x: the error and the estimates fit',
+        (tester) async {
+      await http.runWithClient(() async {
+        await pumpBoard(tester, scale);
+        failing = true;
+        await tester.pump(StopsPage.autoRefreshInterval);
+        await tester.pump();
+
+        final error =
+            find.textContaining('No se pudo actualizar. Datos de las');
+        expect(error, findsOneWidget);
+        expect(tester.renderObject<RenderParagraph>(error).didExceedMaxLines,
+            isFalse);
+        for (final time in ['~8:00', '~8:12', '~20:17']) {
+          expect(find.text(time), findsOneWidget, reason: time);
+        }
         for (final d in ['DELTA DEL TIGRE', 'PUNTA CARRETAS']) {
           final text = tester.renderObject<RenderParagraph>(find.text(d));
           expect(text.didExceedMaxLines, isFalse, reason: '$d at ${scale}x');

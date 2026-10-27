@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/semantics.dart';
 import 'package:flutter/services.dart';
 import '../models/alert_schedule.dart';
+import '../models/arrivals_board.dart';
 import '../models/bus_arrival.dart';
 import '../models/bus_stop.dart';
 import '../models/bus_wait.dart';
@@ -12,6 +13,7 @@ import '../models/catalog_stop.dart';
 import '../models/nearby_stop.dart';
 import '../models/route_alert.dart';
 import '../models/transport_news.dart';
+import '../services/api/api_result.dart';
 import '../services/background_worker.dart';
 import '../services/bus_status_service.dart';
 import '../services/bus_wait_service.dart';
@@ -35,10 +37,15 @@ class StopsPage extends StatefulWidget {
   /// Opens the stop in Cómo Ir (official deep link).
   final ValueChanged<int> onOpenStopInComoIr;
 
-  const StopsPage({super.key, required this.onOpenStopInComoIr});
+  /// Mis paradas is on screen: its tab is selected and no page covers it.
+  /// Arrivals are polled only then; becoming active refreshes them once.
+  final bool active;
+
+  const StopsPage(
+      {super.key, required this.onOpenStopInComoIr, this.active = true});
 
   /// Arrival times go stale within a minute: refresh this often while the
-  /// app is in the foreground.
+  /// page is on screen and the app in the foreground.
   static const autoRefreshInterval = Duration(seconds: 30);
 
   @override
@@ -48,21 +55,30 @@ class StopsPage extends StatefulWidget {
 class _StopsPageState extends State<StopsPage>
     with SingleTickerProviderStateMixin, WidgetsBindingObserver {
   late final TabController _tabController;
-  // null while the app is in the background
+  // null while not polling: app in the background or page not on screen
   Timer? _autoRefreshTimer;
   bool _autoRefreshing = false;
+  // The app is hidden or paused
+  bool _inBackground = false;
+  // After a busy answer (429), ticks are skipped until then
+  DateTime? _skipTicksUntil;
+
+  // After a failed refresh the last buses stay this long, as estimates;
+  // a bus due more than [_staleRowGrace] ago is dropped from them
+  static const _staleFor = Duration(minutes: 5);
+  static const _staleRowGrace = Duration(minutes: 1);
+  // Without a Retry-After
+  static const _busyDefault = Duration(seconds: 60);
 
   // --- Stops ---
   List<BusStop> _stops = [];
-  // null value = last request failed (network/server error)
-  final Map<int, List<BusArrival>?> _stopArrivals = {};
-  final Map<int, bool> _stopLoading = {};
 
   // --- Routes ---
   List<RouteAlert> _routes = [];
-  // key: routeId → arrivals filtered by preferred lines (null = failed)
-  final Map<int, List<BusArrival>?> _routeArrivals = {};
-  final Map<int, bool> _routeLoading = {};
+
+  // The board of every stop a card shows, saved stops and route origins
+  // alike: a stop is requested once, whatever the cards that show it
+  final Map<int, _BoardView> _boards = {};
 
   // GPS data quality per operator (null = unknown)
   List<OperatorGpsStatus>? _gpsStatus;
@@ -101,8 +117,19 @@ class _StopsPageState extends State<StopsPage>
     });
     _loadAll();
     WidgetsBinding.instance.addObserver(this);
-    _startAutoRefresh();
+    if (widget.active) _startAutoRefresh();
     BusWaitService.current.addListener(_onWaitChanged);
+  }
+
+  @override
+  void didUpdateWidget(StopsPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.active == oldWidget.active) return;
+    if (widget.active) {
+      _resumeAutoRefresh();
+    } else {
+      _stopAutoRefresh();
+    }
   }
 
   @override
@@ -120,15 +147,15 @@ class _StopsPageState extends State<StopsPage>
       case AppLifecycleState.resumed:
         // Back from the background (not from a system dialog, which only
         // makes the app inactive): what is on screen may be minutes old
-        if (_autoRefreshTimer == null) {
+        if (_inBackground) {
+          _inBackground = false;
           BusWaitService.sync();
-          _autoRefresh();
-          _startAutoRefresh();
+          _resumeAutoRefresh();
         }
       case AppLifecycleState.hidden:
       case AppLifecycleState.paused:
-        _autoRefreshTimer?.cancel();
-        _autoRefreshTimer = null;
+        _inBackground = true;
+        _stopAutoRefresh();
       case AppLifecycleState.inactive:
       case AppLifecycleState.detached:
         break;
@@ -141,42 +168,92 @@ class _StopsPageState extends State<StopsPage>
 
   void _startAutoRefresh() {
     _autoRefreshTimer?.cancel();
-    _autoRefreshTimer =
-        Timer.periodic(StopsPage.autoRefreshInterval, (_) => _autoRefresh());
+    _autoRefreshTimer = Timer.periodic(StopsPage.autoRefreshInterval, (_) {
+      // Busy (429): wait out the Retry-After, without a word
+      final skipUntil = _skipTicksUntil;
+      if (skipUntil != null && DateTime.now().isBefore(skipUntil)) return;
+      _autoRefresh();
+    });
   }
 
-  /// Refreshes stops and routes without spinners, so the chips do not
-  /// flicker. A stop that is also a route origin is requested once.
+  void _stopAutoRefresh() {
+    _autoRefreshTimer?.cancel();
+    _autoRefreshTimer = null;
+  }
+
+  /// On screen again: refreshed at once, then every 30 s.
+  void _resumeAutoRefresh() {
+    if (!widget.active || _inBackground || _autoRefreshTimer != null) return;
+    _autoRefresh();
+    _startAutoRefresh();
+  }
+
+  /// Refreshes every card without spinners, so the rows do not flicker.
   Future<void> _autoRefresh() async {
     if (_autoRefreshing) return; // slow network: don't pile up requests
     _autoRefreshing = true;
-    _loadGpsStatus();
-    final ids = {
-      ..._stops.map((s) => s.id),
-      ..._routes.map((r) => r.originStopId),
-    };
-    final results = <int, List<BusArrival>?>{};
-    await Future.wait(ids.map((id) async =>
-        results[id] = await MvdApiService.getNextArrivals(id)));
-    _autoRefreshing = false;
-    results.forEach(BusWaitService.onArrivals);
+    try {
+      _loadGpsStatus();
+      await _refresh(_shownStopIds);
+    } finally {
+      _autoRefreshing = false;
+    }
+  }
+
+  /// Every stop a card shows: the saved stops and the route origins.
+  Set<int> get _shownStopIds => {
+        ..._stops.map((s) => s.id),
+        ..._routes.map((r) => r.originStopId),
+      };
+
+  /// The one way boards are fetched: on open, every tick, back on screen,
+  /// on pull to refresh, and for a stop or route just added. Each stop
+  /// once, all in parallel. With [spinner] a card with no buses to show
+  /// yet says it is loading.
+  Future<void> _refresh(Set<int> ids, {bool spinner = false}) async {
+    if (ids.isEmpty) return;
+    if (spinner) {
+      setState(() {
+        for (final id in ids) {
+          final view = _boards[id];
+          _boards[id] = _BoardView(
+              lastGood: view?.lastGood, failure: view?.failure, loading: true);
+        }
+      });
+    }
+    final results = await MvdApiService.getBoards(ids);
+    results.forEach((id, result) =>
+        BusWaitService.onArrivals(id, result.valueOrNull?.arrivals));
+
+    Duration? busyFor;
+    for (final result in results.values) {
+      if (result case ApiError(failure: ApiFailure.busy, :final retryAfter)) {
+        final wait = retryAfter ?? _busyDefault;
+        if (busyFor == null || wait > busyFor) busyFor = wait;
+      }
+    }
+    if (busyFor != null) _skipTicksUntil = DateTime.now().add(busyFor);
+
     if (!mounted) return;
-    // Stops added meanwhile are loaded by _loadStops/_loadRoutes
     setState(() {
-      for (final s in _stops) {
-        if (results.containsKey(s.id)) _stopArrivals[s.id] = results[s.id];
-      }
-      for (final r in _routes) {
-        if (!results.containsKey(r.originStopId)) continue;
-        _routeArrivals[r.id] =
-            results[r.originStopId]?.where(r.accepts).toList();
-      }
+      results.forEach((id, result) {
+        final view = _boards[id];
+        _boards[id] = switch (result) {
+          ApiOk(:final value) => _BoardView(lastGood: value),
+          // Nothing new and nothing to say: the next ticks wait
+          ApiError(failure: ApiFailure.busy) =>
+            _BoardView(lastGood: view?.lastGood, failure: view?.failure),
+          ApiError(:final failure) =>
+            _BoardView(lastGood: view?.lastGood, failure: failure),
+        };
+      });
     });
   }
 
   void _loadAll() {
     _loadStops();
     _loadRoutes();
+    _refresh(_shownStopIds, spinner: true);
     _loadNews();
     _loadGpsStatus();
   }
@@ -210,24 +287,7 @@ class _StopsPageState extends State<StopsPage>
 
   // ---------------------------------------------------------------- Stops ---
 
-  void _loadStops() {
-    setState(() => _stops = CacheService.getAllStops());
-    for (final s in _stops) {
-      _refreshStopArrivals(s.id);
-    }
-  }
-
-  Future<void> _refreshStopArrivals(int stopId) async {
-    setState(() => _stopLoading[stopId] = true);
-    final arrivals = await MvdApiService.getNextArrivals(stopId);
-    BusWaitService.onArrivals(stopId, arrivals);
-    if (mounted) {
-      setState(() {
-        _stopArrivals[stopId] = arrivals;
-        _stopLoading[stopId] = false;
-      });
-    }
-  }
+  void _loadStops() => setState(() => _stops = CacheService.getAllStops());
 
   Future<void> _addStop() async {
     final stopId = await _showAddStopDialog();
@@ -256,6 +316,7 @@ class _StopsPageState extends State<StopsPage>
     if (mounted) {
       snack.clearSnackBars();
       _loadStops();
+      _refresh({stop.id}, spinner: true);
     }
   }
 
@@ -286,33 +347,19 @@ class _StopsPageState extends State<StopsPage>
     // Dismissible requires the item to leave the list synchronously
     setState(() {
       _stops.removeWhere((s) => s.id == stop.id);
-      _stopArrivals.remove(stop.id);
+      _forgetUnshownBoard(stop.id);
     });
     CacheService.deleteStop(stop.id).then((_) => _syncAlerts());
   }
 
+  /// Drops the board of [stopId] once no card shows it any more.
+  void _forgetUnshownBoard(int stopId) {
+    if (!_shownStopIds.contains(stopId)) _boards.remove(stopId);
+  }
+
   // ---------------------------------------------------------------- Routes --
 
-  void _loadRoutes() {
-    setState(() => _routes = CacheService.getAllRoutes());
-    for (final r in _routes) {
-      _refreshRouteArrivals(r);
-    }
-  }
-
-  Future<void> _refreshRouteArrivals(RouteAlert route) async {
-    setState(() => _routeLoading[route.id] = true);
-    final all = await MvdApiService.getNextArrivals(route.originStopId);
-    BusWaitService.onArrivals(route.originStopId, all);
-    final filtered = all?.where(route.accepts).toList();
-
-    if (mounted) {
-      setState(() {
-        _routeArrivals[route.id] = filtered;
-        _routeLoading[route.id] = false;
-      });
-    }
-  }
+  void _loadRoutes() => setState(() => _routes = CacheService.getAllRoutes());
 
   Future<void> _addRouteManually() async {
     final result = await _showAddRouteDialog();
@@ -345,6 +392,7 @@ class _StopsPageState extends State<StopsPage>
     if (mounted) {
       snack.clearSnackBars();
       _loadRoutes();
+      _refresh({route.originStopId}, spinner: true);
       await _syncAlerts(enabling: true);
     }
   }
@@ -395,7 +443,7 @@ class _StopsPageState extends State<StopsPage>
     // Dismissible requires the item to leave the list synchronously
     setState(() {
       _routes.removeWhere((r) => r.id == route.id);
-      _routeArrivals.remove(route.id);
+      _forgetUnshownBoard(route.originStopId);
     });
     CacheService.deleteRoute(route.id).then((_) => _syncAlerts());
   }
@@ -629,11 +677,9 @@ class _StopsPageState extends State<StopsPage>
       );
     }
     return RefreshIndicator(
-      onRefresh: () async {
+      onRefresh: () {
         _loadGpsStatus();
-        for (final s in _stops) {
-          await _refreshStopArrivals(s.id);
-        }
+        return _refresh({for (final s in _stops) s.id});
       },
       child: ListView.builder(
         padding: const EdgeInsets.only(top: 6, bottom: 96),
@@ -647,10 +693,6 @@ class _StopsPageState extends State<StopsPage>
   /// A saved stop as a small board: name and number, the timetable and the
   /// alert, then its next buses.
   Widget _buildStopCard(BusStop stop) {
-    final arrivals = _stopArrivals[stop.id];
-    final failed = _stopArrivals.containsKey(stop.id) && arrivals == null;
-    final isLoading = _stopLoading[stop.id] ?? false;
-
     return Dismissible(
       key: Key('stop_${stop.id}'),
       direction: DismissDirection.endToStart,
@@ -701,8 +743,7 @@ class _StopsPageState extends State<StopsPage>
             _buildAlertSettingsRow(stop.etaAlertMinutes, stop.schedule,
                 () => _editStopAlert(stop)),
           const Divider(),
-          _buildArrivals('s${stop.id}', arrivals, isLoading, failed, stop.id,
-              stop.name),
+          _buildArrivals('s${stop.id}', stop.id, stop.name),
           const Divider(),
           Align(
             alignment: Alignment.centerRight,
@@ -732,11 +773,9 @@ class _StopsPageState extends State<StopsPage>
       );
     }
     return RefreshIndicator(
-      onRefresh: () async {
+      onRefresh: () {
         _loadGpsStatus();
-        for (final r in _routes) {
-          await _refreshRouteArrivals(r);
-        }
+        return _refresh({for (final r in _routes) r.originStopId});
       },
       child: ListView(
         padding: const EdgeInsets.only(top: 6, bottom: 96),
@@ -748,11 +787,8 @@ class _StopsPageState extends State<StopsPage>
     );
   }
 
+  /// A route reads its origin's board, through its lines and directions.
   Widget _buildRouteCard(RouteAlert route) {
-    final arrivals = _routeArrivals[route.id];
-    final failed = _routeArrivals.containsKey(route.id) && arrivals == null;
-    final isLoading = _routeLoading[route.id] ?? false;
-
     return Dismissible(
       key: Key('route_${route.id}'),
       direction: DismissDirection.endToStart,
@@ -819,8 +855,8 @@ class _StopsPageState extends State<StopsPage>
             _buildAlertSettingsRow(route.alertMinutes, route.schedule,
                 () => _editRouteAlert(route)),
           const Divider(),
-          _buildArrivals('r${route.id}', arrivals, isLoading, failed,
-              route.originStopId, route.originName),
+          _buildArrivals('r${route.id}', route.originStopId, route.originName,
+              accepts: route.accepts),
         ],
       ),
     );
@@ -892,11 +928,16 @@ class _StopsPageState extends State<StopsPage>
     );
   }
 
-  /// The next buses of a stop: three rows, all of them (up to six) on
-  /// request.
-  Widget _buildArrivals(String key, List<BusArrival>? arrivals,
-      bool isLoading, bool failed, int stopId, String stopName) {
-    if (isLoading) {
+  /// The next buses of [stopId] that [accepts] lets through: three rows,
+  /// all of them (up to six) on request. After a failed refresh the last
+  /// buses stay for a while under the error, as estimates.
+  Widget _buildArrivals(String key, int stopId, String stopName,
+      {bool Function(BusArrival)? accepts}) {
+    final view = _boards[stopId];
+    final board = view?.lastGood;
+    final failure = view?.failure;
+    // Nothing to show yet: loading, or busy before the first board
+    if (board == null && (failure == null || view!.loading)) {
       return const Padding(
         padding: EdgeInsets.all(16),
         child: Center(
@@ -907,29 +948,77 @@ class _StopsPageState extends State<StopsPage>
         ),
       );
     }
-    // Offline must not look like "no buses are coming". An error inside a
-    // card is a red LED; a warning over a list is the avisoNoche panel
-    if (failed) {
+    // An error inside a card is a red LED; a warning over a list is the
+    // avisoNoche panel
+    if (failure == ApiFailure.notFound) {
       return const _BoardNote(
         icon: PixelGlyphs.warning,
         color: TimbreColors.rojoLed,
-        text: 'No se pudo actualizar. Deslizá para reintentar',
+        text: 'Esta parada ya no existe. Deslizá la tarjeta para borrarla.',
       );
     }
-    if (arrivals == null || arrivals.isEmpty) {
+    List<BusArrival> accepted(ArrivalsBoard b) =>
+        accepts == null ? b.arrivals : b.arrivals.where(accepts).toList();
+    final now = DateTime.now();
+    if (failure != null) {
+      // Offline must not look like "no buses are coming", and old minutes
+      // must not look live
+      if (board == null || now.difference(board.fetchedAt) >= _staleFor) {
+        return const _BoardNote(
+          icon: PixelGlyphs.warning,
+          color: TimbreColors.rojoLed,
+          text: 'No se pudo actualizar. Deslizá para reintentar',
+        );
+      }
+      final cutoff = now.subtract(_staleRowGrace);
+      final stale = accepted(board)
+          .where((a) => !a.expectedAt.isBefore(cutoff))
+          .toList();
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _BoardNote(
+            icon: PixelGlyphs.warning,
+            color: TimbreColors.rojoLed,
+            text: 'No se pudo actualizar. Datos de las '
+                '${MvdApiService.montevideoClock(board.fetchedAt)}. '
+                'Deslizá para reintentar.',
+          ),
+          if (stale.isNotEmpty)
+            _buildRows(key, stale, board.arrivals, stopId, stopName,
+                stale: true),
+        ],
+      );
+    }
+    final arrivals = accepted(board!);
+    if (arrivals.isEmpty) {
       return const _BoardNote(
         icon: PixelGlyphs.bus,
         color: TimbreColors.tenue,
         text: 'Sin ómnibus próximos',
       );
     }
+    return _buildRows(key, arrivals, board.arrivals, stopId, stopName);
+  }
+
+  /// [arrivals] of a board whose buses are [all]. A [stale] row is an
+  /// estimate from the last board: not lit, not followed, not tappable.
+  Widget _buildRows(String key, List<BusArrival> arrivals,
+      List<BusArrival> all, int stopId, String stopName,
+      {bool stale = false}) {
     final wait = BusWaitService.current.value;
-    final waited = wait != null && wait.stopId == stopId
-        ? wait.findTrip(arrivals, DateTime.now())
-        : null;
-    final all = arrivals.take(6).toList();
-    final open = _expanded.contains(key) || all.length <= 3;
-    final shown = open ? all : all.take(3).toList();
+    final now = DateTime.now();
+    final rows = arrivals.take(6).toList();
+    final open = _expanded.contains(key) || rows.length <= 3;
+    final shown = open ? rows : rows.take(3).toList();
+    // The followed trip, by its id, among all the buses of the stop
+    final waited = [
+      for (final a in shown)
+        !stale &&
+            wait != null &&
+            wait.stopId == stopId &&
+            wait.follows(a, all, now),
+    ];
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -937,12 +1026,15 @@ class _StopsPageState extends State<StopsPage>
           if (i > 0) const Divider(indent: 14, endIndent: 14),
           ArrivalRow(
             arrival: shown[i],
-            waited: identical(shown[i], waited),
-            onTap: () => _showWaitSheet(stopId, stopName, shown[i],
-                waiting: identical(shown[i], waited)),
+            waited: waited[i],
+            stale: stale,
+            onTap: stale
+                ? null
+                : () => _showWaitSheet(stopId, stopName, shown[i],
+                    waiting: waited[i]),
           ),
         ],
-        if (all.length > 3)
+        if (rows.length > 3)
           Align(
             alignment: Alignment.centerLeft,
             child: Padding(
@@ -953,7 +1045,7 @@ class _StopsPageState extends State<StopsPage>
                 icon: PixelIcon(
                     open ? PixelGlyphs.minus : PixelGlyphs.chevronDown,
                     size: TimbreIconSize.row),
-                label: Text(open ? 'Ver menos' : 'Ver las ${all.length}'),
+                label: Text(open ? 'Ver menos' : 'Ver las ${rows.length}'),
               ),
             ),
           ),
@@ -973,6 +1065,21 @@ class _StopsPageState extends State<StopsPage>
         child: const PixelIcon(PixelGlyphs.trash,
             color: TimbreColors.noche, semanticLabel: 'Eliminar'),
       );
+}
+
+/// What the cards of one stop show: the last board that arrived, and why
+/// the latest refresh failed, if it did.
+class _BoardView {
+  const _BoardView({this.lastGood, this.failure, this.loading = false});
+
+  final ArrivalsBoard? lastGood;
+
+  /// The latest refresh failed; null after a good one. A busy answer
+  /// changes nothing.
+  final ApiFailure? failure;
+
+  /// Being fetched with a spinner, for a card with nothing to show yet.
+  final bool loading;
 }
 
 /// A card of the stops and routes tabs: an ink panel on the board.
