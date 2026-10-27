@@ -80,7 +80,10 @@ abstract final class NewsAdapter {
     if (raw is! Map) return null;
     final id = ContractRules.toIntLoose(raw['idMensaje']);
     final ms = ContractRules.toIntLoose(raw['fecha']);
-    if (id == null || ms == null) return null;
+    // Like the proxy's Date check: a date DateTime cannot hold is no date
+    if (id == null || ms == null || ms.abs() > ContractRules.maxDateMs) {
+      return null;
+    }
     String trimmed(Object? value) =>
         ContractRules.trimText(ContractRules.text(value));
     return {

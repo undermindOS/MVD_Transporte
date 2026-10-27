@@ -57,6 +57,17 @@ void main() {
               .messages,
           isEmpty);
     });
+
+    test('skips a message dated past any date, like the proxy', () {
+      final page = TransportNewsService.parsePage({
+        'count': 2,
+        'messages': [
+          {'idMensaje': '1', 'titulo': 'T', 'fecha': 9e15},
+          {'idMensaje': '2', 'titulo': 'T', 'fecha': 1581096904776},
+        ],
+      })!;
+      expect(page.messages.map((m) => m.id), [2]);
+    });
   });
 
   group('TransportNews.fromJson', () {

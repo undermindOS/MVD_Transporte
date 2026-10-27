@@ -13,8 +13,8 @@ abstract final class ContractRules {
   // Past ±(2^53 − 1) JS rounds and Dart overflows: neither has the value
   static const _maxSafeInt = 9007199254740991;
 
-  // The widest time a JS Date holds, and a DateTime too: ±10^8 days
-  static const _maxDateMs = 8640000000000000;
+  /// The widest time a JS Date holds, and a DateTime too: ±10^8 days
+  static const maxDateMs = 8640000000000000;
 
   /// A number truncated toward zero, or a text that is an integer once
   /// trimmed ("007" → 7); anything else is null ("5.0", true, ""), and so
@@ -122,7 +122,7 @@ abstract final class ContractRules {
         : ((fetchedAt.millisecondsSinceEpoch + eta * 60000.0) / 60000)
                 .floorToDouble() * 60000;
     // DateTime would throw: one bad row, not a failure for the whole stop
-    if (!(expectedMs.abs() <= _maxDateMs)) return null;
+    if (!(expectedMs.abs() <= maxDateMs)) return null;
     final expectedAt =
         DateTime.fromMillisecondsSinceEpoch(expectedMs.toInt(), isUtc: true);
 
