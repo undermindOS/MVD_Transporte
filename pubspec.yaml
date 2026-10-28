@@ -63,6 +63,8 @@ dependencies:
 
   # Transport news: HTML parsed to text widgets (no JS engine involved)
   html: ^0.15.7
+  flutter_foreground_task: ^10.0.0
+  timezone: ^0.10.1
 
 dev_dependencies:
   flutter_test:
@@ -79,7 +81,7 @@ dev_dependencies:
   flutter_lints: ^6.0.0
 
   # Tool to generate app icons for Android and iOS
-  flutter_launcher_icons: ^0.13.1
+  flutter_launcher_icons: ^0.14.4
 
   # Hive code generation
   build_runner: ^2.4.0
@@ -95,6 +97,42 @@ flutter:
   # included with your application, so that you can use the icons in
   # the material Icons class.
   uses-material-design: true
+
+  # Licenses of bundled fonts (SIL OFL 1.1) and pixel icons (MIT), shown
+  # in the app's license page
+  assets:
+    - assets/fonts/OFL-FiraSans.txt
+    - assets/fonts/OFL-FiraSansExtraCondensed.txt
+    - assets/fonts/OFL-Doto.txt
+    - assets/licenses/MIT-pixelarticons.txt
+    # The privacy policy, shown as it is (lib/ui/privacy_policy_page.dart)
+    - docs/privacy-policy.md
+
+  # Timbre MVD typefaces, bundled (no runtime download): Latin subsets of
+  # Fira Sans, Fira Sans Extra Condensed and a static Black instance of Doto
+  fonts:
+    - family: FiraSans
+      fonts:
+        - asset: assets/fonts/FiraSans-Regular.ttf
+          weight: 400
+        - asset: assets/fonts/FiraSans-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/FiraSans-SemiBold.ttf
+          weight: 600
+        - asset: assets/fonts/FiraSans-Bold.ttf
+          weight: 700
+    - family: FiraSansExtraCondensed
+      fonts:
+        - asset: assets/fonts/FiraSansExtraCondensed-SemiBold.ttf
+          weight: 600
+        - asset: assets/fonts/FiraSansExtraCondensed-Bold.ttf
+          weight: 700
+        - asset: assets/fonts/FiraSansExtraCondensed-ExtraBold.ttf
+          weight: 800
+    - family: Doto
+      fonts:
+        - asset: assets/fonts/Doto-Black.ttf
+          weight: 900
 
   # To add assets to your application, add an assets section, like this:
   # assets:
@@ -127,11 +165,22 @@ flutter:
   # For details regarding fonts from package dependencies,
   # see https://flutter.dev/to/font-from-package
 
-# App Icon Configuration
+# App Icon Configuration (sources and design notes: assets/README.md)
 flutter_launcher_icons:
   android: true
   ios: true
   image_path: "assets/app_icon.png"
-  adaptive_icon_background: "#0066CC"  # Blue
+  # Android < 8: rounded tile
+  image_path_android: "assets/app_icon_android.png"
+  # Android 8+: the ink board with unlit LEDs, the lit bus on top
+  adaptive_icon_background: "assets/app_icon_background.png"
   adaptive_icon_foreground: "assets/app_icon_foreground.png"
+  # The bus is already inside the 66 dp safe zone of the PNG
+  adaptive_icon_foreground_inset: 0
+  # Android 13+ themed icons
+  adaptive_icon_monochrome: "assets/app_icon_monochrome.png"
   remove_alpha_ios: true
+  # iOS 18 dark: the lit bus on transparent; tinted: the white bus
+  image_path_ios_dark_transparent: "assets/app_icon_ios_dark.png"
+  image_path_ios_tinted_grayscale: "assets/app_icon_ios_tinted.png"
+  desaturate_tinted_to_grayscale_ios: true

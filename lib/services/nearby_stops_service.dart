@@ -6,7 +6,13 @@ import 'package:flutter/foundation.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:http/http.dart' as http;
 
+import '../models/catalog_stop.dart';
 import '../models/nearby_stop.dart';
+import 'api/contract_rules.dart';
+import 'api/direct/wfs_adapter.dart';
+import 'api/v1_parser.dart';
+import 'external_apps.dart';
+import 'mvd_api_service.dart';
 
 /// Why the nearby-stops search could not run; the UI picks the message.
 enum NearbyStopsError {
@@ -25,14 +31,22 @@ class NearbyStopsException implements Exception {
   String toString() => 'NearbyStopsException($error)';
 }
 
-/// Stops around the user from the open WFS layer `imm:v_uptu_paradas` of the
-/// Intendencia de Montevideo GeoServer (no credentials).
+/// Stops around the user.
 ///
-/// Each feature is one "stop × line variant"; features are grouped by
-/// `cod_ubic_parada`, the stop number transporteRest and Cómo Ir use.
+/// Through the proxy they come from the stop catalog kept on the phone
+/// ([MvdApiService.getStopCatalog]): the position never leaves the device.
+/// Without it, from the open WFS layer `imm:v_uptu_paradas` of the
+/// Intendencia de Montevideo GeoServer (no credentials), asked for a box
+/// around the position rounded to 3 decimals — an approximate area — and
+/// filtered by the exact position on the phone.
 class NearbyStopsService {
   static const _wfsUrl = 'https://geoserver.montevideo.gub.uy/geoserver/ows';
   static const radiusMeters = 400.0;
+
+  /// Half-side of the WFS box: [radiusMeters] plus 72 m, half the diagonal
+  /// of a 0.001° cell, so the box around the rounded position holds the
+  /// whole circle around the exact one.
+  static const boxHalfSideMeters = radiusMeters + 72;
 
   static const _timeout = Duration(seconds: 15);
   static const _locationTimeout = Duration(seconds: 15);
@@ -51,8 +65,10 @@ class NearbyStopsService {
     return stops;
   }
 
-  /// The only way back after "Don't ask again".
-  static Future<bool> openAppSettings() => Geolocator.openAppSettings();
+  /// The only way back after "Don't ask again". The settings are another
+  /// app, opened from here: coming back from them does not lock.
+  static Future<bool> openAppSettings() =>
+      ExternalApps.open(Geolocator.openAppSettings);
 
   static Future<Position> _currentPosition() async {
     if (!await Geolocator.isLocationServiceEnabled()) {
@@ -91,33 +107,47 @@ class NearbyStopsService {
     throw const NearbyStopsException(NearbyStopsError.locationUnavailable);
   }
 
+  /// Stops within [radiusMeters] of the point, nearest first.
   /// Returns null on network/server error.
-  static Future<List<NearbyStop>?> fetchNearby(double lat, double lng,
-      {double radius = radiusMeters}) async {
+  static Future<List<NearbyStop>?> fetchNearby(double lat, double lng) async {
+    final catalog = MvdApiService.usesProxy
+        ? await MvdApiService.getStopCatalog()
+        : await _stopsInBox(lat, lng);
+    return catalog == null ? null : nearbyFrom(catalog, lat, lng);
+  }
+
+  /// Direct mode: the stops of the WFS box around the point.
+  static Future<List<CatalogStop>?> _stopsInBox(double lat, double lng) async {
     try {
-      final response = await http.get(buildUri(lat, lng, radius),
+      final response = await http.get(buildUri(lat, lng),
           headers: const {'Accept': 'application/json'}).timeout(_timeout);
 
       if (response.statusCode != 200) {
-        debugPrint('❌ WFS ${response.statusCode}: ${response.body}');
+        debugPrint('❌ WFS ${response.statusCode}');
         return null;
       }
 
-      return parseFeatures(jsonDecode(utf8.decode(response.bodyBytes)),
-          lat: lat, lng: lng, radius: radius);
+      final items = WfsAdapter.featuresToCatalogItems(
+          jsonDecode(utf8.decode(response.bodyBytes)));
+      return items == null ? null : V1Parser.catalog({'stops': items})?.stops;
     } catch (e) {
-      debugPrint('❌ WFS error: $e');
+      // Not the error text: it can hold the URL, and so the box
+      debugPrint('❌ WFS error: ${e.runtimeType}');
       return null;
     }
   }
 
-  /// GetFeature for the box around the point. With the `EPSG:4326` suffix
-  /// this GeoServer reads the BBOX as lon,lat (lat,lon silently returns no
+  /// GetFeature for the box of half-side [boxHalfSideMeters] around the
+  /// point rounded to 3 decimals. With the `EPSG:4326` suffix this
+  /// GeoServer reads the BBOX as lon,lat (lat,lon silently returns no
   /// features); the GeoJSON coordinates come back as [lon, lat] too.
   @visibleForTesting
-  static Uri buildUri(double lat, double lng, double radius) {
-    final dLat = radius / _metersPerDegree;
-    final dLng = radius / (_metersPerDegree * math.cos(_toRadians(lat)));
+  static Uri buildUri(double lat, double lng) {
+    double rounded(double v) => (v * 1000).round() / 1000;
+    final centerLat = rounded(lat), centerLng = rounded(lng);
+    final dLat = boxHalfSideMeters / _metersPerDegree;
+    final dLng = boxHalfSideMeters /
+        (_metersPerDegree * math.cos(_toRadians(centerLat)));
     String f(double v) => v.toStringAsFixed(6);
 
     return Uri.parse(_wfsUrl).replace(queryParameters: {
@@ -128,58 +158,24 @@ class NearbyStopsService {
       'outputFormat': 'application/json',
       'srsName': 'EPSG:4326',
       'propertyName': 'cod_ubic_parada,desc_linea,calle,esquina,the_geom',
-      'bbox': '${f(lng - dLng)},${f(lat - dLat)},'
-          '${f(lng + dLng)},${f(lat + dLat)},EPSG:4326',
+      'bbox': '${f(centerLng - dLng)},${f(centerLat - dLat)},'
+          '${f(centerLng + dLng)},${f(centerLat + dLat)},EPSG:4326',
     });
   }
 
-  /// Parses the GeoJSON FeatureCollection:
-  /// `{"features":[{"geometry":{"type":"Point","coordinates":[lon,lat]},
-  ///   "properties":{"cod_ubic_parada":574,"desc_linea":"116",
-  ///   "calle":"SAN JOSE","esquina":"ANDES"}}, ...]}`
-  /// Groups the per-variant features by stop, drops the BBOX corners beyond
-  /// [radius] and sorts nearest first.
-  @visibleForTesting
-  static List<NearbyStop> parseFeatures(dynamic data,
-      {required double lat,
-      required double lng,
-      double radius = radiusMeters}) {
-    if (data is! Map || data['features'] is! List) return [];
-
-    final byId = <int, _StopBuilder>{};
-    for (final feature in data['features'] as List) {
-      if (feature is! Map) continue;
-      final props = feature['properties'];
-      final geometry = feature['geometry'];
-      if (props is! Map || geometry is! Map) continue;
-
-      final id = props['cod_ubic_parada'];
-      final coords = geometry['coordinates'];
-      if (id is! num || coords is! List || coords.length < 2) continue;
-      final lon = coords[0], la = coords[1];
-      if (lon is! num || la is! num) continue;
-
-      final stop = byId.putIfAbsent(
-        id.toInt(),
-        () => _StopBuilder(
-          id: id.toInt(),
-          name: _stopName(id.toInt(), props['calle'], props['esquina']),
-          latitude: la.toDouble(),
-          longitude: lon.toDouble(),
-        ),
-      );
-      final line = props['desc_linea']?.toString().trim() ?? '';
-      if (line.isNotEmpty) stop.lines.add(line);
-    }
-
+  /// The stops of [catalog] within [radius] of the point, nearest first —
+  /// the proxy's catalog and the WFS box alike.
+  static List<NearbyStop> nearbyFrom(
+      List<CatalogStop> catalog, double lat, double lng,
+      {double radius = radiusMeters}) {
     final stops = <NearbyStop>[];
-    for (final s in byId.values) {
+    for (final s in catalog) {
       final distance = distanceMeters(lat, lng, s.latitude, s.longitude);
       if (distance > radius) continue;
       stops.add(NearbyStop(
         id: s.id,
         name: s.name,
-        lines: s.lines.toList()..sort(compareLines),
+        lines: s.lines,
         latitude: s.latitude,
         longitude: s.longitude,
         distanceMeters: distance,
@@ -189,26 +185,11 @@ class NearbyStopsService {
     return stops;
   }
 
-  static String _stopName(int id, dynamic street, dynamic corner) {
-    final s = street?.toString().trim() ?? '';
-    final c = corner?.toString().trim() ?? '';
-    if (s.isEmpty && c.isEmpty) return 'Parada $id';
-    if (s.isEmpty || c.isEmpty) return s.isEmpty ? c : s;
-    return '$s y $c';
-  }
-
-  static final _leadingNumber = RegExp(r'^\d+');
-
   /// Numeric lines by value ("21" < "104"), suffixed variants next to their
   /// number ("124" < "124 SD" < "125"), then lettered lines ("CE1", "D10").
   @visibleForTesting
-  static int compareLines(String a, String b) {
-    final na = int.tryParse(_leadingNumber.stringMatch(a) ?? '');
-    final nb = int.tryParse(_leadingNumber.stringMatch(b) ?? '');
-    if (na != null && nb != null && na != nb) return na.compareTo(nb);
-    if ((na == null) != (nb == null)) return na == null ? 1 : -1;
-    return a.compareTo(b);
-  }
+  static int compareLines(String a, String b) =>
+      ContractRules.compareLines(a, b);
 
   /// Great-circle distance (haversine).
   @visibleForTesting
@@ -224,19 +205,4 @@ class NearbyStopsService {
   }
 
   static double _toRadians(double degrees) => degrees * math.pi / 180;
-}
-
-class _StopBuilder {
-  final int id;
-  final String name;
-  final double latitude;
-  final double longitude;
-  final Set<String> lines = {};
-
-  _StopBuilder({
-    required this.id,
-    required this.name,
-    required this.latitude,
-    required this.longitude,
-  });
 }

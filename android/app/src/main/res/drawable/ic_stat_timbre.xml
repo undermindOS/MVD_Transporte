@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Status bar icon: the Timbre MVD bus as a white silhouette (Android
+     tints it). Sign and windshield are holes; the LED bar stays lit. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="724"
+    android:viewportHeight="724">
+    <group
+        android:translateX="-150"
+        android:translateY="-148">
+        <path
+            android:fillColor="#FFFFFFFF"
+            android:pathData="M192,292H196A22,22 0 0 1 218,314V398A22,22 0 0 1 196,420H192A22,22 0 0 1 170,398V314A22,22 0 0 1 192,292ZM828,292H832A22,22 0 0 1 854,314V398A22,22 0 0 1 832,420H828A22,22 0 0 1 806,398V314A22,22 0 0 1 828,292ZM324,742H360A28,28 0 0 1 388,770V818A28,28 0 0 1 360,846H324A28,28 0 0 1 296,818V770A28,28 0 0 1 324,742ZM664,742H700A28,28 0 0 1 728,770V818A28,28 0 0 1 700,846H664A28,28 0 0 1 636,818V770A28,28 0 0 1 664,742ZM354,178H670A92,92 0 0 1 762,270V752A40,40 0 0 1 722,792H302A40,40 0 0 1 262,752V270A92,92 0 0 1 354,178ZM322,214A24,24 0 0 0 298,238V290A24,24 0 0 0 322,314H702A24,24 0 0 0 726,290V238A24,24 0 0 0 702,214ZM320,336A30,30 0 0 0 290,366V636A30,30 0 0 0 320,666H704A30,30 0 0 0 734,636V366A30,30 0 0 0 704,336ZM364,250H590A14,14 0 0 1 604,264V264A14,14 0 0 1 590,278H364A14,14 0 0 1 350,264V264A14,14 0 0 1 364,250Z" />
+        <path
+            android:strokeColor="#FFFFFFFF"
+            android:strokeWidth="20"
+            android:strokeLineCap="round"
+            android:pathData="M300,214C236,198 198,236 194,300M724,214C788,198 826,236 830,300" />
+    </group>
+</vector>

@@ -1,13 +1,14 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
-import 'package:home_widget/home_widget.dart';
 import 'package:workmanager/workmanager.dart';
 import 'cache_service.dart';
+import 'home_widget_feed.dart';
 import 'mvd_api_service.dart';
 import 'notification_service.dart';
 
 const _taskName = 'busEtaCheck';
 const _taskUniqueName = 'bus-eta-check';
-const _widgetName = 'MVDTransporteWidgetProvider';
 
 /// Must be a top-level function — called by WorkManager in a separate isolate.
 @pragma('vm:entry-point')
@@ -19,87 +20,13 @@ void callbackDispatcher() {
       await CacheService.init();
       await NotificationService.init();
 
-      // Check individual stop alerts
-      final stops = CacheService.getStopsWithNotificationsEnabled();
-      for (final stop in stops) {
-        final arrivals =
-            await MvdApiService.getNextArrivals(stop.id) ?? const [];
-        // Only GPS-tracked buses: a timetable estimate is not "arriving"
-        final imminent = arrivals.where(
-            (a) => a.isRealTime && a.etaMinutes <= stop.etaAlertMinutes);
-        for (final bus in imminent) {
-          await NotificationService.showBusAlert(
-            line: bus.line,
-            stopName: stop.name,
-            etaMinutes: bus.etaMinutes,
-          );
-        }
-      }
-
-      // Check route alerts (A → B)
-      final routes = CacheService.getEnabledRoutes();
-      bool widgetRouteUpdated = false;
-      for (final route in routes) {
-        final arrivals =
-            await MvdApiService.getNextArrivals(route.originStopId) ??
-                const [];
-
-        // Filter by preferred lines if specified
-        final relevant =
-            arrivals.where((a) => route.acceptsLine(a.line)).toList();
-
-        // Push soonest bus for the first enabled route to the home widget.
-        // Own try: a widget failure (e.g. iOS without App Group) must not
-        // swallow the notifications below.
-        if (!widgetRouteUpdated) {
-          widgetRouteUpdated = true;
-          try {
-            await _updateWidgetRoute(
-              relevant.isEmpty ? null : relevant.first.line,
-              relevant.isEmpty ? null : relevant.first.etaMinutes,
-              route.destinationName,
-            );
-          } catch (e) {
-            debugPrint('⚠️ Widget update error: $e');
-          }
-        }
-
-        final imminent = relevant
-            .where((a) => a.isRealTime && a.etaMinutes <= route.alertMinutes);
-
-        for (final bus in imminent) {
-          await NotificationService.showRouteAlert(
-            line: bus.line,
-            originName: route.originName,
-            destinationName: route.destinationName,
-            etaMinutes: bus.etaMinutes,
-          );
-        }
-      }
+      await BackgroundWorker.checkAlerts(DateTime.now());
     } catch (e) {
       debugPrint('❌ Background task error: $e');
     }
 
     return true;
   });
-}
-
-/// The widget refreshes only when this task runs (≥15 min apart), so store
-/// the expected arrival clock time — a bare "5 min" would go stale.
-Future<void> _updateWidgetRoute(
-    String? line, int? etaMinutes, String destination) async {
-  if (line == null || etaMinutes == null) {
-    await HomeWidget.saveWidgetData<String>('route_line', null);
-  } else {
-    final at = DateTime.now().add(Duration(minutes: etaMinutes));
-    final hh = at.hour.toString().padLeft(2, '0');
-    final mm = at.minute.toString().padLeft(2, '0');
-    await HomeWidget.saveWidgetData<String>('route_line', line);
-    await HomeWidget.saveWidgetData<int>('route_eta_min', etaMinutes);
-    await HomeWidget.saveWidgetData<String>('route_eta_at', '$hh:$mm');
-    await HomeWidget.saveWidgetData<String>('route_dest', destination);
-  }
-  await HomeWidget.updateWidget(name: _widgetName);
 }
 
 class BackgroundWorker {
@@ -127,6 +54,67 @@ class BackgroundWorker {
     debugPrint('✅ WorkManager tarea registrada');
   }
 
+  /// One background pass: notifies about GPS-tracked buses within each
+  /// alert's threshold, only inside the alert's schedule, and refreshes the
+  /// home widget. Every stop involved is requested once, all in parallel.
+  static Future<void> checkAlerts(DateTime now) async {
+    final stops = CacheService.getStopsWithNotificationsEnabled()
+        .where((s) => s.schedule.allows(now))
+        .toList();
+    final routes = CacheService.getEnabledRoutes();
+    final scheduledRoutes =
+        routes.where((r) => r.schedule.allows(now)).toList();
+    // The home widget shows the first route at any hour
+    final widgetRoute = routes.firstOrNull;
+
+    final boards = await MvdApiService.getBoards({
+      for (final stop in stops) stop.id,
+      for (final route in scheduledRoutes) route.originStopId,
+      if (widgetRoute != null) widgetRoute.originStopId,
+    });
+
+    // Check individual stop alerts
+    for (final stop in stops) {
+      // Not checked is not "no buses": nothing to say
+      final arrivals = boards[stop.id]?.valueOrNull?.arrivals;
+      if (arrivals == null) continue;
+      // Only GPS-tracked buses: a timetable estimate is not "arriving"
+      final imminent = arrivals.where(
+          (a) => a.isRealTime && a.etaMinutes <= stop.etaAlertMinutes);
+      for (final bus in imminent) {
+        await NotificationService.showBusAlert(
+          line: bus.line,
+          stopName: stop.name,
+          etaMinutes: bus.etaMinutes,
+        );
+      }
+    }
+
+    // Catches its own errors: a widget failure (e.g. iOS without App
+    // Group) must not swallow the notifications below
+    await WidgetFeed.update(enabledRoutes: routes, boards: boards, now: now);
+
+    // Check route alerts (A → B)
+    for (final route in scheduledRoutes) {
+      final arrivals = boards[route.originStopId]?.valueOrNull?.arrivals;
+      if (arrivals == null) continue;
+      // Preferred lines and direction, GPS-tracked, within the threshold
+      final imminent = arrivals.where((a) =>
+          route.accepts(a) &&
+          a.isRealTime &&
+          a.etaMinutes <= route.alertMinutes);
+
+      for (final bus in imminent) {
+        await NotificationService.showRouteAlert(
+          line: bus.line,
+          originName: route.originName,
+          destinationName: route.destinationName,
+          etaMinutes: bus.etaMinutes,
+        );
+      }
+    }
+  }
+
   /// True if any stop or route alert is enabled.
   static bool get hasActiveAlerts =>
       CacheService.getStopsWithNotificationsEnabled().isNotEmpty ||
@@ -135,14 +123,22 @@ class BackgroundWorker {
   /// Registers the periodic task when any alert is enabled, cancels it
   /// otherwise. Call after every change to stops/routes alert state.
   static Future<void> sync() async {
+    final active = hasActiveAlerts;
     try {
-      if (hasActiveAlerts) {
+      if (active) {
         await registerPeriodicTask();
       } else {
         await Workmanager().cancelByUniqueName(_taskUniqueName);
       }
     } catch (e) {
       debugPrint('⚠️ WorkManager sync error: $e');
+    }
+    // Without a route, or without the task, nothing refreshes the widget:
+    // no stale row on it, even while a stop alert keeps the task alive.
+    // Not awaited: callers wait for the task only (the app unlocks after
+    // this), and the widget catches its own errors
+    if (CacheService.getEnabledRoutes().isEmpty) {
+      unawaited(WidgetFeed.clear(WidgetFeed.statusOff));
     }
   }
 

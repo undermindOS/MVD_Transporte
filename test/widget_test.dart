@@ -17,6 +17,10 @@ import 'package:stm_app/main.dart';
 import 'package:stm_app/models/bus_stop.dart';
 import 'package:stm_app/services/cache_service.dart';
 import 'package:stm_app/services/official_sites.dart';
+import 'package:stm_app/ui/lock_screen.dart';
+import 'package:stm_app/ui/stops_page.dart';
+
+import 'support/layout.dart';
 
 void main() {
   late Directory hiveDir;
@@ -51,21 +55,52 @@ void main() {
 
     expect(find.byType(NavigationBar), findsOneWidget);
     expect(find.byType(NavigationDestination), findsNWidgets(2));
-    expect(find.text('Mis paradas'), findsNWidgets(2)); // AppBar + nav label
+    expect(find.text('MIS PARADAS'), findsOneWidget); // the header sign
+    expect(find.text('Mis paradas'), findsOneWidget); // nav label
     expect(find.text('Servicios'), findsOneWidget);
-    expect(find.text('Sin paradas guardadas'), findsOneWidget);
-    expect(find.byIcon(Icons.info_outline), findsOneWidget);
+    expect(find.text('SIN PARADAS'), findsOneWidget);
+    expect(find.byTooltip('Info'), findsOneWidget);
+  });
+
+  testWidgets('Mis paradas polls only while it is on screen',
+      (WidgetTester tester) async {
+    await tester.pumpWidget(const MiTransporteMVDApp());
+    await tester.pump();
+    bool polling() => tester
+        .widget<StopsPage>(find.byType(StopsPage, skipOffstage: false))
+        .active;
+    expect(polling(), isTrue);
+
+    // Another tab
+    await tester.tap(find.text('Servicios'));
+    await tester.pump();
+    expect(polling(), isFalse);
+    await tester.tap(find.text('Mis paradas'));
+    await tester.pump();
+    expect(polling(), isTrue);
+
+    // A page on top
+    await tester.tap(find.byTooltip('Info'));
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 1));
+    expect(polling(), isFalse);
+    await tester.pageBack();
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 1));
+    expect(polling(), isTrue);
   });
 
   testWidgets('Servicios lists the official sites',
       (WidgetTester tester) async {
+    // Portrait phone: the 800 × 600 test window hides the last tile
+    usePhoneScreen(tester);
     await tester.pumpWidget(const MiTransporteMVDApp());
     await tester.pump();
 
     await tester.tap(find.text('Servicios'));
     await tester.pump();
 
-    expect(find.text('Servicios'), findsNWidgets(2));
+    expect(find.text('SERVICIOS'), findsOneWidget);
     for (final title in ['Mi STM', 'Recarga', 'Cómo Ir', 'Avisos']) {
       expect(find.text(title), findsOneWidget);
     }
@@ -113,7 +148,10 @@ void main() {
     await tester.tap(find.text('Avisos'));
     await tester.pump();
 
-    expect(find.text('No se pudo abrir el navegador'), findsOneWidget);
+    expect(
+        find.text(
+            'No se pudo abrir el navegador. Revisá que tengas uno activado.'),
+        findsOneWidget);
   });
 
   testWidgets('Ver en Cómo Ir opens the stop deep link',
@@ -168,7 +206,7 @@ void main() {
     cycle();
     await tester.pump();
     expect(auth.calls, 1);
-    expect(find.text('Aplicación bloqueada'), findsNothing);
+    expect(find.byType(LockScreen), findsNothing);
 
     cycle();
     await tester.pump();

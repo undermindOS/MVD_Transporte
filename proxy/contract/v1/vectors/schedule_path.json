@@ -1,0 +1,58 @@
+{
+  "rule": "schedulePath",
+  "notes": [
+    "weekday/saturday/sunday ↔ HABIL/SABADO/DOMINGO. La hora va como H:MM: sin cero a la izquierda en la hora y con dos dígitos en los minutos.",
+    "proxyPath es lo que pide la app al proxy; directUrl es lo que pide el proxy a transporteRest y también la app en modo directo."
+  ],
+  "cases": [
+    {
+      "in": {"stopId": 3140, "day": "weekday", "hour": 8, "minute": 5},
+      "out": {
+        "proxyPath": "/v1/stops/3140/schedule/weekday/8:05",
+        "directUrl": "https://api.montevideo.gub.uy/transporteRest/siguientesParada/3140/HABIL/8:05"
+      }
+    },
+    {
+      "in": {"stopId": 3140, "day": "saturday", "hour": 23, "minute": 0},
+      "out": {
+        "proxyPath": "/v1/stops/3140/schedule/saturday/23:00",
+        "directUrl": "https://api.montevideo.gub.uy/transporteRest/siguientesParada/3140/SABADO/23:00"
+      }
+    },
+    {
+      "in": {"stopId": 3140, "day": "sunday", "hour": 7, "minute": 30},
+      "out": {
+        "proxyPath": "/v1/stops/3140/schedule/sunday/7:30",
+        "directUrl": "https://api.montevideo.gub.uy/transporteRest/siguientesParada/3140/DOMINGO/7:30"
+      }
+    },
+    {
+      "in": {"stopId": 574, "day": "weekday", "hour": 0, "minute": 0},
+      "out": {
+        "proxyPath": "/v1/stops/574/schedule/weekday/0:00",
+        "directUrl": "https://api.montevideo.gub.uy/transporteRest/siguientesParada/574/HABIL/0:00"
+      }
+    },
+    {
+      "in": {"stopId": 574, "day": "sunday", "hour": 23, "minute": 59},
+      "out": {
+        "proxyPath": "/v1/stops/574/schedule/sunday/23:59",
+        "directUrl": "https://api.montevideo.gub.uy/transporteRest/siguientesParada/574/DOMINGO/23:59"
+      }
+    },
+    {
+      "in": {"stopId": 9999999, "day": "saturday", "hour": 12, "minute": 9},
+      "out": {
+        "proxyPath": "/v1/stops/9999999/schedule/saturday/12:09",
+        "directUrl": "https://api.montevideo.gub.uy/transporteRest/siguientesParada/9999999/SABADO/12:09"
+      }
+    },
+    {
+      "in": {"stopId": 1, "day": "weekday", "hour": 10, "minute": 10},
+      "out": {
+        "proxyPath": "/v1/stops/1/schedule/weekday/10:10",
+        "directUrl": "https://api.montevideo.gub.uy/transporteRest/siguientesParada/1/HABIL/10:10"
+      }
+    }
+  ]
+}

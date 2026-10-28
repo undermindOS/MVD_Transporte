@@ -1,5 +1,5 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    package="com.example.stm_app">
+    package="com.liberontech.stmapp">
 
     <uses-permission android:name="android.permission.INTERNET"/>
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
@@ -8,13 +8,16 @@
     <uses-permission android:name="android.permission.USE_FINGERPRINT"/>
     <!-- Notifications (Android 13+) -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+    <!-- "Estoy esperando": foreground service polling one stop (dataSync) -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC"/>
     <!-- WorkManager boot restore -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
     <!-- SCHEDULE_EXACT_ALARM removed: no exact alarms are scheduled, and
          Google Play restricts it to alarm/calendar apps -->
 
     <application
-        android:label="MVD Transporte"
+        android:label="Timbre MVD"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher"
         android:usesCleartextTraffic="false">
@@ -48,6 +51,20 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/mvd_transporte_widget_info"/>
         </receiver>
+
+        <!-- "Estoy esperando" (flutter_foreground_task; the name is fixed).
+             Started only by a tap, stops when the bus is close, after the
+             trip passes or after 60 min. -->
+        <service
+            android:name="com.pravera.flutter_foreground_task.service.ForegroundService"
+            android:foregroundServiceType="dataSync"
+            android:exported="false"/>
+
+        <!-- Status bar icon of the "Estoy esperando" notification
+             (NotificationIcon in BusWaitService) -->
+        <meta-data
+            android:name="com.liberontech.stmapp.NOTIFICATION_ICON"
+            android:resource="@drawable/ic_stat_timbre" />
 
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->

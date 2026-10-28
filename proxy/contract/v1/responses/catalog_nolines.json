@@ -1,0 +1,30 @@
+{
+  "fetchedAt": "2026-10-27T13:22:26.000Z",
+  "linesAvailable": false,
+  "stops": [
+    {
+      "id": 546,
+      "name": "CORUÑA y GRAL JULIO AMADEO ROLETTI",
+      "location": {"lat": -34.87240513, "lng": -56.14675823},
+      "lines": []
+    },
+    {
+      "id": 574,
+      "name": "SAN JOSE y ANDES",
+      "location": {"lat": -34.90739436, "lng": -56.198255},
+      "lines": []
+    },
+    {
+      "id": 3140,
+      "name": "AV RAMON ANADOR y TIBURCIO GOMEZ",
+      "location": {"lat": -34.8941445, "lng": -56.13754252},
+      "lines": []
+    },
+    {
+      "id": 6325,
+      "name": "MATAOJO",
+      "location": {"lat": -34.88287335, "lng": -56.11962915},
+      "lines": []
+    }
+  ]
+}

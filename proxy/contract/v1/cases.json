@@ -1,0 +1,384 @@
+[
+  {
+    "id": "stop.574",
+    "request": "/v1/stops/574",
+    "gateway": "fake",
+    "status": 200,
+    "cacheControl": "public, max-age=86400",
+    "headers": {},
+    "response": "responses/stop_574.json",
+    "upstream": [
+      {"url": "https://api.montevideo.gub.uy/transporteRest/lineas/574", "file": "upstream/transporte_rest/lineas_574.json"},
+      {"url": "https://im-gateway/stops/574/meta", "file": "upstream/im_gateway/stop_meta_574.json"}
+    ],
+    "direct": {"upstream": ["https://api.montevideo.gub.uy/transporteRest/lineas/574"], "mask": ["directions"], "failure": null},
+    "dart": {"failure": null, "retryAfter": null, "request": true}
+  },
+  {
+    "id": "stop.574.degraded",
+    "request": "/v1/stops/574",
+    "gateway": "fake",
+    "status": 200,
+    "cacheControl": "public, max-age=300",
+    "headers": {},
+    "response": "responses/stop_574_degraded.json",
+    "upstream": [
+      {"url": "https://api.montevideo.gub.uy/transporteRest/lineas/574", "file": "upstream/transporte_rest/lineas_574.json"},
+      {"url": "https://im-gateway/stops/574/meta", "status": 503, "body": "{\"error\":\"upstream_busy\"}", "headers": {"Retry-After": "30"}}
+    ],
+    "direct": {"upstream": ["https://api.montevideo.gub.uy/transporteRest/lineas/574"], "mask": ["directions"], "failure": null},
+    "dart": {"failure": null, "retryAfter": null, "request": true}
+  },
+  {
+    "id": "stop.not_found",
+    "request": "/v1/stops/99999",
+    "gateway": "none",
+    "status": 404,
+    "cacheControl": "public, max-age=3600",
+    "headers": {},
+    "response": "responses/error_stop_not_found.json",
+    "upstream": [
+      {"url": "https://api.montevideo.gub.uy/transporteRest/lineas/99999", "status": 500, "body": "No existe la ubicación de parada con código '99999'."}
+    ],
+    "direct": {"upstream": ["https://api.montevideo.gub.uy/transporteRest/lineas/99999"], "mask": [], "failure": "notFound"},
+    "dart": {"failure": "notFound", "retryAfter": null, "request": true}
+  },
+  {
+    "id": "stop.id_out_of_range",
+    "request": "/v1/stops/10000000",
+    "gateway": "none",
+    "status": 404,
+    "cacheControl": "no-store",
+    "headers": {},
+    "response": "responses/error_not_found.json",
+    "upstream": [],
+    "direct": {"upstream": [], "mask": [], "failure": "notFound"},
+    "dart": {"failure": "notFound", "retryAfter": null, "request": false}
+  },
+  {
+    "id": "arrivals.574",
+    "request": "/v1/stops/574/arrivals",
+    "gateway": "fake",
+    "status": 200,
+    "cacheControl": "public, max-age=15",
+    "headers": {},
+    "response": "responses/arrivals_574.json",
+    "upstream": [
+      {"url": "https://api.montevideo.gub.uy/transporteRest/siguientesParada/574", "file": "upstream/transporte_rest/arrivals_574.json"},
+      {"url": "https://im-gateway/vehicles?ids=50:111,50:1118,50:139", "file": "upstream/im_gateway/vehicles_574.json"}
+    ],
+    "direct": {
+      "upstream": ["https://api.montevideo.gub.uy/transporteRest/siguientesParada/574"],
+      "mask": ["arrivals[].airConditioning", "arrivals[].zeroEmission"],
+      "failure": null
+    },
+    "dart": {"failure": null, "retryAfter": null, "request": true}
+  },
+  {
+    "id": "arrivals.3140",
+    "request": "/v1/stops/3140/arrivals",
+    "gateway": "none",
+    "status": 200,
+    "cacheControl": "public, max-age=15",
+    "headers": {},
+    "response": "responses/arrivals_3140.json",
+    "upstream": [
+      {"url": "https://api.montevideo.gub.uy/transporteRest/siguientesParada/3140", "file": "upstream/transporte_rest/arrivals_3140.json"}
+    ],
+    "direct": {
+      "upstream": ["https://api.montevideo.gub.uy/transporteRest/siguientesParada/3140"],
+      "mask": ["arrivals[].airConditioning", "arrivals[].zeroEmission"],
+      "failure": null
+    },
+    "dart": {"failure": null, "retryAfter": null, "request": true}
+  },
+  {
+    "id": "arrivals.empty",
+    "request": "/v1/stops/6325/arrivals",
+    "gateway": "none",
+    "status": 200,
+    "cacheControl": "public, max-age=15",
+    "headers": {},
+    "response": "responses/arrivals_empty.json",
+    "upstream": [
+      {"url": "https://api.montevideo.gub.uy/transporteRest/siguientesParada/6325", "body": "[]"}
+    ],
+    "direct": {
+      "upstream": ["https://api.montevideo.gub.uy/transporteRest/siguientesParada/6325"],
+      "mask": ["arrivals[].airConditioning", "arrivals[].zeroEmission"],
+      "failure": null
+    },
+    "dart": {"failure": null, "retryAfter": null, "request": true}
+  },
+  {
+    "id": "arrivals.bad_shape",
+    "request": "/v1/stops/574/arrivals",
+    "gateway": "none",
+    "status": 502,
+    "cacheControl": "no-store",
+    "headers": {},
+    "response": "responses/error_upstream_error.json",
+    "upstream": [
+      {"url": "https://api.montevideo.gub.uy/transporteRest/siguientesParada/574", "body": "{}"}
+    ],
+    "direct": {"upstream": ["https://api.montevideo.gub.uy/transporteRest/siguientesParada/574"], "mask": [], "failure": "failed"},
+    "dart": {"failure": "failed", "retryAfter": null, "request": true}
+  },
+  {
+    "id": "arrivals.upstream_500",
+    "request": "/v1/stops/574/arrivals",
+    "gateway": "none",
+    "status": 502,
+    "cacheControl": "no-store",
+    "headers": {},
+    "response": "responses/error_upstream_error.json",
+    "upstream": [
+      {
+        "url": "https://api.montevideo.gub.uy/transporteRest/siguientesParada/574",
+        "status": 500,
+        "body": "{ \"tipo\": \"BadRequestException\", \"mensaje\": \"... NoExisteTransporteException\" }"
+      }
+    ],
+    "direct": {"upstream": ["https://api.montevideo.gub.uy/transporteRest/siguientesParada/574"], "mask": [], "failure": "failed"},
+    "dart": {"failure": "failed", "retryAfter": null, "request": true}
+  },
+  {
+    "id": "arrivals.timeout",
+    "request": "/v1/stops/574/arrivals",
+    "gateway": "none",
+    "status": 504,
+    "cacheControl": "no-store",
+    "headers": {},
+    "response": "responses/error_upstream_timeout.json",
+    "upstream": [
+      {"url": "https://api.montevideo.gub.uy/transporteRest/siguientesParada/574", "throw": "timeout"}
+    ],
+    "direct": {"upstream": ["https://api.montevideo.gub.uy/transporteRest/siguientesParada/574"], "mask": [], "failure": "timeout"},
+    "dart": {"failure": "timeout", "retryAfter": null, "request": true}
+  },
+  {
+    "id": "schedule.3140.weekday.8-05",
+    "request": "/v1/stops/3140/schedule/weekday/8:05",
+    "gateway": "none",
+    "status": 200,
+    "cacheControl": "public, max-age=21600",
+    "headers": {},
+    "response": "responses/schedule_3140_weekday_8-05.json",
+    "upstream": [
+      {
+        "url": "https://api.montevideo.gub.uy/transporteRest/siguientesParada/3140/HABIL/8:05",
+        "file": "upstream/transporte_rest/schedule_3140_habil_805.json"
+      }
+    ],
+    "direct": {"upstream": ["https://api.montevideo.gub.uy/transporteRest/siguientesParada/3140/HABIL/8:05"], "mask": [], "failure": null},
+    "dart": {"failure": null, "retryAfter": null, "request": true}
+  },
+  {
+    "id": "schedule.noncanonical",
+    "request": "/v1/stops/3140/schedule/weekday/08:05",
+    "gateway": "none",
+    "status": 404,
+    "cacheControl": "no-store",
+    "headers": {},
+    "response": "responses/error_not_found.json",
+    "upstream": [],
+    "direct": null,
+    "dart": null
+  },
+  {
+    "id": "schedule.bad_day",
+    "request": "/v1/stops/3140/schedule/holiday/8:05",
+    "gateway": "none",
+    "status": 400,
+    "cacheControl": "no-store",
+    "headers": {},
+    "response": "responses/error_bad_request.json",
+    "upstream": [],
+    "direct": null,
+    "dart": null
+  },
+  {
+    "id": "schedule.hour_out_of_range",
+    "request": "/v1/stops/3140/schedule/weekday/24:00",
+    "gateway": "none",
+    "status": 400,
+    "cacheControl": "no-store",
+    "headers": {},
+    "response": "responses/error_bad_request.json",
+    "upstream": [],
+    "direct": null,
+    "dart": null
+  },
+  {
+    "id": "catalog.sample",
+    "request": "/v1/catalog/stops",
+    "gateway": "real",
+    "status": 200,
+    "cacheControl": "public, max-age=86400",
+    "headers": {},
+    "response": "responses/catalog_sample.json",
+    "upstream": [
+      {
+        "url": "https://mvdapi-auth.montevideo.gub.uy/auth/realms/pci/protocol/openid-connect/token",
+        "body": "{\"access_token\":\"t\",\"expires_in\":300}"
+      },
+      {"url": "https://api.montevideo.gub.uy/api/transportepublico/buses/busstops", "file": "upstream/im_api/im_busstops.json"},
+      {
+        "url": "https://geoserver.montevideo.gub.uy/geoserver/ows?service=wfs&version=2.0.0&request=GetFeature&typeNames=imm:v_uptu_paradas&outputFormat=csv&propertyName=cod_ubic_parada,desc_linea,cod_variante",
+        "file": "upstream/geoserver/stop_index_sample.csv"
+      },
+      {"url": "https://api.montevideo.gub.uy/api/transportepublico/buses/linevariants", "file": "upstream/im_api/im_linevariants.json"}
+    ],
+    "direct": {"upstream": [], "mask": [], "failure": "unavailable"},
+    "dart": {"failure": null, "retryAfter": null, "request": true}
+  },
+  {
+    "id": "catalog.nolines",
+    "request": "/v1/catalog/stops",
+    "gateway": "real",
+    "status": 200,
+    "cacheControl": "public, max-age=900",
+    "headers": {},
+    "response": "responses/catalog_nolines.json",
+    "upstream": [
+      {
+        "url": "https://mvdapi-auth.montevideo.gub.uy/auth/realms/pci/protocol/openid-connect/token",
+        "body": "{\"access_token\":\"t\",\"expires_in\":300}"
+      },
+      {"url": "https://api.montevideo.gub.uy/api/transportepublico/buses/busstops", "file": "upstream/im_api/im_busstops.json"},
+      {
+        "url": "https://geoserver.montevideo.gub.uy/geoserver/ows?service=wfs&version=2.0.0&request=GetFeature&typeNames=imm:v_uptu_paradas&outputFormat=csv&propertyName=cod_ubic_parada,desc_linea,cod_variante",
+        "status": 500,
+        "body": ""
+      }
+    ],
+    "direct": {"upstream": [], "mask": [], "failure": "unavailable"},
+    "dart": {"failure": null, "retryAfter": null, "request": true}
+  },
+  {
+    "id": "catalog.not_configured",
+    "request": "/v1/catalog/stops",
+    "gateway": "none",
+    "status": 503,
+    "cacheControl": "no-store",
+    "headers": {},
+    "response": "responses/error_not_configured.json",
+    "upstream": [],
+    "direct": {"upstream": [], "mask": [], "failure": "unavailable"},
+    "dart": {"failure": "unavailable", "retryAfter": null, "request": true}
+  },
+  {
+    "id": "catalog.busy",
+    "request": "/v1/catalog/stops",
+    "gateway": "fake",
+    "status": 503,
+    "cacheControl": "no-store",
+    "headers": {"Retry-After": "42"},
+    "response": "responses/error_upstream_busy.json",
+    "upstream": [
+      {"url": "https://im-gateway/catalog/stops", "status": 503, "body": "{\"error\":\"upstream_busy\"}", "headers": {"Retry-After": "42"}}
+    ],
+    "direct": {"upstream": [], "mask": [], "failure": "unavailable"},
+    "dart": {"failure": "busy", "retryAfter": 42, "request": true}
+  },
+  {
+    "id": "news.cold",
+    "request": "/v1/news",
+    "gateway": "none",
+    "status": 200,
+    "cacheControl": "public, max-age=300",
+    "headers": {},
+    "response": "responses/news_cold.json",
+    "upstream": [
+      {"url": "https://api.montevideo.gub.uy/notificacion/mensajes?idApp=1&fromIdMessage=0", "file": "upstream/notificacion/mensajes_from0.json"},
+      {"url": "https://api.montevideo.gub.uy/notificacion/mensajes?idApp=1&fromIdMessage=136", "file": "upstream/notificacion/mensajes_from136.json"},
+      {"url": "https://api.montevideo.gub.uy/notificacion/mensajes?idApp=1&fromIdMessage=168", "file": "upstream/notificacion/mensajes_from168.json"},
+      {"url": "https://api.montevideo.gub.uy/notificacion/mensajes?idApp=1&fromIdMessage=172", "file": "upstream/notificacion/mensajes_from172.json"}
+    ],
+    "direct": {
+      "upstream": [
+        "https://api.montevideo.gub.uy/notificacion/mensajes?idApp=1&fromIdMessage=0",
+        "https://api.montevideo.gub.uy/notificacion/mensajes?idApp=1&fromIdMessage=136",
+        "https://api.montevideo.gub.uy/notificacion/mensajes?idApp=1&fromIdMessage=168",
+        "https://api.montevideo.gub.uy/notificacion/mensajes?idApp=1&fromIdMessage=172"
+      ],
+      "mask": [],
+      "failure": null
+    },
+    "dart": {"failure": null, "retryAfter": null, "request": true}
+  },
+  {
+    "id": "news.page_fails",
+    "request": "/v1/news",
+    "gateway": "none",
+    "status": 502,
+    "cacheControl": "no-store",
+    "headers": {},
+    "response": "responses/error_upstream_error.json",
+    "upstream": [
+      {"url": "https://api.montevideo.gub.uy/notificacion/mensajes?idApp=1&fromIdMessage=0", "file": "upstream/notificacion/mensajes_from0.json"},
+      {"url": "https://api.montevideo.gub.uy/notificacion/mensajes?idApp=1&fromIdMessage=136", "status": 500, "body": ""}
+    ],
+    "direct": {
+      "upstream": [
+        "https://api.montevideo.gub.uy/notificacion/mensajes?idApp=1&fromIdMessage=0",
+        "https://api.montevideo.gub.uy/notificacion/mensajes?idApp=1&fromIdMessage=136"
+      ],
+      "mask": [],
+      "failure": "failed"
+    },
+    "dart": {"failure": "failed", "retryAfter": null, "request": true}
+  },
+  {
+    "id": "gps.ok",
+    "request": "/v1/status/gps",
+    "gateway": "none",
+    "status": 200,
+    "cacheControl": "public, max-age=60",
+    "headers": {},
+    "response": "responses/gps_ok.json",
+    "upstream": [
+      {"url": "https://pci.montevideo.gub.uy/buses/control", "file": "upstream/pci/buses_control.json"}
+    ],
+    "direct": {"upstream": ["https://pci.montevideo.gub.uy/buses/control"], "mask": [], "failure": null},
+    "dart": {"failure": null, "retryAfter": null, "request": true}
+  },
+  {
+    "id": "gps.empty",
+    "request": "/v1/status/gps",
+    "gateway": "none",
+    "status": 502,
+    "cacheControl": "no-store",
+    "headers": {},
+    "response": "responses/error_upstream_error.json",
+    "upstream": [
+      {"url": "https://pci.montevideo.gub.uy/buses/control", "body": "[]"}
+    ],
+    "direct": {"upstream": ["https://pci.montevideo.gub.uy/buses/control"], "mask": [], "failure": "failed"},
+    "dart": {"failure": "failed", "retryAfter": null, "request": true}
+  },
+  {
+    "id": "removed.lines_buses",
+    "request": "/v1/lines/117/buses",
+    "gateway": "fake",
+    "status": 404,
+    "cacheControl": "no-store",
+    "headers": {},
+    "response": "responses/error_not_found.json",
+    "upstream": [],
+    "direct": null,
+    "dart": null
+  },
+  {
+    "id": "removed.catalog_lines",
+    "request": "/v1/catalog/lines",
+    "gateway": "fake",
+    "status": 404,
+    "cacheControl": "no-store",
+    "headers": {},
+    "response": "responses/error_not_found.json",
+    "upstream": [],
+    "direct": null,
+    "dart": null
+  }
+]

@@ -1,99 +1,148 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Home screen widget: a small night board. The plate, the next bus of
+     the first enabled route (an estimate: outline badge and clock, never
+     lit amber) and the links to the official sites. -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@android:id/background"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
     android:background="@drawable/widget_background"
     android:padding="12dp">
 
-    <!-- Header row: icon + app name -->
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:gravity="center_vertical">
+    <ImageView
+        android:layout_width="wrap_content"
+        android:layout_height="20dp"
+        android:adjustViewBounds="true"
+        android:scaleType="fitStart"
+        android:src="@drawable/widget_plate"
+        android:contentDescription="Timbre MVD" />
 
-        <ImageView
-            android:layout_width="20dp"
-            android:layout_height="20dp"
-            android:src="@mipmap/ic_launcher"
-            android:contentDescription="MVD Transporte" />
-
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginStart="6dp"
-            android:text="MVD Transporte"
-            android:textColor="#FFFFFFFF"
-            android:textSize="11sp"
-            android:alpha="0.8" />
-
-    </LinearLayout>
-
-    <!-- Route ETA: next bus of the first enabled route alert -->
+    <!-- Next bus of the first enabled route alert -->
     <LinearLayout
         android:id="@+id/widget_route_section"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
         android:orientation="horizontal"
-        android:layout_marginTop="10dp"
-        android:gravity="center_vertical">
-
-        <ImageView
-            android:layout_width="12dp"
-            android:layout_height="12dp"
-            android:src="@android:drawable/ic_menu_directions"
-            android:alpha="0.7" />
+        android:gravity="center_vertical"
+        android:visibility="gone">
 
         <TextView
-            android:id="@+id/widget_route_text"
+            android:id="@+id/widget_route_line"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:background="@drawable/widget_badge_bg"
+            android:fontFamily="sans-serif-condensed"
+            android:paddingStart="6dp"
+            android:paddingEnd="6dp"
+            android:paddingTop="1dp"
+            android:paddingBottom="1dp"
+            android:textColor="@color/etiqueta"
+            android:textSize="14sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/widget_route_dest"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:layout_marginStart="4dp"
-            android:text=""
-            android:textColor="#FFFFFFFF"
-            android:textSize="11sp"
-            android:alpha="0.9"
+            android:layout_marginStart="8dp"
+            android:ellipsize="end"
+            android:fontFamily="sans-serif-condensed"
             android:maxLines="1"
-            android:ellipsize="end" />
+            android:textColor="@color/papel"
+            android:textSize="15sp"
+            android:textStyle="bold" />
+
+        <ImageView
+            android:layout_width="13dp"
+            android:layout_height="13dp"
+            android:layout_marginStart="8dp"
+            android:src="@drawable/widget_ic_clock"
+            android:importantForAccessibility="no" />
+
+        <TextView
+            android:id="@+id/widget_route_eta"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="4dp"
+            android:fontFamily="sans-serif-condensed"
+            android:textColor="@color/etiqueta"
+            android:textSize="16sp"
+            android:textStyle="bold" />
 
     </LinearLayout>
 
-    <!-- Action buttons -->
+    <!-- No enabled route alert, or none of its lines is coming -->
+    <LinearLayout
+        android:id="@+id/widget_route_empty"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:orientation="horizontal"
+        android:gravity="center_vertical">
+
+        <ImageView
+            android:layout_width="14dp"
+            android:layout_height="14dp"
+            android:src="@drawable/widget_ic_route"
+            android:importantForAccessibility="no" />
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_marginStart="8dp"
+            android:ellipsize="end"
+            android:maxLines="2"
+            android:text="Sin próximos ómnibus en tus rutas"
+            android:textColor="@color/etiqueta"
+            android:textSize="13sp" />
+
+    </LinearLayout>
+
+    <!-- Links to the official sites, in the browser. 44dp touch targets;
+         the tighter padding and margins keep the 3 x 2 widget's height -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="horizontal"
         android:layout_marginTop="8dp"
+        android:orientation="horizontal"
         android:gravity="start">
 
         <TextView
             android:id="@+id/widget_btn_mistm"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Mi STM"
-            android:textColor="#FFFFFFFF"
-            android:textSize="12sp"
             android:background="@drawable/widget_button_bg"
-            android:paddingStart="10dp"
+            android:drawableEnd="@drawable/widget_ic_external"
+            android:drawablePadding="5dp"
+            android:gravity="center_vertical"
+            android:minHeight="44dp"
+            android:paddingStart="12dp"
             android:paddingEnd="10dp"
-            android:paddingTop="4dp"
-            android:paddingBottom="4dp" />
+            android:text="Mi STM"
+            android:textColor="@color/ambar"
+            android:textSize="13sp"
+            android:textStyle="bold" />
 
         <TextView
             android:id="@+id/widget_btn_recarga"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginStart="8dp"
-            android:text="Recarga"
-            android:textColor="#FFFFFFFF"
-            android:textSize="12sp"
             android:background="@drawable/widget_button_bg"
-            android:paddingStart="10dp"
+            android:drawableEnd="@drawable/widget_ic_external"
+            android:drawablePadding="5dp"
+            android:gravity="center_vertical"
+            android:minHeight="44dp"
+            android:paddingStart="12dp"
             android:paddingEnd="10dp"
-            android:paddingTop="4dp"
-            android:paddingBottom="4dp" />
+            android:text="Recarga"
+            android:textColor="@color/ambar"
+            android:textSize="13sp"
+            android:textStyle="bold" />
 
     </LinearLayout>
 

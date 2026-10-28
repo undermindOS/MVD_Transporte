@@ -1,0 +1,9 @@
+{
+  "fetchedAt": "2026-10-27T13:23:30.000Z",
+  "operators": [
+    {"company": "COETC", "percent": 100, "partial": false},
+    {"company": "COME", "percent": 100, "partial": false},
+    {"company": "CUTCSA", "percent": 100, "partial": false},
+    {"company": "UCOT", "percent": 100, "partial": false}
+  ]
+}
