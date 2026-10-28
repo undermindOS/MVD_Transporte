@@ -90,7 +90,7 @@ export function clockText(value) {
  * without a line or minutes, or when its time is past what a Date holds.
  * [fetchedAtMs] is when the answer arrived: it dates the minutes when the
  * row has no `time`. Comfort is unknown here (null); index.js fills it from
- * the official API.
+ * the official API. `location` is the GPS bus position (see busLocation).
  */
 export function arrival(row, fetchedAtMs) {
   if (!isObject(row)) return null;
@@ -124,7 +124,24 @@ export function arrival(row, fetchedAtMs) {
     accessible: row.accesibilidad === true,
     airConditioning: null,
     zeroEmission: null,
+    // Only a GPS row has a bus position
+    location: real ? busLocation(row.coordinates) : null,
   };
+}
+
+/**
+ * transporteRest `coordinates` `[-56.207848, -34.909443]` (lng, lat) →
+ * `{lat, lng}` as sent, unrounded. Null unless the first two items are
+ * finite JSON numbers, not both 0, with |lat| <= 90 and |lng| <= 180. No
+ * Montevideo box: the app's map drops what is off its basemap.
+ */
+function busLocation(coordinates) {
+  if (!Array.isArray(coordinates) || coordinates.length < 2) return null;
+  const [lng, lat] = coordinates;
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+  if (lat === 0 && lng === 0) return null;
+  if (Math.abs(lat) > 90 || Math.abs(lng) > 180) return null;
+  return { lat, lng };
 }
 
 /** "8:05" → 805; null without digits. */

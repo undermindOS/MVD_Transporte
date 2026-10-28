@@ -252,6 +252,10 @@ Map<String, Object?> _boardToV1(ArrivalsBoard board) => {
             'accessible': a.accessible,
             'airConditioning': a.airConditioning,
             'zeroEmission': a.zeroEmission,
+            'location': switch (a.location) {
+              (:final lat, :final lng) => {'lat': lat, 'lng': lng},
+              null => null,
+            },
           },
       ],
     };

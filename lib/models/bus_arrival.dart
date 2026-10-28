@@ -46,6 +46,10 @@ class BusArrival {
   /// Zero-emission (electric) bus; null = unknown.
   final bool? zeroEmission;
 
+  /// Where the GPS-tracked bus is (/v1 `location`), as the city sent it.
+  /// null = unknown (timetable estimate, implausible fix, older proxy).
+  final ({double lat, double lng})? location;
+
   const BusArrival({
     required this.tripId,
     this.variantId,
@@ -58,6 +62,7 @@ class BusArrival {
     this.accessible = false,
     this.airConditioning,
     this.zeroEmission,
+    this.location,
   });
 
   /// true = ETA computed from the bus GPS position;

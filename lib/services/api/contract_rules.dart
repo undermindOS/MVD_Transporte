@@ -99,7 +99,8 @@ abstract final class ContractRules {
   /// One row of transporteRest `siguientesParada` as a /v1 arrival, or
   /// null when it has no line or no minutes, or its time is past what a
   /// date holds. [fetchedAt] is when the answer came. Comfort is always
-  /// null here: only the proxy knows it.
+  /// null here: only the proxy knows it. `location` is the GPS bus
+  /// position ([_busLocation]).
   /// Vectors: `arrival.json`.
   static Map<String, Object?>? arrival(Object? row, DateTime fetchedAt) {
     if (row is! Map) return null;
@@ -146,7 +147,26 @@ abstract final class ContractRules {
       'accessible': row['accesibilidad'] == true,
       'airConditioning': null,
       'zeroEmission': null,
+      // Only a GPS row has a bus position
+      'location': real ? _busLocation(row['coordinates']) : null,
     };
+  }
+
+  /// transporteRest `coordinates` ([lng, lat]) as `{lat, lng}`, the
+  /// decoded numbers unchanged (no rounding, no toDouble). Null unless the
+  /// first two items are finite JSON numbers, not both 0, with |lat| <= 90
+  /// and |lng| <= 180. No Montevideo box: the map drops what is off its
+  /// basemap.
+  /// Vectors: `arrival.json`.
+  static Map<String, Object?>? _busLocation(Object? coordinates) {
+    if (coordinates is! List || coordinates.length < 2) return null;
+    final lng = coordinates[0], lat = coordinates[1];
+    if (lat is! num || lng is! num || !lat.isFinite || !lng.isFinite) {
+      return null;
+    }
+    if (lat == 0 && lng == 0) return null;
+    if (lat.abs() > 90 || lng.abs() > 180) return null;
+    return {'lat': lat, 'lng': lng};
   }
 
   static final _webLink =

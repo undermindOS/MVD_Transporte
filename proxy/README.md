@@ -36,7 +36,7 @@ El texto para leer (formas, reglas, errores, caché y orden de despliegue) está
 | Ruta | Qué devuelve | Caché |
 |---|---|---|
 | `/v1/stops/{id}` | nombre, líneas y a dónde va cada una (`directions`) | 24 h; 5 min si todavía no se sabe a dónde van |
-| `/v1/stops/{id}/arrivals` | los próximos ómnibus, el más cercano primero: `tripId`, `state`, `expectedAt`, `clockTime`, confort | 15 s |
+| `/v1/stops/{id}/arrivals` | los próximos ómnibus, el más cercano primero: `tripId`, `state`, `expectedAt`, `clockTime`, confort y, si tiene GPS, dónde está el ómnibus (`location`) | 15 s |
 | `/v1/stops/{id}/schedule/{day}/{H:MM}` | ~50 pasadas del horario teórico desde esa hora | 6 h |
 | `/v1/catalog/stops` | todas las paradas (~4 970) con ubicación y líneas, y `linesAvailable` | 24 h; 15 min sin líneas |
 | `/v1/news` | las 10 novedades más nuevas | 5 min |

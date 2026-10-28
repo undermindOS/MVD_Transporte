@@ -13,7 +13,8 @@
       "clockTime": "19:56",
       "accessible": true,
       "airConditioning": true,
-      "zeroEmission": false
+      "zeroEmission": false,
+      "location": {"lat": -34.909443, "lng": -56.207848}
     },
     {
       "tripId": "bus-50-1118",
@@ -26,7 +27,8 @@
       "clockTime": "19:57",
       "accessible": true,
       "airConditioning": true,
-      "zeroEmission": false
+      "zeroEmission": false,
+      "location": {"lat": -34.910614, "lng": -56.211353}
     },
     {
       "tripId": "bus-50-139",
@@ -39,7 +41,8 @@
       "clockTime": "20:01",
       "accessible": true,
       "airConditioning": true,
-      "zeroEmission": true
+      "zeroEmission": true,
+      "location": {"lat": -34.904907, "lng": -56.20582}
     },
     {
       "tripId": "sched-883-2001",
@@ -52,7 +55,8 @@
       "clockTime": "20:01",
       "accessible": false,
       "airConditioning": null,
-      "zeroEmission": null
+      "zeroEmission": null,
+      "location": null
     },
     {
       "tripId": "sched-8214-2002",
@@ -65,7 +69,8 @@
       "clockTime": "20:02",
       "accessible": false,
       "airConditioning": null,
-      "zeroEmission": null
+      "zeroEmission": null,
+      "location": null
     },
     {
       "tripId": "sched-3700-2009",
@@ -78,7 +83,8 @@
       "clockTime": "20:09",
       "accessible": false,
       "airConditioning": null,
-      "zeroEmission": null
+      "zeroEmission": null,
+      "location": null
     }
   ]
 }

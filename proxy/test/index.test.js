@@ -290,6 +290,8 @@ describe('GET /v1/stops/{id}/arrivals', () => {
       // No ImGateway in this env: comfort is unknown, arrivals still work
       airConditioning: null,
       zeroEmission: null,
+      // coordinates [lng, lat] of the GPS row, unrounded
+      location: { lat: -34.897755, lng: -56.12432 },
     });
     // Timetable-only bus: a trip id from its variant and time
     assert.equal(body.arrivals[2].tripId, 'sched-4615-1909');

@@ -79,9 +79,11 @@ export function toStop(stopId, data) {
 /**
  * `[{"linea":"117","minutos":4,"real":true,"destino":"PUNTA CARRETAS",
  *    "idEmpresa":50,"idBus":111,"variante":2779,"hora":1956,
- *    "horaDesc":"19:56","time":1792450560000,"accesibilidad":true, ...}]`
- * Without GPS (`real:false`) `idEmpresa` and `idBus` are null. Each row
- * becomes a /v1 arrival (rules.js `arrival`) dated by [fetchedAtMs].
+ *    "horaDesc":"19:56","time":1792450560000,"accesibilidad":true,
+ *    "coordinates":[-56.207848,-34.909443], ...}]`
+ * Without GPS (`real:false`) `idEmpresa`, `idBus` and `coordinates` are
+ * null. Each row becomes a /v1 arrival (rules.js `arrival`) dated by
+ * [fetchedAtMs]; a GPS row's `coordinates` ([lng, lat]) become `location`.
  * `_bus` ("companyId:busId" of a GPS bus, else null) is internal: index.js
  * matches it with the official API for comfort and drops it.
  */

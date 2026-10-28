@@ -64,6 +64,7 @@ V1Source ──▶ JSON /v1 ──▶ V1Parser ──▶ modelos (lib/models)
         └──▶ pci
       además, solo en modo directo:
         NearbyStopsService   ──▶ geoserver WFS   caja alrededor de la posición redondeada
+        StopLocationsService ──▶ geoserver WFS   paradas guardadas del Mapa, por número
         TransportNewsService ──▶ notificacion    paginado desde el último inicio guardado
 ```
 
@@ -125,7 +126,7 @@ pruebas.
 | notificacion | `api.montevideo.gub.uy/notificacion/mensajes?idApp=1&fromIdMessage=N` | novedades de Cómo Ir | ninguna | Worker (`notificacion.js`); app en modo directo | 5 s por página en el Worker, 10 s en la app |
 | pci | `pci.montevideo.gub.uy/buses/control` | qué parte de los ómnibus de cada empresa manda GPS | ninguna | Worker (`pci.js`); app en modo directo (`PciAdapter`) | 5 s en el Worker, 10 s en la app |
 | API oficial IM | `api.montevideo.gub.uy/api/transportepublico`: `/buses`, `/buses/busstops`, `/buses/linevariants`; token en `mvdapi-auth.montevideo.gub.uy` | flota con confort, catálogo de paradas, variantes de línea | OAuth2 (`IM_CLIENT_ID`, `IM_CLIENT_SECRET`) | solo `ImGateway` (`im_api.js`) | 10 s |
-| geoserver WFS | `geoserver.montevideo.gub.uy/geoserver/ows`, capa `imm:v_uptu_paradas` | proxy: CSV de toda la capa (`cod_ubic_parada,desc_linea,cod_variante`); app en modo directo: GeoJSON de una caja | ninguna | `ImGateway` (`geoserver.js`), una vez por día (a los 15 min si el armado falló); app en modo directo (`NearbyStopsService`) | 20 s en el DO, 15 s en la app |
+| geoserver WFS | `geoserver.montevideo.gub.uy/geoserver/ows`, capa `imm:v_uptu_paradas` | proxy: CSV de toda la capa (`cod_ubic_parada,desc_linea,cod_variante`); app en modo directo: GeoJSON de una caja, o de una parada por su número | ninguna | `ImGateway` (`geoserver.js`), una vez por día (a los 15 min si el armado falló); app en modo directo (`NearbyStopsService`, `StopLocationsService`) | 20 s en el DO, 15 s en la app |
 
 La API oficial hoy no da tiempos de arribo (`upcomingbuses` viene vacío): por
 eso los arribos salen de transporteRest y la API oficial solo agrega el
@@ -157,6 +158,11 @@ Qué cambia para la persona que usa una versión sin proxy:
   con `MvdApiService.usesProxy`).
 - «Paradas cercanas» pide a geoserver una caja alrededor de la posición
   redondeada (sección 8).
+- Para ubicar las paradas guardadas en el Mapa, la app le pide a geoserver
+  la capa `imm:v_uptu_paradas` filtrada por el número de la parada
+  (`CQL_FILTER`), porque sin proxy no hay catálogo. Es un pedido por cada
+  parada que todavía no tiene ubicación, y la ubicación queda guardada en el
+  teléfono (sección 8).
 - Novedades pagina desde el último inicio guardado (`news_from_id`), con su
   propio pedido (`TransportNewsService._fetchPage`). `DirectSource.news()`
   empieza siempre en 0: es lo que comparan las pruebas del contrato con el
@@ -228,9 +234,9 @@ esta sección.
 | Ruta | Cuerpo 200 | Quién la usa en la app | `Cache-Control` en 200 | Errores propios |
 |---|---|---|---|---|
 | `GET /v1/stops/{id}` | `StopResponse` | «Agregar parada» con un número escrito, «Agregar ruta», `healPlaceholderStops` | `public, max-age=86400`; `public, max-age=300` si la metadata de `ImGateway` falló, tardó más de 2 s o está incompleta | 404 `stop_not_found` (3600 s), 404 `not_found`, 502, 504 |
-| `GET /v1/stops/{id}/arrivals` | `ArrivalsResponse` | tarjetas de Mis paradas y Rutas, «Estoy esperando», avisos de fondo, widget, HACIA de respaldo en «Agregar ruta» | `public, max-age=15` | 404 `stop_not_found` (3600 s), 404 `not_found`, 502, 504 |
+| `GET /v1/stops/{id}/arrivals` | `ArrivalsResponse` | tarjetas de Mis paradas y Rutas, «Estoy esperando», avisos de fondo, widget, HACIA de respaldo en «Agregar ruta», ómnibus del Mapa | `public, max-age=15` | 404 `stop_not_found` (3600 s), 404 `not_found`, 502, 504 |
 | `GET /v1/stops/{id}/schedule/{day}/{H:MM}` | `ScheduleResponse` | Horarios | `public, max-age=21600` | 400 `bad_request`, 404 `not_found`, 404 `stop_not_found`, 502, 504 |
-| `GET /v1/catalog/stops` | `CatalogStopsResponse` | «Buscar por calles», «Paradas cercanas» | `public, max-age=86400`; `public, max-age=900` con `linesAvailable: false` | 503 `not_configured`, 503 `upstream_busy` con `Retry-After`, 502, 504 |
+| `GET /v1/catalog/stops` | `CatalogStopsResponse` | «Buscar por calles», «Paradas cercanas», ubicación de las paradas guardadas en el Mapa | `public, max-age=86400`; `public, max-age=900` con `linesAvailable: false` | 503 `not_configured`, 503 `upstream_busy` con `Retry-After`, 502, 504 |
 | `GET /v1/news` | `NewsResponse` | Novedades | `public, max-age=300` | 502, 504 |
 | `GET /v1/status/gps` | `GpsStatusResponse` | aviso «Datos GPS parciales» | `public, max-age=60` | 502 (también con `[]`, algo que no es lista o ningún elemento válido), 504 |
 | cualquiera | – | – | – | 400 `bad_request` (query string), 405, 429, 404 `not_found`, 500 `internal_error` |
@@ -299,8 +305,9 @@ empresa y número de ómnibus.
 
 ### ArrivalsResponse
 
-Para las tarjetas, «Estoy esperando», los avisos de fondo y el widget. Golden
-`responses/arrivals_574.json`, recortado a 2 de sus 6 elementos:
+Para las tarjetas, «Estoy esperando», los avisos de fondo, el widget y los
+ómnibus del Mapa. Golden `responses/arrivals_574.json`, recortado a 2 de sus
+6 elementos:
 
 ```json
 {
@@ -318,7 +325,8 @@ Para las tarjetas, «Estoy esperando», los avisos de fondo y el widget. Golden
       "clockTime": "19:56",
       "accessible": true,
       "airConditioning": true,
-      "zeroEmission": false
+      "zeroEmission": false,
+      "location": {"lat": -34.909443, "lng": -56.207848}
     },
     {
       "tripId": "sched-883-2001",
@@ -331,7 +339,8 @@ Para las tarjetas, «Estoy esperando», los avisos de fondo y el widget. Golden
       "clockTime": "20:01",
       "accessible": false,
       "airConditioning": null,
-      "zeroEmission": null
+      "zeroEmission": null,
+      "location": null
     }
   ]
 }
@@ -339,12 +348,12 @@ Para las tarjetas, «Estoy esperando», los avisos de fondo y el widget. Golden
 
 La fila cruda de transporteRest del primer elemento
 (`upstream/transporte_rest/arrivals_574.json`), sin los campos que la regla no
-lee (`coordinates`, `parada_actual`, `tipoAccesibilidad`, `dia_anterior`):
+lee (`parada_actual`, `tipoAccesibilidad`, `dia_anterior`):
 
 ```json
-{"time": 1792450560000, "destino": "PUNTA CARRETAS", "linea": "117", "accesibilidad": true,
- "hora": 1956, "variante": 2779, "minutos": 4, "real": true, "idBus": 111, "idEmpresa": 50,
- "horaDesc": "19:56"}
+{"time": 1792450560000, "coordinates": [-56.207848, -34.909443], "destino": "PUNTA CARRETAS",
+ "linea": "117", "accesibilidad": true, "hora": 1956, "variante": 2779, "minutos": 4,
+ "real": true, "idBus": 111, "idEmpresa": 50, "horaDesc": "19:56"}
 ```
 
 | Campo | Tipo | Regla (detalle en la regla `arrival`, sección 5) |
@@ -362,6 +371,7 @@ lee (`coordinates`, `parada_actual`, `tipoAccesibilidad`, `dia_anterior`):
 | `accessible` | booleano | `accesibilidad === true` |
 | `airConditioning` | `true` o `null` | flota de la API oficial: `thermalConfort` igual a `"Aire Acondicionado"`. La API no distingue «sin aire» de «sin datos», así que nunca viene `false`. |
 | `zeroEmission` | booleano o `null` | flota de la API oficial: `"Cero emisiones"` → `true`; otro valor que no sea vacío ni `"Sin datos"` → `false`; si no, `null` |
+| `location` | `{lat, lng}` o `null` | `coordinates` de una fila con `real === true`, que transporteRest manda como `[lng, lat]`: `{lat: coordinates[1], lng: coordinates[0]}`, sin redondear. Si no es una posición posible, `null` (ver abajo) |
 
 - Se descarta la fila sin `linea` o cuyo `minutos` no es entero.
 - También se descarta la fila cuya hora esperada (`time`, o `fetchedAt` más
@@ -374,8 +384,24 @@ lee (`coordinates`, `parada_actual`, `tipoAccesibilidad`, `dia_anterior`):
   `idBus`). El Worker le pide a `ImGateway` `/vehicles?ids=50:111,50:1118,…` y
   espera como mucho 2 s. Si falla, tarda o no hay binding, el confort va en
   `null` y la respuesta sale igual.
+- **Posición.** `location` va en `null` si la fila no tiene `real === true`,
+  si `coordinates` no es una lista de al menos dos elementos, si alguno de
+  los dos primeros no es un número JSON finito (un texto como `"-56.2"`
+  tampoco sirve), si los dos son 0, o si la latitud pasa de ±90 o la
+  longitud de ±180. De una lista más larga se usan los dos primeros. Una
+  posición imposible no descarta la fila: solo `location` va en `null`.
+  - El contrato no tiene una caja de Montevideo: el Mapa descarta las
+    posiciones que caen fuera de su mapa base.
+  - El ómnibus se reconoce por `tripId` (`bus-{idEmpresa}-{idBus}`), igual
+    en todas las paradas. Una fila con `real: true` sin `idBus` puede traer
+    posición con un `tripId` `sched-…`, que vale solo para esa parada.
+  - transporteRest no dice de cuándo es la posición: la única hora es
+    `fetchedAt`.
+  - El lector (`V1Parser`) no exige `location`: si falta o no es
+    `{lat, lng}` con números (un proxy anterior), va en `null` y el arribo
+    queda.
 - No están en la forma pública: `realTime`, `scheduledTime`, `companyId`,
-  `location`, `accessibilityType` ni `vehicle`.
+  `accessibilityType` ni `vehicle`.
 
 ### ScheduleResponse
 
@@ -403,7 +429,8 @@ a partir de las 8:05; las dos primeras:
 
 ### CatalogStopsResponse
 
-Para «Buscar por calles» y «Paradas cercanas». Golden
+Para «Buscar por calles», «Paradas cercanas» y, con proxy, la ubicación de
+las paradas guardadas en el Mapa. Golden
 `responses/catalog_sample.json`, 4 paradas; dos de ellas:
 
 ```json
@@ -519,7 +546,7 @@ Para el aviso «Datos GPS parciales». Golden `responses/gps_ok.json`:
 
 Cada regla está dos veces, en `proxy/src/rules.js` y en
 `lib/services/api/contract_rules.dart`. Las dos suites corren todos los
-archivos de `proxy/contract/v1/vectors/` (9 archivos, 148 casos).
+archivos de `proxy/contract/v1/vectors/` (9 archivos, 160 casos).
 
 | Regla | Definición | Vectores |
 |---|---|---|
@@ -527,7 +554,7 @@ archivos de `proxy/contract/v1/vectors/` (9 archivos, 148 casos).
 | `trimText` | Quita `^[\s\u0085]+\|[\s\u0085]+$`. U+0085 se agrega porque el `trim` de JS lo deja y el de Dart lo saca. Los espacios del medio no se tocan. | `text_trim.json` |
 | `compareLines` | Primero el número inicial como entero; una línea con número va antes que una sin número; los empates, por unidades de código UTF-16 (`<` y `>` en JS, `compareTo` en Dart), nunca `localeCompare`. `["124 SD","124","CE1","21","D10","D9","104","M-A","PA"]` → `["21","104","124","124 SD","CE1","D10","D9","M-A","PA"]`. | `line_order.json` |
 | `stopName` | `[calle, esquina]` recortados con `trimText`, sin las partes vacías, unidos con `" y "`; `null` si no queda ninguna. | `stop_name.json` |
-| `arrival` | Una fila de `siguientesParada` → un elemento de `arrivals`, o `null`. Ver la tabla de ArrivalsResponse. `real` cuenta solo si es exactamente `true`; `time` cuenta solo si es un número JSON. Una hora esperada fuera de `±8.64e15` ms → `null`. `destino` nunca se recorta. `airConditioning` y `zeroEmission` salen en `null`: el confort lo agrega el Worker después. | `arrival.json` |
+| `arrival` | Una fila de `siguientesParada` → un elemento de `arrivals`, o `null`. Ver la tabla de ArrivalsResponse. `real` cuenta solo si es exactamente `true`; `time` cuenta solo si es un número JSON. Una hora esperada fuera de `±8.64e15` ms → `null`. `destino` nunca se recorta. `location`: `coordinates` `[lng, lat]` → `{lat, lng}` sin redondear, solo con `real === true`, dos números JSON finitos, no los dos 0, `\|lat\| ≤ 90` y `\|lng\| ≤ 180`; si no, `null`. `airConditioning` y `zeroEmission` salen en `null`: el confort lo agrega el Worker después. | `arrival.json` |
 | `newsLink` | Sobre el texto recortado, `^(https?)://([^/?#]+)(.*)$` sin distinguir mayúsculas: esquema y host en minúsculas, el resto igual. Cualquier otra cosa (`""`, `"null"`, `ftp:`, sin host) → `null`. | `news_link.json` |
 | `gpsOperator` | `percent = clamp(round(valor), 0, 100)`, `partial = percent < 70` (69,5 → 70 → `false`). | `gps_status.json` |
 | `stopId` | Válido si y solo si `1 ≤ id ≤ 9999999`. Un id inválido no genera ningún pedido. | `stop_id.json` |
@@ -728,8 +755,22 @@ aparece cada uno, en [09-pantallas.md](09-pantallas.md).
   con la posición exacta (`NearbyStopsService.buildUri`,
   `boxHalfSideMeters`). Eso hace verdadera la frase «área aproximada» de
   [docs/privacy-policy.md](../privacy-policy.md).
+- Para el Mapa, una versión sin proxy le pide a geoserver cada parada
+  guardada que todavía no tiene ubicación, por su número
+  (`CQL_FILTER=cod_ubic_parada=N`), sin caja y sin coordenadas
+  (`StopLocationsService`). Con proxy, la ubicación sale del catálogo
+  (`/v1/catalog/stops`, el mismo de «Buscar por calles»).
 - Los demás pedidos llevan solo números de parada. Las paradas, las rutas, lo
   leído en Novedades y los avisos guardados no salen del teléfono.
+- **Las posiciones de los ómnibus bajan; de la persona no sube nada.**
+  `arrivals[].location` es la posición de un vehículo público, la que publica
+  la Intendencia, y viene con los arribos que la app ya pide: el pedido sigue
+  llevando solo el número de parada.
+- **El mapa base viene dentro de la app** (`assets/map/`): moverlo o acercarlo
+  no le pide nada a ningún servidor. No hay servidor de teselas, ni del
+  proyecto ni de terceros.
+- **El Mapa no usa la ubicación del teléfono.** Dibuja las paradas guardadas
+  y los ómnibus que vienen a ellas, nada más.
 - **Logs del proxy apagados.** `proxy/wrangler.jsonc` no tiene bloque
   `observability`, y la regla es no agregarlo: Workers Logs guardaría cada
   pedido con la ruta (que lleva el número de parada) y la IP.
