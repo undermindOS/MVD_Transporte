@@ -10,7 +10,7 @@
     "location es la posición del ómnibus con GPS: coordinates viene como [lng, lat] y sale como {lat: coordinates[1], lng: coordinates[0]}, sin redondear. Solo con real exactamente true; si no, null.",
     "location es null si coordinates no es una lista de al menos dos elementos, si alguno de los dos primeros no es un número JSON finito (un texto no sirve), si los dos son 0, o si |lat| > 90 o |lng| > 180. De una lista más larga se usan los dos primeros. Los bordes ±90 y ±180 valen. No hay caja de Montevideo: el mapa de la app descarta lo que cae fuera de su mapa base.",
     "Una posición imposible nunca descarta la fila: solo location va en null. Una fila real sin idBus puede traer location con un tripId sched-….",
-    "Ninguna coordenada de estos vectores es entera, salvo el [0, 0] que da null: así los valores también sirven para un golden, donde el modelo de Dart los pasa a double y canonicalJson distingue 5 de 5.0."
+    "Toda coordenada de estos vectores se escribe con punto decimal, salvo el [0, 0] que da null: un valor entero como 90 se escribe 90.0, así Dart lo lee como double (90 lo leería como int) y el valor también sirve para un golden, donde el modelo de Dart lo pasa a double y canonicalJson distingue 5 de 5.0. En JS 90 y 90.0 son el mismo número: la diferencia solo se ve en Dart."
   ],
   "cases": [
     {

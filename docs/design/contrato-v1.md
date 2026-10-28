@@ -397,6 +397,9 @@ lee (`parada_actual`, `tipoAccesibilidad`, `dia_anterior`):
     posición con un `tripId` `sched-…`, que vale solo para esa parada.
   - transporteRest no dice de cuándo es la posición: la única hora es
     `fetchedAt`.
+  - El lector (`V1Parser`) no exige `location`: si falta o no es
+    `{lat, lng}` con números (un proxy anterior), va en `null` y el arribo
+    queda.
 - No están en la forma pública: `realTime`, `scheduledTime`, `companyId`,
   `accessibilityType` ni `vehicle`.
 
