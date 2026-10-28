@@ -36,6 +36,10 @@ class BusStop extends HiveObject {
   @HiveField(9, defaultValue: AlertSchedule.dayMinutes)
   int alertToMinute;
 
+  /// 0.0, 0.0 means the location is unknown: stops saved before the Mapa,
+  /// or typed by number, until StopLocationsService fills them.
+  bool get hasLocation => latitude != 0 || longitude != 0;
+
   AlertSchedule get schedule => AlertSchedule(
       days: alertDays, fromMinute: alertFromMinute, toMinute: alertToMinute);
 

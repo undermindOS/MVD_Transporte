@@ -117,9 +117,23 @@ class NearbyStopsService {
   }
 
   /// Direct mode: the stops of the WFS box around the point.
-  static Future<List<CatalogStop>?> _stopsInBox(double lat, double lng) async {
+  static Future<List<CatalogStop>?> _stopsInBox(double lat, double lng) =>
+      _getStops(buildUri(lat, lng));
+
+  /// Direct mode only: the stop numbered [stopId], asked by its number with
+  /// no position at all, to place a saved stop on the Mapa. Null when
+  /// geoserver does not know it or cannot be reached. Never through the
+  /// proxy: a proxy build asks no city host.
+  static Future<CatalogStop?> fetchStop(int stopId) async {
+    if (MvdApiService.usesProxy) return null;
+    final stops = await _getStops(buildStopUri(stopId));
+    return stops?.where((s) => s.id == stopId).firstOrNull;
+  }
+
+  /// A WFS GetFeature as catalog stops; null on network/server error.
+  static Future<List<CatalogStop>?> _getStops(Uri uri) async {
     try {
-      final response = await http.get(buildUri(lat, lng),
+      final response = await http.get(uri,
           headers: const {'Accept': 'application/json'}).timeout(_timeout);
 
       if (response.statusCode != 200) {
@@ -131,7 +145,8 @@ class NearbyStopsService {
           jsonDecode(utf8.decode(response.bodyBytes)));
       return items == null ? null : V1Parser.catalog({'stops': items})?.stops;
     } catch (e) {
-      // Not the error text: it can hold the URL, and so the box
+      // Not the error text: it can hold the URL, and so the box or the
+      // stop number
       debugPrint('❌ WFS error: ${e.runtimeType}');
       return null;
     }
@@ -162,6 +177,25 @@ class NearbyStopsService {
           '${f(centerLng + dLng)},${f(centerLat + dLat)},EPSG:4326',
     });
   }
+
+  /// GetFeature for one stop by its number (`CQL_FILTER`, a GeoServer
+  /// extension): no BBOX and no position. One feature is enough, as the
+  /// "stop × variant" features of a stop share one point (so in every
+  /// capture), and only the number and the point are asked for, to keep
+  /// the answer small.
+  @visibleForTesting
+  static Uri buildStopUri(int stopId) =>
+      Uri.parse(_wfsUrl).replace(queryParameters: {
+        'service': 'wfs',
+        'version': '2.0.0',
+        'request': 'GetFeature',
+        'typename': 'imm:v_uptu_paradas',
+        'outputFormat': 'application/json',
+        'srsName': 'EPSG:4326',
+        'propertyName': 'cod_ubic_parada,the_geom',
+        'CQL_FILTER': 'cod_ubic_parada=$stopId',
+        'count': '1',
+      });
 
   /// The stops of [catalog] within [radius] of the point, nearest first —
   /// the proxy's catalog and the WFS box alike.
