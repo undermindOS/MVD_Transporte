@@ -94,7 +94,16 @@ abstract final class V1Parser {
       accessible: item['accessible'] == true,
       airConditioning: _bool(item['airConditioning']),
       zeroEmission: _bool(item['zeroEmission']),
+      location: _location(item['location']),
     );
+  }
+
+  // Never a reason to skip the arrival: an older proxy has no `location`
+  static ({double lat, double lng})? _location(Object? value) {
+    if (value is! Map) return null;
+    final lat = value['lat'], lng = value['lng'];
+    if (lat is! num || lng is! num) return null;
+    return (lat: lat.toDouble(), lng: lng.toDouble());
   }
 
   /// `GET /v1/stops/{id}/schedule/{day}/{H:MM}`, in the order given

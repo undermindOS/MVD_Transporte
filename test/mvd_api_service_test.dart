@@ -169,6 +169,12 @@ void main() {
       expect(bus.airConditioning, isNull);
     });
 
+    test('an older proxy sends no location: every arrival stays, unplaced',
+        () {
+      expect(arrivals, hasLength(6));
+      expect(arrivals.map((a) => a.location), everyElement(isNull));
+    });
+
     test('a body of the wrong shape is a failure, a bad item is skipped',
         () {
       expect(V1Parser.arrivals([], 574), isNull);
@@ -192,6 +198,52 @@ void main() {
           [('2', null)]);
       // No fetchedAt: now
       expect(partial.fetchedAt, DateTime.utc(2026, 10, 19, 23, 13));
+    });
+  });
+
+  group('arrival location', () {
+    // The one GPS arrival of a body whose `location` is [location]
+    BusArrival? parse(Object? location) => V1Parser.arrivals({
+          'arrivals': [
+            {
+              'tripId': 'bus-50-111',
+              'line': '117',
+              'state': 'live',
+              'etaMinutes': 4,
+              'expectedAt': '2026-10-19T22:56:00.000Z',
+              'clockTime': '19:56',
+              'location': location,
+            },
+          ]
+        }, 574)!
+            .arrivals
+            .singleOrNull;
+
+    test('reads lat and lng as given, as doubles', () {
+      expect(parse({'lat': -34.909443, 'lng': -56.207848})!.location,
+          (lat: -34.909443, lng: -56.207848));
+      final whole = parse({'lat': -34, 'lng': -56})!.location!;
+      expect(whole, (lat: -34.0, lng: -56.0));
+      expect(whole.lat, isA<double>());
+      expect(whole.lng, isA<double>());
+    });
+
+    test('anything else is no location, and the arrival stays', () {
+      for (final bad in <Object?>[
+        null,
+        [-56.207848, -34.909443],
+        {'lat': '-34.909443', 'lng': '-56.207848'},
+        {'lat': -34.909443},
+        {'lat': -34.909443, 'lng': null},
+        {'latitude': -34.909443, 'longitude': -56.207848},
+        'garbage',
+        true,
+      ]) {
+        final arrival = parse(bad);
+        expect(arrival, isNotNull, reason: '$bad');
+        expect(arrival!.location, isNull, reason: '$bad');
+        expect(arrival.tripId, 'bus-50-111');
+      }
     });
   });
 
