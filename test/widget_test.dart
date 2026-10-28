@@ -9,6 +9,8 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
 import 'package:local_auth_platform_interface/local_auth_platform_interface.dart';
 import 'package:url_launcher_platform_interface/link.dart';
 import 'package:url_launcher_platform_interface/url_launcher_platform_interface.dart';
@@ -16,8 +18,10 @@ import 'package:url_launcher_platform_interface/url_launcher_platform_interface.
 import 'package:stm_app/main.dart';
 import 'package:stm_app/models/bus_stop.dart';
 import 'package:stm_app/services/cache_service.dart';
+import 'package:stm_app/services/mvd_api_service.dart';
 import 'package:stm_app/services/official_sites.dart';
 import 'package:stm_app/ui/lock_screen.dart';
+import 'package:stm_app/ui/map/mapa_page.dart';
 import 'package:stm_app/ui/stops_page.dart';
 
 import 'support/layout.dart';
@@ -48,15 +52,16 @@ void main() {
     await hiveDir.delete(recursive: true);
   });
 
-  testWidgets('opens on Mis paradas with two native tabs',
+  testWidgets('opens on Mis paradas with three native tabs',
       (WidgetTester tester) async {
     await tester.pumpWidget(const MiTransporteMVDApp());
     await tester.pump();
 
     expect(find.byType(NavigationBar), findsOneWidget);
-    expect(find.byType(NavigationDestination), findsNWidgets(2));
+    expect(find.byType(NavigationDestination), findsNWidgets(3));
     expect(find.text('MIS PARADAS'), findsOneWidget); // the header sign
     expect(find.text('Mis paradas'), findsOneWidget); // nav label
+    expect(find.text('Mapa'), findsOneWidget);
     expect(find.text('Servicios'), findsOneWidget);
     expect(find.text('SIN PARADAS'), findsOneWidget);
     expect(find.byTooltip('Info'), findsOneWidget);
@@ -88,6 +93,26 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(seconds: 1));
     expect(polling(), isTrue);
+  });
+
+  testWidgets('Mapa is not built until opened, then kept',
+      (WidgetTester tester) async {
+    await tester.pumpWidget(const MiTransporteMVDApp());
+    await tester.pump();
+    final mapa = find.byType(MapaPage, skipOffstage: false);
+    expect(mapa, findsNothing);
+
+    await tester.tap(find.text('Mapa'));
+    await tester.pump();
+    expect(find.text('MAPA'), findsOneWidget); // the header sign
+    expect(mapa, findsOneWidget);
+    // No saved stops: the sign, and no basemap
+    expect(find.text('SIN PARADAS'), findsWidgets);
+
+    await tester.tap(find.text('Servicios'));
+    await tester.pump();
+    expect(mapa, findsOneWidget);
+    expect(tester.widget<MapaPage>(mapa).active, isFalse);
   });
 
   testWidgets('Servicios lists the official sites',
@@ -211,6 +236,70 @@ void main() {
     cycle();
     await tester.pump();
     expect(auth.calls, 2);
+  });
+
+  // Last: its Hive writes are not awaited, and a later test that awaits
+  // one on the stops box would wait for them forever
+  testWidgets('Mapa polls only while it is on screen',
+      (WidgetTester tester) async {
+    final arrivals = <Uri>[];
+    final client = MockClient((request) async {
+      if (request.url.path.startsWith('/transporteRest/siguientesParada/')) {
+        arrivals.add(request.url);
+      }
+      return http.Response('[]', 200);
+    });
+    // Not awaited, as in test/stops_page_test.dart: let the IO finish
+    CacheService.saveStop(BusStop(
+        id: 574,
+        name: 'SAN JOSE y ANDES',
+        latitude: -34.90739436,
+        longitude: -56.198255));
+    await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 100)));
+    addTearDown(MvdApiService.resetLatestBoards);
+
+    await http.runWithClient(() async {
+      await tester.pumpWidget(const MiTransporteMVDApp());
+      await tester.pump();
+      bool polling() => tester
+          .widget<MapaPage>(find.byType(MapaPage, skipOffstage: false))
+          .active;
+      // Mis paradas asked once
+      expect(arrivals, hasLength(1));
+
+      // Just refreshed by Mis paradas: not asked again
+      await tester.tap(find.text('Mapa'));
+      await tester.pump();
+      expect(polling(), isTrue);
+      expect(arrivals, hasLength(1));
+      await tester.pump(StopsPage.autoRefreshInterval);
+      expect(arrivals, hasLength(2));
+
+      // Another tab
+      await tester.tap(find.text('Servicios'));
+      await tester.pump();
+      expect(polling(), isFalse);
+      await tester.pump(StopsPage.autoRefreshInterval * 3);
+      expect(arrivals, hasLength(2));
+      await tester.tap(find.text('Mapa'));
+      await tester.pump();
+      expect(polling(), isTrue);
+
+      // A page on top
+      await tester.tap(find.byTooltip('Info'));
+      await tester.pump();
+      await tester.pump(const Duration(seconds: 1));
+      expect(polling(), isFalse);
+      final asked = arrivals.length;
+      await tester.pump(StopsPage.autoRefreshInterval * 3);
+      expect(arrivals, hasLength(asked));
+      await tester.pageBack();
+      await tester.pump();
+      await tester.pump(const Duration(seconds: 1));
+      expect(polling(), isTrue);
+    }, () => client);
+    CacheService.deleteStop(574);
   });
 }
 

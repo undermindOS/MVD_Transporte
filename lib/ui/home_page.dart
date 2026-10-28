@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../services/official_sites.dart';
 import 'app_lock.dart';
 import 'info_page.dart';
+import 'map/mapa_page.dart';
 import 'services_page.dart';
 import 'stops_page.dart';
 import 'widgets/pixel_icon.dart';
@@ -30,14 +31,15 @@ class _TabDef {
 // Main page
 // ---------------------------------------------------------------------------
 
-/// Native tabs only. Mi STM, Recarga, Cómo Ir and Avisos are official sites
-/// and open in the system browser (see [OfficialSite]).
+/// Native tabs only: Mis paradas, Mapa and Servicios. Mi STM, Recarga, Cómo
+/// Ir and Avisos are official sites and open in the system browser (see
+/// [OfficialSite]).
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
 
-  /// Pages pushed over the home page (Horarios, Info): Mis paradas stops
-  /// polling while one covers it. Registered in `main.dart`. A dialog or a
-  /// sheet leaves the board in sight, so only full pages count.
+  /// Pages pushed over the home page (Horarios, Info): Mis paradas and the
+  /// Mapa stop polling while one covers them. Registered in `main.dart`. A
+  /// dialog or a sheet leaves the board in sight, so only full pages count.
   static final routeObserver = RouteObserver<PageRoute<dynamic>>();
 
   @override
@@ -45,16 +47,29 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> with RouteAware {
-  int _currentIndex = 0;
+  // Indexes into [_tabs] and the IndexedStack
+  static const _stopsTab = 0;
+  static const _mapaTab = 1;
 
-  // A page pushed on top (Horarios, Info) hides Mis paradas
+  int _currentIndex = _stopsTab;
+
+  // A page pushed on top (Horarios, Info) hides the tabs
   bool _covered = false;
+
+  // The Mapa is built on its first visit, then kept (camera included):
+  // nothing of it loads or polls before
+  bool _mapaOpened = false;
 
   // --- Tab definitions (order matters) ---
   static const List<_TabDef> _tabs = [
     _TabDef(
       label: 'Mis paradas',
       icon: PixelGlyphs.bus,
+    ),
+    // No subtitle: the map keeps the room
+    _TabDef(
+      label: 'Mapa',
+      icon: PixelGlyphs.streets,
     ),
     _TabDef(
       label: 'Servicios',
@@ -112,6 +127,8 @@ class _HomePageState extends State<HomePage> with RouteAware {
   Widget build(BuildContext context) {
     // Under the lock screen (see AppLock) the page stays built, out of sight
     final locked = AppLock.of(context).locked;
+    // Polls only while on screen
+    final mapaActive = _currentIndex == _mapaTab && !_covered && !locked;
 
     return Scaffold(
       appBar: buildTimbreAppBar(
@@ -132,17 +149,27 @@ class _HomePageState extends State<HomePage> with RouteAware {
         children: [
           StopsPage(
             // Polls only while on screen
-            active: _currentIndex == 0 && !_covered && !locked,
+            active: _currentIndex == _stopsTab && !_covered && !locked,
             onOpenStopInComoIr: (stopId) =>
                 _openInBrowser(OfficialSite.comoIrStop(stopId)),
           ),
+          if (_mapaOpened)
+            // The IndexedStack keeps a hidden tab's tickers running
+            TickerMode(
+              enabled: mapaActive,
+              child: MapaPage(active: mapaActive),
+            )
+          else
+            const SizedBox.shrink(),
           ServicesPage(onOpen: (site) => _openInBrowser(site.uri)),
         ],
       ),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _currentIndex,
-        onDestinationSelected: (index) =>
-            setState(() => _currentIndex = index),
+        onDestinationSelected: (index) => setState(() {
+          _currentIndex = index;
+          if (index == _mapaTab) _mapaOpened = true;
+        }),
         destinations: _tabs
             .map((tab) => NavigationDestination(
                   icon: PixelIcon(tab.icon),

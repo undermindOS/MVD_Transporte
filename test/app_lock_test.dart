@@ -27,7 +27,9 @@ import 'package:stm_app/services/device_auth.dart';
 import 'package:stm_app/ui/app_lock.dart';
 import 'package:stm_app/ui/home_page.dart';
 import 'package:stm_app/ui/info_page.dart';
+import 'package:stm_app/services/mvd_api_service.dart';
 import 'package:stm_app/ui/lock_screen.dart';
+import 'package:stm_app/ui/map/mapa_page.dart';
 import 'package:stm_app/ui/news_list.dart';
 import 'package:stm_app/ui/stops_page.dart';
 
@@ -387,6 +389,58 @@ void main() {
       await tester.pump();
       await tester.pump();
       expect(polling(tester), isTrue);
+      expect(arrivals, hasLength(requested + 1));
+    }, () => client);
+    CacheService.deleteStop(574);
+  });
+
+  testWidgets('the Mapa requests nothing while locked', (tester) async {
+    final arrivals = <Uri>[];
+    final client = MockClient((request) async {
+      if (request.url.path.startsWith('/transporteRest/siguientesParada/')) {
+        arrivals.add(request.url);
+      }
+      return http.Response('[]', 200);
+    });
+    // Not awaited, as in test/stops_page_test.dart: let the IO finish
+    CacheService.saveStop(BusStop(
+        id: 574,
+        name: 'SAN JOSE y ANDES',
+        latitude: -34.90739436,
+        longitude: -56.198255));
+    await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 100)));
+    lockSetting(true);
+    addTearDown(() {
+      MvdApiService.resetLatestBoards();
+      MapaPage.clock = DateTime.now;
+    });
+    bool mapaPolling() => tester
+        .widget<MapaPage>(find.byType(MapaPage, skipOffstage: false))
+        .active;
+
+    await http.runWithClient(() async {
+      await pumpApp(tester);
+      await tester.tap(find.text('Mapa'));
+      await tester.pump();
+      expect(mapaPolling(), isTrue);
+      final requested = arrivals.length;
+      expect(requested, greaterThan(0));
+
+      auth.autoAnswer = null;
+      await tripToBackground(tester);
+      await tester.pump(StopsPage.autoRefreshInterval * 3);
+      expect(find.byType(LockScreen), findsOneWidget);
+      expect(mapaPolling(), isFalse);
+      // Not even on the way back
+      expect(arrivals, hasLength(requested));
+
+      // Unlocked minutes later: refreshed at once
+      MapaPage.clock = () => DateTime.now().add(const Duration(minutes: 6));
+      auth.answer(true);
+      await tester.pump();
+      await tester.pump();
+      expect(mapaPolling(), isTrue);
       expect(arrivals, hasLength(requested + 1));
     }, () => client);
     CacheService.deleteStop(574);

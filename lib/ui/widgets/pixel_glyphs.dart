@@ -22,6 +22,23 @@ abstract final class PixelGlyphs {
     '............',
   ]);
 
+  /// Two streets crossing, a bus on its way: the Mapa tab. Not [map],
+  /// which opens Cómo Ir, and not a pin: a stop is always [stop].
+  static const streets = PixelGlyph([
+    '...#....#...',
+    '...#....#...',
+    '...#....#...',
+    '####....####',
+    '............',
+    '.###........',
+    '.###........',
+    '............',
+    '####....####',
+    '...#....#...',
+    '...#....#...',
+    '...#....#...',
+  ]);
+
   /// Info.
   static const info = PixelGlyph([
     '............',
