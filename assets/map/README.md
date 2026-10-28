@@ -23,8 +23,10 @@ colores del flavor (nada de ámbar).
 - `lib/services/map/basemap.dart` (`Basemap.load`) copia el archivo, una sola vez, del paquete de
   la app a `getApplicationCacheDirectory()/map/mvd-20261028.pmtiles`: primero a un `.tmp` y después
   lo renombra. Como el nombre lleva la versión, si el archivo existe está completo. Borra cualquier
-  otro `*.pmtiles` o `*.tmp` de esa carpeta. Es la carpeta de caché a propósito: no entra en los
-  respaldos de iCloud ni de Android, y si el sistema la vacía, la app vuelve a copiar el archivo.
+  otro `*.pmtiles` o `*.tmp` de esa carpeta. Si dos cargas se pisan (un «Reintentar», la pestaña que
+  se vuelve a abrir mientras carga), comparten la misma copia. Es la carpeta de caché a propósito:
+  no entra en los respaldos de iCloud ni de Android, y si el sistema la vacía, la app vuelve a copiar
+  el archivo.
 - `lib/services/map/local_pmtiles_provider.dart` lee las teselas de esa copia y las entrega
   todavía comprimidas: `flutter_map_vector_tiles` las descomprime en sus isolates.
 - Los bordes del mapa (`Basemap.bounds`) salen del encabezado del `.pmtiles`, no de una constante.

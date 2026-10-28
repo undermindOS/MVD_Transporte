@@ -99,11 +99,17 @@ class Basemap {
     return vt.StyleAttribution.parse(attribution).text;
   }
 
+  /// Copies in progress, by target path.
+  static final _copies = <String, Future<String>>{};
+
   /// The path of the archive copy in `<cacheDirectory>/map/`, copied from
   /// [bundle] when it is not there. The copy is written aside and renamed,
   /// and its name carries the version: a file that exists is complete.
   /// Other `*.pmtiles` (older extracts) and `*.tmp` (interrupted copies)
   /// in that folder are deleted.
+  ///
+  /// Overlapping calls (a retry, a remount while a load is pending) share
+  /// one copy: two would delete and rename each other's `.tmp`.
   @visibleForTesting
   static Future<String> ensureArchive({
     required AssetBundle bundle,
@@ -113,6 +119,25 @@ class Basemap {
     final dir = Directory('${(await cacheDirectory()).path}$sep$_cacheFolder');
     final name = archiveAsset.substring(archiveAsset.lastIndexOf('/') + 1);
     final file = File('${dir.path}$sep$name');
+    final pending = _copies[file.path];
+    if (pending != null) return pending;
+    final copy = _copy(bundle, dir, file, name);
+    _copies[file.path] = copy;
+    try {
+      return await copy;
+    } finally {
+      // Also after a failure: the next call tries again
+      _copies.remove(file.path);
+    }
+  }
+
+  static Future<String> _copy(
+    AssetBundle bundle,
+    Directory dir,
+    File file,
+    String name,
+  ) async {
+    final sep = Platform.pathSeparator;
     await dir.create(recursive: true);
     await for (final entity in dir.list(followLinks: false)) {
       if (entity is! File) continue;

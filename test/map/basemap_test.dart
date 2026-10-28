@@ -1,8 +1,10 @@
 // Basemap.load with a fake asset bundle and temp cache directories: the
-// archive copy (first copy, reuse, version change, leftovers, a path with
-// a space), the style compile and the layer it hands out. No network, no
-// bundled asset (those are checked in basemap_assets_test.dart).
+// archive copy (first copy, reuse, version change, leftovers, overlapping
+// calls, a retry, a path with a space), the style compile and the layer it
+// hands out. No network, no bundled asset (those are checked in
+// basemap_assets_test.dart).
 
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
@@ -73,6 +75,23 @@ String _style({Object? attribution = '© OpenStreetMap'}) => jsonEncode({
     },
   ],
 });
+
+/// Holds every load until [release], so a copy stays in progress.
+class _HeldBundle extends _Bundle {
+  _HeldBundle(super.files);
+
+  final loading = Completer<void>();
+  final _released = Completer<void>();
+
+  void release() => _released.complete();
+
+  @override
+  Future<ByteData> load(String key) async {
+    if (!loading.isCompleted) loading.complete();
+    await _released.future;
+    return super.load(key);
+  }
+}
 
 _Bundle _bundle({List<int>? archive, String? style}) => _Bundle({
   Basemap.archiveAsset: archive ?? _archive(),
@@ -161,6 +180,32 @@ void main() {
     );
     expect(File(path).readAsBytesSync(), _archive());
     expect(mapFolder(), [_name]);
+  });
+
+  test('overlapping calls share one copy', () async {
+    final bundle = _HeldBundle(_bundle().files);
+    final first = Basemap.ensureArchive(bundle: bundle, cacheDirectory: cache);
+    await bundle.loading.future;
+    final second = Basemap.ensureArchive(bundle: bundle, cacheDirectory: cache);
+    bundle.release();
+
+    final path = '${root.path}/map/$_name';
+    expect(await Future.wait([first, second]), [path, path]);
+    expect(bundle.loads[Basemap.archiveAsset], 1);
+    expect(File(path).readAsBytesSync(), _archive());
+    expect(mapFolder(), [_name]);
+  });
+
+  test('a failed copy is retried by the next call', () async {
+    await expectLater(
+      Basemap.ensureArchive(bundle: _Bundle({}), cacheDirectory: cache),
+      throwsStateError,
+    );
+    final path = await Basemap.ensureArchive(
+      bundle: _bundle(),
+      cacheDirectory: cache,
+    );
+    expect(File(path).readAsBytesSync(), _archive());
   });
 
   test(
