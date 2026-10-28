@@ -151,6 +151,30 @@ void main() {
       expect(locationOf(574), _at574);
     });
 
+    test('a second call while the first is asking skips its stops',
+        () async {
+      await saved(574);
+      answer = (request) async {
+        await Future<void>.delayed(const Duration(milliseconds: 10));
+        return wfs(request);
+      };
+      expect(await Future.wait([fill(), fill()]), [1, 0]);
+      expect(requests, hasLength(1));
+      expect(locationOf(574), _at574);
+    });
+
+    test('a stop found at 0.0, 0.0 counts as not found', () async {
+      await saved(574);
+      answer = (_) async => http.Response(
+          '{"type":"FeatureCollection","features":[{"type":"Feature",'
+          '"geometry":{"type":"Point","coordinates":[0,0]},'
+          '"properties":{"cod_ubic_parada":574}}]}',
+          200);
+      expect(await fill(), 0);
+      expect(requests, hasLength(1));
+      expect(CacheService.getStop(574)!.hasLocation, isFalse);
+    });
+
     test('a stop looked up less than 10 minutes ago is not asked again',
         () async {
       var now = DateTime.utc(2026, 10, 28, 12);

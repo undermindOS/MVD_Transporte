@@ -61,8 +61,10 @@ class StopLocationsService {
   }
 
   /// Saves the location of [found] into [stop] and its saved copy. False
-  /// when the stop was deleted meanwhile: it is not saved back.
+  /// when [found] is at 0.0, 0.0 too (no location, as not found), or the
+  /// stop was deleted meanwhile: it is not saved back.
   static Future<bool> _save(BusStop stop, CatalogStop found) async {
+    if (found.latitude == 0 && found.longitude == 0) return false;
     final saved = CacheService.getStop(stop.id);
     if (saved == null) return false;
     for (final s in [stop, saved]) {
