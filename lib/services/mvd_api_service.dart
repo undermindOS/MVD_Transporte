@@ -77,10 +77,32 @@ class MvdApiService {
   static String montevideoClock(DateTime utc) =>
       ContractRules.montevideoClock(utc);
 
+  /// The newest board of every stop fetched in this isolate, whoever asked
+  /// for it ([getBoard], [getBoards]): the Mapa draws from it at once, and
+  /// skips its own fetch right after Mis paradas refreshed. A new map on
+  /// every change, so listeners fire.
+  static final ValueNotifier<Map<int, ArrivalsBoard>> latestBoards =
+      ValueNotifier(const {});
+
   /// Upcoming buses of a stop, soonest first.
-  static Future<ApiResult<ArrivalsBoard>> getBoard(int stopId) =>
-      _call(stopId, () => source.arrivals(stopId),
-          (json) => V1Parser.arrivals(json, stopId));
+  static Future<ApiResult<ArrivalsBoard>> getBoard(int stopId) async {
+    final result = await _call(stopId, () => source.arrivals(stopId),
+        (json) => V1Parser.arrivals(json, stopId));
+    if (result case ApiOk(:final value)) _publish(stopId, value);
+    return result;
+  }
+
+  /// Keeps [board] in [latestBoards] unless a newer one is there.
+  static void _publish(int stopId, ArrivalsBoard board) {
+    final boards = latestBoards.value;
+    final known = boards[stopId];
+    if (known != null && known.fetchedAt.isAfter(board.fetchedAt)) return;
+    latestBoards.value = {...boards, stopId: board};
+  }
+
+  /// Forgets [latestBoards], as at app start.
+  @visibleForTesting
+  static void resetLatestBoards() => latestBoards.value = const {};
 
   /// The boards of several stops: each stop once, all in parallel. A stop
   /// already being fetched by another call shares that request.

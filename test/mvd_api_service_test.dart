@@ -577,6 +577,72 @@ void main() {
         await later;
       }, () => client);
     });
+
+    group('latestBoards', () {
+      String at(int id, String fetchedAt) =>
+          '{"id":$id,"fetchedAt":"$fetchedAt","arrivals":[]}';
+      setUp(MvdApiService.resetLatestBoards);
+      tearDown(MvdApiService.resetLatestBoards);
+
+      test('keeps the good boards per stop, a new map on every change',
+          () async {
+        var notified = 0;
+        void listener() => notified++;
+        MvdApiService.latestBoards.addListener(listener);
+        addTearDown(() => MvdApiService.latestBoards.removeListener(listener));
+
+        await http.runWithClient(() async {
+          final boards = MvdApiService.getBoards([574, 3140]);
+          await pumpEventQueue();
+          pending['/v1/stops/574/arrivals']!
+              .complete(_json(at(574, '2026-10-19T22:52:10.000Z')));
+          pending['/v1/stops/3140/arrivals']!
+              .complete(_json('{"error":"upstream_error"}', 502));
+          await boards;
+        }, () => client);
+
+        // A failure changes nothing
+        final first = MvdApiService.latestBoards.value;
+        expect(first.keys, [574]);
+        expect(first[574]!.fetchedAt, DateTime.utc(2026, 10, 19, 22, 52, 10));
+        expect(notified, 1);
+
+        pending.clear();
+        await http.runWithClient(() async {
+          final board = MvdApiService.getBoard(3140);
+          await pumpEventQueue();
+          pending['/v1/stops/3140/arrivals']!
+              .complete(_json(at(3140, '2026-10-19T22:52:40.000Z')));
+          await board;
+        }, () => client);
+        final second = MvdApiService.latestBoards.value;
+        expect(identical(first, second), isFalse);
+        expect(second.keys, unorderedEquals([574, 3140]));
+        expect(notified, 2);
+      });
+
+      test('an older board does not replace a newer one', () async {
+        Future<void> fetch(String fetchedAt) async {
+          pending.clear();
+          await http.runWithClient(() async {
+            final board = MvdApiService.getBoard(574);
+            await pumpEventQueue();
+            pending['/v1/stops/574/arrivals']!
+                .complete(_json(at(574, fetchedAt)));
+            await board;
+          }, () => client);
+        }
+
+        await fetch('2026-10-19T22:52:40.000Z');
+        // An edge-cached answer that came later
+        await fetch('2026-10-19T22:52:10.000Z');
+        expect(MvdApiService.latestBoards.value[574]!.fetchedAt,
+            DateTime.utc(2026, 10, 19, 22, 52, 40));
+        await fetch('2026-10-19T22:53:10.000Z');
+        expect(MvdApiService.latestBoards.value[574]!.fetchedAt,
+            DateTime.utc(2026, 10, 19, 22, 53, 10));
+      });
+    });
   });
 
   group('rate limit', () {
