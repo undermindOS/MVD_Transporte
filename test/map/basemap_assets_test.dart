@@ -18,6 +18,8 @@ import 'package:stm_app/services/map/local_pmtiles_provider.dart';
 
 const _archiveSha256 =
     '7f709b47def44df05ddc97e31e0a68158162caecaa85b710ba876ab193835111';
+const _styleSha256 =
+    'e78b294976dd3907d8ea456837d8b33dbb1c22bb7f3cbd0e06e1d63fe6282f9d';
 
 /// The extract bbox: -56.80,-34.97,-55.70,-34.50.
 final _bounds = LatLngBounds(
@@ -93,6 +95,11 @@ void main() {
   group('the Timbre Noche style', () {
     final raw = File(Basemap.styleAsset).readAsStringSync();
     final style = jsonDecode(raw) as Map<String, Object?>;
+
+    test('is the file of the README', () {
+      final bytes = File(Basemap.styleAsset).readAsBytesSync();
+      expect(sha256.convert(bytes).toString(), _styleSha256);
+    });
 
     test('is minified, named Timbre Noche, with no sprite or glyphs', () {
       expect(raw.trimRight(), jsonEncode(style));

@@ -14,9 +14,9 @@ En la app viajan solo estos dos archivos, los únicos que declara `pubspec.yaml`
 El generador del estilo está en [`tool/map/`](../../tool/map/): `gen_style.mjs`, `flavor_noche.json` y
 un `package.json` con las versiones fijas (más su `package-lock.json`).
 
-Las pruebas de `test/map/basemap_assets_test.dart` comprueban el SHA-256 y los bordes del
-`.pmtiles`, y compilan el estilo de verdad: 67 capas, ninguna advertencia del lector y solo los 12
-colores del flavor (nada de ámbar).
+Las pruebas de `test/map/basemap_assets_test.dart` comprueban el SHA-256 de los dos archivos y los
+bordes del `.pmtiles`, y compilan el estilo de verdad: 67 capas, ninguna advertencia del lector y
+solo los 12 colores del flavor (nada de ámbar).
 
 ## Cómo lo usa la app
 
@@ -162,7 +162,7 @@ npm run estilo   # escribe ../../assets/map/style_noche.json y muestra capas, er
 <@maplibre/maplibre-gl-style-spec dist/index.mjs> flavor_noche.json ../../assets/map/style_noche.json`.
 Con estas versiones y este flavor sale el mismo archivo, byte por byte. Después corré
 `flutter test test/map/basemap_assets_test.dart` y, si cambió algo a propósito, actualizá esa prueba
-y el SHA-256 de este README.
+(incluido el SHA-256 del estilo) y el SHA-256 de este README.
 
 ### Las teselas
 
