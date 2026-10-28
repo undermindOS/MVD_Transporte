@@ -21,6 +21,7 @@ import 'package:stm_app/services/cache_service.dart';
 import 'package:stm_app/services/mvd_api_service.dart';
 import 'package:stm_app/services/nearby_stops_service.dart';
 import 'package:stm_app/services/notification_service.dart';
+import 'package:stm_app/services/stop_locations_service.dart';
 import 'package:stm_app/services/transport_news_service.dart';
 
 const _responses = 'proxy/contract/v1/responses';
@@ -97,6 +98,10 @@ void main() {
       expect((await MvdApiService.getStopDetails(574)).valueOrNull, isNotNull);
       expect(await MvdApiService.resolveStop(574), isNotNull);
       expect(await MvdApiService.healPlaceholderStops(), 1);
+      // The saved stop is placed from the catalog, not from geoserver
+      expect(await StopLocationsService.fillMissing(CacheService.getAllStops()),
+          1);
+      expect(CacheService.getStop(574)!.hasLocation, isTrue);
       expect(await MvdApiService.getSchedule(3140, DayType.habil, 8, 5),
           isNotEmpty);
       expect(await MvdApiService.getStopCatalog(), isNotEmpty);
