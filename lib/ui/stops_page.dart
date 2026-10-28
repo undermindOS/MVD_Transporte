@@ -1519,17 +1519,26 @@ class _AddStopDialogState extends State<_AddStopDialog> {
     );
   }
 
-  /// A listed stop is saved with the name and lines it is listed with:
-  /// nothing more to look up.
-  void _pick(int id, String name, List<String> lines) =>
-      Navigator.pop<_StopChoice>(context,
-          (id: id, stop: BusStop(id: id, name: name, lines: [...lines])));
+  /// A listed stop is saved with the name, lines and location it is
+  /// listed with: nothing more to look up, and the Mapa can place it.
+  void _pick(int id, String name, List<String> lines, double latitude,
+          double longitude) =>
+      Navigator.pop<_StopChoice>(context, (
+        id: id,
+        stop: BusStop(
+            id: id,
+            name: name,
+            lines: [...lines],
+            latitude: latitude,
+            longitude: longitude),
+      ));
 
   /// A stop around the user. Without lines (the catalog could not get
   /// them) the line ends at the distance.
   Widget _buildNearbyTile(NearbyStop stop) {
     final meters = stop.distanceMeters.round();
-    void pick() => _pick(stop.id, stop.name, stop.lines);
+    void pick() => _pick(
+        stop.id, stop.name, stop.lines, stop.latitude, stop.longitude);
     return Semantics(
       button: true,
       label: '${_stopPhrase(stop.id, stop.name)}, a $meters metros'
@@ -1561,7 +1570,8 @@ class _AddStopDialogState extends State<_AddStopDialog> {
   /// A stop found by its streets: the same tile as a nearby one, with
   /// the number under the name.
   Widget _buildMatchTile(CatalogStop stop) {
-    void pick() => _pick(stop.id, stop.name, stop.lines);
+    void pick() => _pick(
+        stop.id, stop.name, stop.lines, stop.latitude, stop.longitude);
     return Semantics(
       button: true,
       label: _stopPhrase(stop.id, stop.name),

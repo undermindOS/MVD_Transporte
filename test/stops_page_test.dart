@@ -134,6 +134,8 @@ void main() {
       expect(saved, isNotNull);
       expect(saved!.name, 'SAN JOSE y ANDES');
       expect(saved.lines, ['116', '117', '121', '141', '142', '144', '538']);
+      // and where geoserver puts it, for the Mapa
+      expect((saved.latitude, saved.longitude), (-34.90739436, -56.198255));
       expect(find.text('Buscando parada…'), findsNothing);
       expect(find.text('#574'), findsOneWidget);
     }, () => client);
