@@ -150,6 +150,8 @@ versiones: [SemVer](https://semver.org/lang/es/).
 - `docs/REVIEW.md`: revisión, mapa de la API de la Intendencia de Montevideo, marco legal, propuestas.
 
 ### Cambiado
+- Info dice que la app la desarrolla Liberon Tech, de Khrestenkov & Co, y el contacto pasa a ser
+  daniil@khrestenkov.com, también en la política de privacidad.
 - Diseño nuevo: la app se llama Timbre MVD (en la pantalla de inicio del teléfono, en el widget y, en iOS, también
   en `CFBundleName`) y toda la interfaz es un tablero de LED nocturno. Fondo azul noche; el ámbar queda solo para lo
   que pasa ahora (un ómnibus con GPS, LLEGANDO), y la hora en Horarios, el resumen del aviso, el candado de Info, la

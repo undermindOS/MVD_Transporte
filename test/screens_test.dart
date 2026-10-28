@@ -335,7 +335,7 @@ void main() {
         'Política de privacidad',
         'Código fuente, github.com/undermindOS/MVD_Transporte, '
             'se abre en el navegador',
-        'Contacto, zhongnanhaii@yahoo.com, se abre en tu app de correo',
+        'Contacto, daniil@khrestenkov.com, se abre en tu app de correo',
       ]) {
         final finder = find.bySemanticsLabel(link);
         await tester.ensureVisible(finder);

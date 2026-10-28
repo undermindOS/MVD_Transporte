@@ -35,7 +35,7 @@ class _InfoPageState extends State<InfoPage> {
   static const _notAffiliated = 'No está afiliada con la Intendencia de '
       'Montevideo, el STM ni ninguna empresa de transporte.';
   static const _sourceCode = 'github.com/undermindOS/MVD_Transporte';
-  static const _contact = 'zhongnanhaii@yahoo.com';
+  static const _contact = 'daniil@khrestenkov.com';
   static const _inBrowser = 'se abre en el navegador';
 
   /// Paragraphs of the cards.
@@ -291,7 +291,7 @@ class _InfoPageState extends State<InfoPage> {
           const Padding(
             padding: EdgeInsets.symmetric(horizontal: 8),
             child: Text(
-              'Desarrollada por undermindOS / Liberon.tech con gratitud '
+              'Desarrollada por Liberon Tech, de Khrestenkov & Co, con gratitud '
               'hacia Uruguay.',
               textAlign: TextAlign.center,
               style: TextStyle(

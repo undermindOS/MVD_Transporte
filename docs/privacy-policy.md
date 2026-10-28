@@ -13,8 +13,8 @@
 
 **Última actualización:** 27 de octubre de 2026
 
-Timbre MVD es una aplicación no oficial, desarrollada por undermindOS /
-Liberon.tech. No es una aplicación de la Intendencia de Montevideo ni de
+Timbre MVD es una aplicación no oficial, desarrollada por Liberon Tech,
+de Khrestenkov & Co. No es una aplicación de la Intendencia de Montevideo ni de
 ningún organismo de gobierno.
 
 ## Resumen
@@ -93,7 +93,7 @@ De acuerdo con la Ley N° 18.331 de Protección de Datos Personales, tenés
 derecho de acceso, rectificación, actualización, inclusión y supresión. Como
 no conservamos datos personales en servidores propios, podés ejercerlos
 directamente borrando los datos de la app. Para consultas escribinos a
-zhongnanhaii@yahoo.com. También podés dirigirte a la Unidad Reguladora y de
+daniil@khrestenkov.com. También podés dirigirte a la Unidad Reguladora y de
 Control de Datos Personales (URCDP).
 
 ## Menores

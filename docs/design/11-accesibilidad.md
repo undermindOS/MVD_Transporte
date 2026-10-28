@@ -176,7 +176,7 @@ diálogos y snack bars abiertos. La pantalla de bloqueo es una pantalla aparte p
 | Placa de la barra | «Timbre MVD» | `CartelCompacto` |
 | Mosaico de Servicios | «Mi STM. Saldo y movimientos de tu tarjeta. Abre el sitio oficial en el navegador», como botón | `_SiteTile` |
 | Aviso de Info | «Aplicación no oficial. No está afiliada con la Intendencia de Montevideo, el STM ni ninguna empresa de transporte.» | `InfoPage` |
-| Enlaces de Info | «Código fuente, github.com/undermindOS/MVD_Transporte, se abre en el navegador»; «Contacto, zhongnanhaii@yahoo.com, se abre en tu app de correo»; «Política de privacidad», sin «se abre en», porque abre una pantalla de la app | `_LinkRow` |
+| Enlaces de Info | «Código fuente, github.com/undermindOS/MVD_Transporte, se abre en el navegador»; «Contacto, daniil@khrestenkov.com, se abre en tu app de correo»; «Política de privacidad», sin «se abre en», porque abre una pantalla de la app | `_LinkRow` |
 | Bloqueo biométrico | la fila entera junto con la llave (`MergeSemantics`) | `InfoPage` |
 | Pantalla de bloqueo | «Aplicación bloqueada», como encabezado | `LockScreen` |
 | Privacidad | el título del archivo y cada sección («Resumen»), como encabezados; la viñeta de una lista no se escucha | `PrivacyPolicyPage` |

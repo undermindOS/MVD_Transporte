@@ -299,7 +299,7 @@ void main() {
     await scrollInfoTo(tester, 'Contacto');
     await tester.tap(find.text('Contacto'));
     await tester.pump();
-    expect(browser.launches.last, 'mailto:zhongnanhaii@yahoo.com');
+    expect(browser.launches.last, 'mailto:daniil@khrestenkov.com');
     now = now.add(const Duration(seconds: 4));
     lifecycle(tester, _toBackground);
     lifecycle(tester, _backFromBackground);
