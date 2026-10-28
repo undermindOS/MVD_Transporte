@@ -66,12 +66,23 @@ dependencies:
   flutter_foreground_task: ^10.0.0
   timezone: ^0.10.1
 
+  # Mapa: the basemap bundled in the app (lib/services/map/). Exact pins:
+  # the vector layer is a young single-author package built against this
+  # flutter_map
+  flutter_map: 8.3.2
+  flutter_map_vector_tiles: 2.10.1
+  latlong2: ^0.10.1
+  # The basemap archive is copied once to the app cache directory
+  path_provider: ^2.1.5
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
   # Fake browser launcher and biometrics for widget tests
   url_launcher_platform_interface: ^2.3.2
   local_auth_platform_interface: ^1.1.0
+  # SHA-256 of the bundled basemap (test/map/basemap_assets_test.dart)
+  crypto: ^3.0.7
 
   # The "flutter_lints" package below contains a set of recommended lints to
   # encourage good coding practices. The lint set provided by the package is
@@ -107,6 +118,10 @@ flutter:
     - assets/licenses/MIT-pixelarticons.txt
     # The privacy policy, shown as it is (lib/ui/privacy_policy_page.dart)
     - docs/privacy-policy.md
+    # The Mapa basemap and its style, nothing else from assets/map/
+    # (provenance and licences: assets/map/README.md)
+    - assets/map/mvd-20261028.pmtiles
+    - assets/map/style_noche.json
 
   # Timbre MVD typefaces, bundled (no runtime download): Latin subsets of
   # Fira Sans, Fira Sans Extra Condensed and a static Black instance of Doto
