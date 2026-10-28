@@ -17,7 +17,7 @@ esta página están también en [tokens.json](tokens.json), y
 | Familia | `TimbreFonts` | Pesos incluidos | Para qué |
 |---|---|---|---|
 | Doto | `doto` = `'Doto'` | 900 (Black) | La matriz de puntos de los carteles: título de página, carteles, minutos con GPS, LLEGANDO. |
-| Fira Sans Extra Condensed | `firaCondensed` = `'FiraSansExtraCondensed'` | 600, 700, 800 | Los datos: número de línea, destino, nombre de parada, hora de horario, «min». |
+| Fira Sans Extra Condensed | `firaCondensed` = `'FiraSansExtraCondensed'` | 600, 700, 800 | Los datos: número de línea, destino, nombre de parada, hora de horario, «min»; las direcciones de la política en Privacidad (600). |
 | Fira Sans | `fira` = `'FiraSans'` | 400, 500, 600, 700 | Todo lo que se lee: interfaz, botones, rótulos, novedades, Info. Es la familia por defecto del tema (`fontFamily` en `buildTimbreTheme()`). |
 
 Solo existen esos pesos. Si pedís otro (por ejemplo Doto a 700 o Fira Sans
@@ -33,7 +33,7 @@ quiere decir que el color lo pone el widget o el tema.
 
 | Estilo | Tamaño / peso / interlineado | Color | Dónde se usa |
 |---|---|---|---|
-| `pageTitle` | 28 / 900 / 1.1, espaciado 1 | `ambar` | Título de página en `PageTitleBar`, en mayúsculas: «MIS PARADAS», «SERVICIOS», «INFO», «HORARIOS». |
+| `pageTitle` | 28 / 900 / 1.1, espaciado 1 | `ambar` | Título de página en `PageTitleBar`, en mayúsculas: «MIS PARADAS», «SERVICIOS», «INFO», «HORARIOS», «PRIVACIDAD». |
 | `liveMinutes([size = 30])` | 30 / 900 / 1 | `ambar` | Cifras de `MinutosEnVivo`. `ArrivalRow` lo pide a 26. Un tamaño menor que 19 se sube a 19. |
 | `cartel(size, {color = ambar})` | el que se pida / 900 / 1 | `ambar`, o el que se pase | Los carteles: ver la tabla de abajo. Un tamaño menor que 19 se sube a 19. |
 
@@ -69,15 +69,15 @@ recibe `fontSize` (22 por defecto) y también lo sube a 19 si es menor.
 
 | Estilo | Tamaño / peso / interlineado | Color | Dónde se usa |
 |---|---|---|---|
-| `dialogTitle` | 20 / 700 / 1.2 | `papel` | Título de los diálogos (`dialogTheme.titleTextStyle`) y de la hoja de una novedad (con interlineado 1.25). |
+| `dialogTitle` | 20 / 700 / 1.2 | `papel` | Título de los diálogos (`dialogTheme.titleTextStyle`), de la hoja de una novedad y de la política en Privacidad (estos dos, con interlineado 1.25). |
 | `buttonLarge` | 17 / 700 / 1.2 | sin color | Botón principal, `FilledButton` desde el tema: «Avisarme cuando llegue», «Guardar», «Ver más». «Desbloquear» reemplaza el estilo por uno propio de 18 / 700 (ver abajo). |
 | `body` | 15 / 400 / 1.2 | `papel` | Texto de diálogos y snackbars (desde el tema); texto completo de una novedad (1.5); títulos de los enlaces de Info (500); «Avisarme cuando falten» (600); error de Horarios (600); texto de la pantalla de bloqueo (1.4, en `etiquetaCartel`). |
 | `button` | 15 / 700 / 1.2 | sin color | `OutlinedButton` y `TextButton` desde el tema; segmentos de `TimbreSegmented` (700 el elegido, 600 los otros); botón «Desde» de Horarios (600). |
-| `subtitle` | 14 / 400 / 1.2 | `etiquetaCartel` | Subtítulo de `PageTitleBar` («Sitios oficiales, en tu navegador»); notas dentro de una tarjeta (`_BoardNote`, con su color); línea bajo el cartel de la hoja Estoy esperando; resumen de una novedad y detalle de `TimbreEmptyState` (1.4); párrafos de Info y nota del navegador en Servicios (1.45, en `papel`); panel de Novedades sin actualizar (600, en `ambar`). |
+| `subtitle` | 14 / 400 / 1.2 | `etiquetaCartel` | Subtítulo de `PageTitleBar` («Sitios oficiales, en tu navegador»); notas dentro de una tarjeta (`_BoardNote`, con su color); línea bajo el cartel de la hoja Estoy esperando; resumen de una novedad y detalle de `TimbreEmptyState` (1.4); párrafos de Info y de Privacidad y nota del navegador en Servicios (1.45, en `papel`); panel de Novedades sin actualizar (600, en `ambar`). |
 | `tabLabel` | 13 / 700 / 1.2 | sin color | Subpestaña elegida (`tabBarTheme.labelStyle`), en `ambar`. Las otras usan un estilo propio del tema: 13 / 500 en `tenue`. |
 | `caption` | 12.5 / 400 / 1.2 | `etiquetaCartel` | Línea bajo una parada en las listas («#5109 · 48 m · 124, 125»); «Líneas: … · Hacia: …» de una ruta (en `tenue`); notas de la hoja Estoy esperando y de los ajustes del aviso (1.4). |
 | `navLabel` | 12 / 700 / 1.2 | sin color | Barra de navegación (`navigationBarTheme`): la elegida a 700 en `ambar`, las otras a 500 en `tenue`. |
-| `sectionLabel` | 12 / 700, espaciado 1.44 | `etiquetaCartel` | Rótulo en mayúsculas: «FUENTE DE DATOS» en Info, «LÍNEAS» y «HACIA» en Agregar ruta, «DÍAS» en los ajustes del aviso. No define interlineado. |
+| `sectionLabel` | 12 / 700, espaciado 1.44 | `etiquetaCartel` | Rótulo en mayúsculas: «FUENTE DE DATOS» en Info, las secciones de Privacidad («RESUMEN»), «LÍNEAS» y «HACIA» en Agregar ruta, «DÍAS» en los ajustes del aviso. No define interlineado. |
 | `cartelLabel` | 12 / 700, espaciado 1.44 | `etiquetaCartel` | «PRÓXIMO» de `CartelParada` (y «Actualizado HH:MM», a 500 sin espaciado). Mismos valores que `sectionLabel`; hoy no se ve en ninguna pantalla. |
 
 ## Doto: nunca por debajo de 19 px

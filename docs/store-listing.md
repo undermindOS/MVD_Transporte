@@ -66,7 +66,7 @@ siempre los canales de la Intendencia de Montevideo.
 
 Privacidad: tus paradas se guardan solo en tu teléfono y tu ubicación no
 sale de él. No hay cuentas, publicidad ni analíticas.
-Política: <URL de docs/privacy-policy.md publicada>
+Política: https://github.com/undermindOS/MVD_Transporte/blob/main/docs/privacy-policy.md
 
 ## English
 
@@ -85,6 +85,18 @@ Live Montevideo bus arrivals and alerts for your stops. Unofficial app.
   No usar capturas de stm.gub.uy ni logos del STM o la Intendencia.
 - El ícono, el splash, el widget y las notificaciones están descritos en
   [docs/design/10-superficies.md](design/10-superficies.md).
+
+## Política de privacidad (Play Console → Contenido de la app)
+
+URL de la política: https://github.com/undermindOS/MVD_Transporte/blob/main/docs/privacy-policy.md
+
+Es el mismo archivo que muestra la app: viene dentro de ella y se abre en
+Info → «Política de privacidad», en la pantalla «Privacidad», también sin
+conexión (`lib/ui/privacy_policy_page.dart`). Las líneas citadas (`>`) del
+archivo son notas para quien lo mantiene: la app no las muestra, pero la URL
+de GitHub sí. La URL muestra lo que está en `main`, así que el texto
+publicado y el de la app coinciden cuando esta versión está fusionada en
+`main`.
 
 ## Seguridad de los datos (Play Console) — borrador
 

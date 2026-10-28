@@ -27,7 +27,9 @@ contrato completo está en [contrato-v1.md](contrato-v1.md).
 - Datos y pantallas: [Datos viejos como estimado](#los-datos-viejos-se-muestran-como-estimado) ·
   [«NUEVA» en ámbar](#nueva-y-la-fecha-de-lo-no-leído-van-en-ámbar) ·
   [El brillo de `LiveDot`](#el-brillo-de-livedot) ·
-  [El widget muestra el destino del ómnibus](#el-widget-muestra-el-destino-del-ómnibus)
+  [El widget muestra el destino del ómnibus](#el-widget-muestra-el-destino-del-ómnibus) ·
+  [El bloqueo va encima del `Navigator`](#el-bloqueo-va-encima-del-navigator) ·
+  [El bloqueo vuelve solo después del segundo plano](#el-bloqueo-vuelve-solo-después-del-segundo-plano)
 - Backend: [Sin ruta por lotes](#sin-ruta-por-lotes) ·
   [Cercanas en el teléfono](#las-paradas-cercanas-se-calculan-en-el-teléfono) ·
   [Sin cambio automático al modo directo](#sin-cambio-automático-al-modo-directo) ·
@@ -297,6 +299,57 @@ el nombre de la ruta (`RouteAlert.destinationName`). Lo escribe `WidgetFeed`
 usuario ve en su tarjeta de ruta. El aviso de ruta, en cambio, usa el nombre
 de la ruta en el título («Línea 116 → Centro»)
 ([10-superficies.md](10-superficies.md#textos)).
+
+### El bloqueo va encima del `Navigator`
+
+**Contexto.** La pantalla de bloqueo la dibujaba `HomePage` en lugar de sus
+pestañas. Lo que estaba abierto encima —Horarios, Info, un diálogo, una
+hoja— quedaba por encima del bloqueo, a la vista y al alcance.
+
+**Decisión.** `AppLock` (`lib/ui/app_lock.dart`) va en `MaterialApp.builder`
+(`lib/main.dart`), encima del `Navigator`. Antes del primer desbloqueo no
+arma la app. Después la deja armada debajo de la pantalla de bloqueo, dentro
+de `Offstage`, `TickerMode(enabled: false)` y `ExcludeFocus`: no se pinta, no
+recibe toques ni foco, no anima y no está en el árbol de semántica.
+`AppLock.routeGuard`, en `navigatorObservers`, le registra a cada ruta abierta
+encima de la primera un `PopEntry` que no la deja cerrar mientras la app está
+bloqueada. La pantalla de bloqueo tiene su propio `ScaffoldMessenger`, así que
+los snack bars de la app se quedan con la app.
+
+**Consecuencia.** Al desbloquear volvés a la misma página, hoja o diálogo, y
+Mis paradas no se carga de cero. Como sigue armada, tiene que saber que está
+tapada: `HomePage` le pasa `active: false` mientras `AppLock.of(context).locked`,
+y el refresco al volver del segundo plano espera al primer cuadro
+(`WidgetsBinding.endOfFrame`) para no pedir nada justo cuando aparece el
+bloqueo. Con solo la pantalla principal debajo, el atrás de Android sigue
+saliendo de la app. Lo que se agregue en `MaterialApp.builder` fuera de
+`AppLock` no queda tapado.
+
+### El bloqueo vuelve solo después del segundo plano
+
+**Contexto.** Antes, cualquier estado que no fuera `resumed` contaba como una
+salida, también `inactive`: un pedido de permiso del sistema alcanzaba para
+que la app se bloqueara al volver. Y solo el navegador abierto desde
+`HomePage` (Servicios, «Ver en Cómo Ir») marcaba la salida como propia: volver
+del correo, de un enlace de Info o de «Ver más» de una novedad bloqueaba otra
+vez.
+
+**Decisión.** Solo bloquea `hidden` o `paused` seguido de `resumed`
+(`AppLockState.didChangeAppLifecycleState`). Siguen las protecciones de antes:
+no bloquea mientras está abierto el pedido del sistema (`_isAuthenticating`)
+ni en los 2 s después de que se cerró. Toda apertura de otra app pasa por
+`ExternalApps` (`lib/services/external_apps.dart`): `launch` para una URL
+(`SystemBrowser.open`, el correo de Info, «Ver más» de una novedad) y `open`
+para una llamada de plugin (los ajustes de la app desde «Paradas cercanas»).
+`AppLock` escucha `ExternalApps.launches`, y una salida que empieza menos de
+3 s después de una apertura no bloquea a la vuelta.
+
+**Consecuencia.** Un enlace nuevo que se abra con `launchUrl` directo, sin
+`ExternalApps`, vuelve a bloquear la app a la vuelta.
+`test/app_lock_test.dart` prueba las salidas de hoy: navegador, correo,
+enlace de una novedad y ajustes del sistema. Lo que cuenta es cuándo empezó
+la salida, no cuánto duró: si desde la app que abriste vas a la pantalla de
+inicio y volvés a Timbre MVD horas después, tampoco bloquea.
 
 ---
 

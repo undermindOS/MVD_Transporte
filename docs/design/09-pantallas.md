@@ -17,7 +17,7 @@ Ver también:
 ## Mapa
 
 ```
-Bloqueo (LockScreen)          reemplaza todo mientras falta autenticar
+Bloqueo (AppLock, LockScreen) tapa toda la app mientras falta autenticar
 HomePage                      barra buildTimbreAppBar + botón «Info»
 ├── Mis paradas (StopsPage)   pestaña inferior 1
 │   ├── Paradas               subpestaña; botón + → Agregar parada
@@ -25,7 +25,8 @@ HomePage                      barra buildTimbreAppBar + botón «Info»
 │   └── Novedades             subpestaña; el detalle se abre en una hoja
 └── Servicios (ServicesPage)  pestaña inferior 2
 
-Páginas que se abren encima:  Horarios (SchedulePage), Info (InfoPage)
+Páginas que se abren encima:  Horarios (SchedulePage), Info (InfoPage) → Privacidad
+                              (PrivacyPolicyPage)
 Diálogos:                     Agregar parada, Agregar ruta
 Hojas:                        Estoy esperando, Ajustes de aviso, detalle de novedad
 ```
@@ -38,7 +39,7 @@ Hojas:                        Estoy esperando, Ajustes de aviso, detalle de nove
   navegador (`OfficialSite` en `lib/services/official_sites.dart`).
 - La barra de todas las pantallas, menos la de bloqueo, es `buildTimbreAppBar` (ver
   [08-componentes.md](08-componentes.md)).
-  En `HomePage` lleva el botón «Info»; Horarios e Info llevan la flecha para volver.
+  En `HomePage` lleva el botón «Info»; Horarios, Info y Privacidad llevan la flecha para volver.
 - Mis paradas tiene tres subpestañas en un `TabBar` (íconos `stop`, `route` y `news`, de 22 px).
   La de Novedades lleva un contador de novedades sin leer. El botón + dice «Agregar parada» en
   Paradas y «Agregar ruta» en Rutas; en Novedades no aparece.
@@ -54,8 +55,9 @@ Hojas:                        Estoy esperando, Ajustes de aviso, detalle de nove
 | Datos de una parada (`GET /v1/stops/{id}`) | al agregar una parada por número; al buscar la parada en Agregar ruta; al arrancar la app, para las paradas guardadas como «Parada N» | Hive, dentro de la parada o la ruta guardada | `MvdApiService.getStopDetails`, `healPlaceholderStops` |
 | Catálogo de paradas (`GET /v1/catalog/stops`, solo con proxy) | en Agregar parada: con la primera letra en «Buscar por calles» o al tocar «Paradas cercanas» | Hive (caja `catalog`), 1 día; uno sin líneas, 15 min, y nunca reemplaza una copia con líneas; sin red se usa la copia vieja, tenga la edad que tenga | `MvdApiService._catalogTtl`, `getStopCatalog` |
 
-«Al arrancar la app» es cuando se arma `StopsPage`: al abrir la app y otra vez después de cada
-desbloqueo (ver «Bloqueo»). El `IndexedStack` la arma aunque la pestaña elegida sea otra.
+«Al arrancar la app» es cuando se arma `StopsPage`: al abrir la app o, con el bloqueo encendido,
+después del primer desbloqueo (ver «Bloqueo»). Los desbloqueos siguientes no la vuelven a armar. El
+`IndexedStack` la arma aunque la pestaña elegida sea otra.
 
 Sin proxy las mismas llamadas van a los servicios de la Intendencia y el teléfono convierte la
 respuesta a /v1. No hay catálogo, y las paradas cercanas salen de geoserver. El detalle está en
@@ -63,12 +65,13 @@ respuesta a /v1. No hay catálogo, y las paradas cercanas salen de geoserver. El
 
 ### Los 30 s: solo con Mis paradas a la vista
 
-El temporizador de `StopsPage` corre solo si se cumplen las tres cosas:
+El temporizador de `StopsPage` corre solo si se cumplen las cuatro cosas:
 
 - la pestaña inferior elegida es Mis paradas. Cualquiera de sus subpestañas sirve: en Rutas y en
   Novedades también se refrescan todos los tableros;
 - no hay una página encima. `HomePage.routeObserver` (registrado en `lib/main.dart`) avisa
   cuando se abre Horarios o Info, y `HomePage` le pasa `active: false` a `StopsPage`;
+- la app no está bloqueada: `HomePage` lee `AppLock.of(context).locked`;
 - la app está en primer plano.
 
 | Situación | Qué pasa con los 30 s |
@@ -76,14 +79,16 @@ El temporizador de `StopsPage` corre solo si se cumplen las tres cosas:
 | Pestaña Servicios | se pausan |
 | Horarios o Info abiertos | se pausan |
 | App en segundo plano (`hidden`, `paused`) | se pausan |
-| App bloqueada | no hay temporizador: mientras está la pantalla de bloqueo, `StopsPage` no existe |
+| App bloqueada | se pausan; antes del primer desbloqueo `StopsPage` todavía no existe |
 | Diálogo u hoja abiertos (Agregar parada, Agregar ruta, Estoy esperando, Ajustes de aviso, detalle de novedad) | siguen: el tablero queda a la vista y solo cuentan las páginas enteras |
 | Un diálogo del sistema que deja la app `inactive` (por ejemplo, un pedido de permiso) | siguen |
 | Mis paradas vuelve a estar a la vista | un refresco enseguida y después cada 30 s (`_resumeAutoRefresh`) |
 | La vuelta anterior todavía no terminó (red lenta) | esa vuelta se saltea (`_autoRefreshing`) |
 
 Al volver del segundo plano, además, `BusWaitService.sync()` revisa si «Estoy esperando»
-terminó mientras tanto.
+terminó mientras tanto. El refresco de esa vuelta espera al primer cuadro
+(`WidgetsBinding.endOfFrame`): si la app se bloquea al volver, ese cuadro ya deja a Mis paradas
+fuera de la vista y no se pide nada.
 
 ### Un pedido por parada
 
@@ -449,11 +454,14 @@ Se abre con el botón «Info» de la barra. Tarjetas de arriba a abajo:
 1. El ícono de la app, el nombre «Timbre MVD» y el aviso «NO OFICIAL» sobre el tablero, con «No
    está afiliada con la Intendencia de Montevideo, el STM ni ninguna empresa de transporte.».
 2. «Bloqueo biométrico», con su llave.
-3. «FUENTE DE DATOS»: de dónde salen los tiempos de arribo, los horarios, las novedades, el estado
-   del GPS y los datos de confort, y que los tiempos con reloj son horarios teóricos.
-4. Enlaces: «Código fuente» (en el navegador) y «Contacto» (en la app de correo). La fila
-   «Política de privacidad» existe en el código, pero no se muestra hasta que `HomePage` le pase
-   `privacyPolicyUrl`; hoy no se la pasa.
+3. «FUENTE DE DATOS»: de dónde salen los tiempos de arribo, los horarios, las novedades y el
+   estado del GPS, y que los tiempos con reloj son horarios teóricos. Solo con proxy
+   (`MvdApiService.usesProxy`) suma dos párrafos: de dónde salen los datos de confort («Aire
+   acondicionado y cero emisiones: API de transporte público de Montevideo.») y «Las consultas
+   pasan por el servidor del proyecto, que no guarda datos personales.». Sin proxy no hay ni
+   datos de confort ni servidor del proyecto.
+4. Enlaces: «Política de privacidad» (abre Privacidad, dentro de la app, con `chevronRight`),
+   «Código fuente» (en el navegador) y «Contacto» (en la app de correo).
 5. Los créditos.
 
 - No pide datos a la red.
@@ -466,19 +474,41 @@ Se abre con el botón «Info» de la barra. Tarjetas de arriba a abajo:
   se pudo abrir el correo. Revisá que tengas una app de correo configurada.».
 - Mientras Info está abierto, Mis paradas no se refresca.
 
+## Privacidad
+
+Código: `lib/ui/privacy_policy_page.dart` (`PrivacyPolicyPage`) y `lib/ui/policy_markdown.dart`
+(`policyToBlocks`).
+
+Se abre con «Política de privacidad» en Info. Muestra `docs/privacy-policy.md` tal cual: el
+archivo viene dentro de la app (`assets` en `pubspec.yaml`), así que dice lo mismo que el archivo
+del repositorio, cuya URL va en Play Console (`docs/store-listing.md`), y se lee sin conexión. Nada
+del texto está escrito en el código.
+
+- El título del archivo («Política de privacidad — Timbre MVD») en `TimbreText.dialogTitle`, cada
+  `## ` en mayúsculas con `TimbreText.sectionLabel` («RESUMEN»), y los párrafos y las viñetas en
+  Fira 14 / 1.45 `papel`, como los párrafos de Info. Las direcciones (`` `código` `` en el
+  archivo) van en Fira Sans Extra Condensed 600; la negrita, en Fira 700.
+- Las líneas citadas (`>`) son notas para quien mantiene el archivo: no se muestran.
+- En el cuerpo no hay Doto ni ámbar: el Doto queda en la barra (la placa y «PRIVACIDAD»).
+- Lee el archivo una vez cada vez que se abre, sin la caché del bundle; hasta que termina, la
+  pantalla queda vacía, sin indicador.
+- No pide datos a la red. Mientras está abierta, Mis paradas no se refresca: Info sigue debajo.
+
 ## Bloqueo
 
-Código: `lib/ui/lock_screen.dart` (`LockScreen`) y `_authenticate`, `_handleResume` en
-`lib/ui/home_page.dart`.
+Código: `lib/ui/app_lock.dart` (`AppLock`, encima del `Navigator`, en `MaterialApp.builder` de
+`lib/main.dart`) y `lib/ui/lock_screen.dart` (`LockScreen`).
 
-Con el bloqueo biométrico encendido, `HomePage` dibuja la pantalla de bloqueo en lugar de las
-pestañas: el tablero de LEDs, el candado `LedLock`, «BLOQUEADA», «Tus paradas y rutas guardadas
-están protegidas», el botón «Desbloquear» y la placa TIMBRE MVD al pie.
+Con el bloqueo biométrico encendido, la pantalla de bloqueo tapa toda la app: el tablero de LEDs,
+el candado `LedLock`, «BLOQUEADA», «Tus paradas y rutas guardadas están protegidas», el botón
+«Desbloquear» y la placa TIMBRE MVD al pie.
 
-- **Cuándo aparece:** al abrir la app y cada vez que vuelve del segundo plano. No aparece si la
-  app volvió dentro de los 2 s de una autenticación, ni si volvió del navegador abierto desde
-  Servicios o desde «Ver en Cómo Ir» (la salida empezó menos de 3 s después de abrirlo,
-  `_browserOpenedAt`).
+- **Cuándo aparece:** al abrir la app y al volver del segundo plano (`hidden` o `paused` y después
+  `resumed`). Un estado `inactive` solo, como el de un pedido de permiso del sistema, no bloquea.
+  Tampoco bloquea si la app volvió mientras el pedido del sistema estaba abierto o dentro de los 2 s
+  de que se cerró, ni si la salida empezó menos de 3 s después de abrir otra app desde Timbre MVD
+  (`ExternalApps`): el navegador desde Servicios, «Ver en Cómo Ir» o «Código fuente», el correo de
+  «Contacto», «Ver más» de una novedad y los ajustes del sistema desde «Paradas cercanas».
 - **El pedido del sistema** dice «Autenticate para acceder a Timbre MVD» y acepta huella, cara,
   PIN o patrón (`biometricOnly: false`).
 - **Si falla o lo cancelás,** queda la pantalla de bloqueo. «Desbloquear» lo vuelve a pedir;
@@ -486,8 +516,19 @@ están protegidas», el botón «Desbloquear» y la placa TIMBRE MVD al pie.
 - **Sin método de bloqueo** en el teléfono (`notAvailable`, `notEnrolled`, `passcodeNotSet`), la
   app se abre: si no, quedarías encerrado. Un bloqueo temporal por intentos fallidos la deja
   cerrada.
-- **Mientras está bloqueada,** Mis paradas no existe: no hay pedidos. Al desbloquear se arma de
-  nuevo: vuelve a la subpestaña Paradas y carga los tableros desde cero, con indicadores.
+- **Antes del primer desbloqueo** la app no se arma: ni `HomePage` ni Mis paradas existen y no hay
+  pedidos. Después del primer desbloqueo, y una sola vez, la app pide el permiso de notificaciones
+  si ya había avisos activados y registra o cancela la verificación en segundo plano
+  (`_setupAfterAuth`, con `BackgroundWorker.sync`).
+- **Mientras está bloqueada,** la app queda armada debajo, fuera de la vista y del alcance: nada se
+  pinta, recibe toques o foco, se anima ni lo escucha el lector de pantalla, y Mis paradas no pide
+  nada. Los snack bars de la app no aparecen sobre el bloqueo, que tiene su propio
+  `ScaffoldMessenger`.
+- **El botón atrás** no cierra ninguna página, hoja ni diálogo escondidos (`AppLock.routeGuard`).
+  Con solo la pantalla principal debajo, sale de la app, como antes.
+- **Al desbloquear** volvés a la misma página, hoja o diálogo. Mis paradas sigue en su subpestaña,
+  con los tableros que tenía: apenas vuelve a estar a la vista los actualiza, sin indicadores, y
+  sigue cada 30 s.
 
 No hay datos de red en esta pantalla.
 
@@ -495,14 +536,8 @@ No hay datos de red en esta pantalla.
 
 Lo anotamos para corregirlo en el código cuando se toque ese archivo:
 
-- **El bloqueo no tapa lo que está abierto encima.** La pantalla de bloqueo la dibuja `HomePage`.
-  Si la app se bloquea con Horarios, Info, un diálogo o una hoja abiertos, esa página queda por
-  encima del bloqueo. Si además cancelás el pedido del sistema estando en Info, podés apagar la
-  llave sin autenticarte, porque apagarla no pide confirmación. Esto sale de leer el código; no se
-  probó en un teléfono.
-- **Volver de un enlace de Info o de «Ver más» vuelve a bloquear.** Esos enlaces abren el
-  navegador o el correo sin pasar por `HomePage._openInBrowser`, así que la vuelta cuenta como una
-  vuelta del segundo plano.
+- **Privacidad sin texto.** Si el archivo de la política no se pudiera leer, la pantalla quedaría
+  vacía, sin error.
 - **Horarios de una parada que ya no existe** dice «Revisá la conexión.», porque
   `MvdApiService.getSchedule` devuelve `null` para cualquier fallo.
 - **Horarios no dice la edad** de una respuesta guardada (hasta 6 h).

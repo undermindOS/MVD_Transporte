@@ -50,8 +50,9 @@ versiones: [SemVer](https://semver.org/lang/es/).
 - Los tiempos de arribo en «Mis paradas» se actualizan solos: cada 30 s mientras estás en «Mis paradas», y al
   momento cuando volvés del segundo plano, de Servicios, de Horarios o de Info (antes, solo con pull-to-refresh, y a
   los 10 minutos en pantalla seguía un «3 min» viejo). Sin indicador de carga, para que las filas no parpadeen; en
-  segundo plano no hay consultas. Cada parada se pide una sola vez y todas a la vez, aunque una ruta salga de una
-  parada guardada: la tarjeta de la ruta usa los datos de su parada de origen.
+  segundo plano y con la app bloqueada no hay consultas, tampoco justo cuando aparece la pantalla de bloqueo al
+  volver. Cada parada se pide una sola vez y todas a la vez, aunque una ruta salga de una parada guardada: la
+  tarjeta de la ruta usa los datos de su parada de origen.
 - Si falla la actualización, la tarjeta dice «No se pudo actualizar. Datos de las H:MM. Deslizá para reintentar.»
   y debajo quedan los últimos ómnibus como estimados («~20:01», nunca en ámbar) durante 5 minutos como máximo.
   Sin error, un tablero que no se renueva hace más de un minuto (al volver de Horarios o Info, o con el proxy
@@ -80,7 +81,13 @@ versiones: [SemVer](https://semver.org/lang/es/).
   ~50 viajes, pasando la medianoche; las respuestas se guardan en caché por 6 h.
 - Aviso «Datos GPS parciales» en «Mis paradas» si una empresa tiene menos del 70 % de sus ómnibus
   transmitiendo GPS (`pci.montevideo.gub.uy/buses/control`, mismo umbral que Cómo Ir); como máximo una vez por minuto.
-- La página Info enumera los datos nuevos en «Fuente de datos».
+- La página Info enumera los datos nuevos en «Fuente de datos». El aire acondicionado y «cero emisiones», y la
+  frase «Las consultas pasan por el servidor del proyecto, que no guarda datos personales.», aparecen solo en la
+  build con `MVD_PROXY_URL`, la única que tiene esos datos y ese servidor.
+- Pantalla «Privacidad»: la fila «Política de privacidad» de Info, que ahora se ve siempre, abre la política dentro
+  de la app, también sin conexión. Es el mismo texto de `docs/privacy-policy.md`, que viene incluido en la app, sin
+  las notas para quien mantiene el archivo; TalkBack y VoiceOver anuncian el título y cada sección como
+  encabezados. Google Play pide la política también dentro de la app.
 - Ícono de «por horario» en los viajes sin GPS; su hora se muestra como hora de reloj («8:07»).
 - Mención de la fuente de datos en la página Info; se corrigió el enlace a GitHub.
 - Con `--dart-define=MVD_PROXY_URL=…` la app le pide todo al proxy (`/v1`): paradas, arribos (también en segundo
@@ -137,7 +144,8 @@ versiones: [SemVer](https://semver.org/lang/es/).
   verifica status, `Cache-Control`, `Content-Type` y las claves del cuerpo.
 - Dependencias: `url_launcher` (enlaces de las novedades), `html` (parseo del HTML de las novedades; ya era transitiva).
 - `docs/store-listing.md`: texto para Google Play / App Store con fuentes y aviso legal,
-  borrador de Data safety; `docs/privacy-policy.md`: política de privacidad (Ley 18.331);
+  borrador de Data safety y la URL de la política para Play Console; `docs/privacy-policy.md`: política de
+  privacidad (Ley 18.331), con fecha del 27 de octubre de 2026;
   `docs/carta-imm.md`: borrador de carta a pci@imm.gub.uy (no enviada).
 - `docs/REVIEW.md`: revisión, mapa de la API de la Intendencia de Montevideo, marco legal, propuestas.
 
@@ -171,8 +179,10 @@ versiones: [SemVer](https://semver.org/lang/es/).
   navegador externo (RFC 8252), no en un WebView con JS inyectado. La navegación inferior tiene dos pestañas
   nativas: «Mis paradas» (principal) y «Servicios», con tarjetas de los sitios oficiales.
 - Botones del widget de Android: «Mi STM» y «Recarga»; abren el sitio en el navegador.
-- El bloqueo biométrico protege las paradas y rutas guardadas (se corrigió el texto en Info);
-  volver del navegador no bloquea la app otra vez.
+- El bloqueo biométrico protege las paradas y rutas guardadas (se corrigió el texto en Info). Volver de una app
+  que abriste desde Timbre MVD —el navegador, también desde un enlace de Info; el correo de «Contacto»; «Ver más»
+  de una novedad; los ajustes del sistema desde «Paradas cercanas»— no bloquea la app otra vez. El siguiente paso
+  al segundo plano sí la bloquea.
 - La hora esperada de un arribo sale de la fuente y ya no se calcula sumando minutos al reloj del teléfono.
 - El chequeo en segundo plano consulta todas las paradas en paralelo y cada una una sola vez.
 - El número de parada admite hasta 7 dígitos. Un número que no puede existir, como 0, se informa como inexistente
@@ -200,6 +210,13 @@ versiones: [SemVer](https://semver.org/lang/es/).
   «A dismissed Dismissible widget is still part of the tree».
 - El bloqueo biométrico no se abre con `LockedOut`/`PermanentlyLockedOut` (era fail-open);
   ya no hay un ciclo de rebloqueo después de ingresar el PIN.
+- El bloqueo biométrico tapa toda la app. Antes, si la app se bloqueaba con Horarios, Info, un diálogo o una hoja
+  abiertos, esa pantalla quedaba encima de la pantalla de bloqueo, a la vista y al alcance. Ahora, mientras está
+  bloqueada, nada de la app se ve, se toca ni lo leen TalkBack o VoiceOver, sus mensajes no aparecen sobre la
+  pantalla de bloqueo y el botón atrás no cierra nada escondido. Al desbloquear volvés a la misma pantalla, hoja
+  o diálogo, y «Mis paradas» sigue en la subpestaña en que estabas y actualiza los tableros sin cargarlos de cero.
+- Un diálogo del sistema que no saca la app de la pantalla, como un pedido de permiso, ya no la bloquea: solo la
+  bloquea volver del segundo plano.
 - El interruptor de biometría en la página Info muestra el estado real.
 - Las líneas preferidas se comparan sin distinguir mayúsculas de minúsculas («64d» = «64D»).
 - El widget muestra la hora de llegada (`~08:14`), no un «N min» que queda desactualizado.

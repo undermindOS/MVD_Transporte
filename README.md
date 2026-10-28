@@ -68,7 +68,8 @@ después la app.
   «Estoy esperando»: en Android, un servicio en primer plano (consulta cada 30 s); en iOS, un recordatorio
   para la hora prevista
 - `lib/ui/stops_page.dart` — paradas y rutas
-- `lib/ui/home_page.dart` — pestañas, bloqueo biométrico
+- `lib/ui/home_page.dart` — pestañas
+- `lib/ui/app_lock.dart`, `lib/ui/lock_screen.dart` — bloqueo biométrico, encima de toda la app
 - `lib/ui/services_page.dart`, `lib/services/official_sites.dart` — sitios oficiales en el navegador del sistema
 - `lib/ui/theme/` — el sistema de diseño Timbre: colores, medidas y opacidades (`timbre_tokens.dart`),
   estilos de texto (`timbre_text.dart`) y tema (`timbre_theme.dart`); los componentes están en

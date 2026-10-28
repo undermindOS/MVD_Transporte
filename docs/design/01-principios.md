@@ -12,7 +12,7 @@ de la parada.
 
 En el código:
 
-- Mis paradas, Servicios, Info y Horarios arrancan con `buildTimbreAppBar`
+- Mis paradas, Servicios, Info, Privacidad y Horarios arrancan con `buildTimbreAppBar`
   (`lib/ui/widgets/timbre_app_bar.dart`): el cartel TIMBRE MVD
   (`CartelCompacto`) y el título de página (`PageTitleBar`) sobre los LEDs
   apagados de `LedMatrix`. La pantalla de bloqueo no tiene barra: es

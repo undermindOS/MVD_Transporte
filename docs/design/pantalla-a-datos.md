@@ -323,7 +323,9 @@ y la caducidad están en [10-superficies.md](10-superficies.md).
 
 - **Servicios**: enlaces fijos que se abren en el navegador
   (`lib/services/official_sites.dart`).
-- **Info**: textos fijos; «FUENTE DE DATOS» no depende del modo.
+- **Info**: textos fijos; «FUENTE DE DATOS» depende del modo: el párrafo del confort y el del
+  servidor del proyecto aparecen solo con proxy (`MvdApiService.usesProxy`).
+- **Privacidad**: el texto de `docs/privacy-policy.md`, que viene dentro de la app.
 - **Bloqueo**: no muestra datos.
 
 Los enlaces del navegador (Cómo Ir, Mi STM, Recarga) no son pedidos de la

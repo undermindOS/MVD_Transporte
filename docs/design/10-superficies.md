@@ -303,7 +303,7 @@ nombre que le pusiste a la ruta («Centro»). El texto largo usa
   iOS las muestre también con la app abierta.
 - **Permiso:** la app pide permiso de notificaciones al activar un aviso, al
   empezar a esperar un ómnibus y, después del primer desbloqueo, si ya había
-  avisos activados (`HomePage._setupAfterAuth`).
+  avisos activados (`AppLockState._setupAfterAuth` en `lib/ui/app_lock.dart`).
 
 Lo que dice la app alrededor de «Estoy esperando» (`_showWaitSheet` en
 `lib/ui/stops_page.dart`):

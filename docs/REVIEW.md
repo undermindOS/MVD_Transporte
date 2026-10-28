@@ -329,7 +329,7 @@ bloqueo biométrico activado.
 | ~~Ícono con símbolos oficiales~~ | **hecho** en `chore/store-compliance`: el anterior tenía el escudo de Montevideo (así lo dice `assets/README.md`) | — |
 | ~~Inicio de sesión en Mi STM dentro del WebView + `BalanceScraper`~~ | — | **resuelto:** Custom Tabs/SFSafariViewController; se eliminaron el scraping y el saldo en el widget, §5.1 |
 | ~~`ComoIrScraper` en la práctica no funciona~~ ✔︎ | — | **resuelto:** eliminado (en el navegador no se puede inyectar JS); en su lugar, el deep link «Ver en Cómo Ir», §5.1 |
-| Política de privacidad en la aplicación | Google Play exige el enlace tanto en la consola como dentro de la aplicación | el texto está listo (`docs/privacy-policy.md`); publicarlo (GitHub Pages) y agregar el enlace en Info (`url_launcher` ya está) |
+| ~~Política de privacidad en la aplicación~~ | — | **resuelto:** Info → «Política de privacidad» abre la pantalla «Privacidad» con el texto de `docs/privacy-policy.md`, que viene dentro de la aplicación; la URL para la consola está en `docs/store-listing.md` |
 | Licencia del repositorio | el repositorio es público pero no tiene `LICENSE`: eso es «código visible», no open source | elegir una licencia (MIT/Apache-2.0/GPL) o dejar explícito «todos los derechos reservados» |
 | Hive abierto a la vez en el isolate de la UI y en el de WorkManager ✔︎ (desde el proxy `/v1`, también la caja del catálogo `catalog`) | migración del almacenamiento | Hive 2.x no es multi-isolate → `hive_ce` con `IsolatedHive` o `shared_preferences` para los datos en segundo plano |
 | iOS: segundo plano y widget sin configurar ✔︎ | hacen falta Xcode, App Group, BGTask | `BGTaskSchedulerPermittedIdentifiers`, `UIBackgroundModes`, registro en AppDelegate, App Group para home_widget |
@@ -389,7 +389,10 @@ las paradas y rutas guardadas (a partir de ellas se puede deducir dónde vive y 
 Hecho: el texto en Info se corrigió a «Protege tus paradas y rutas guardadas»; volver del
 navegador ya no vuelve a bloquear la aplicación (la Custom Tab es una activity aparte, y en iOS mostrar
 SFSafariViewController también produce `inactive → hidden → paused`; solo se ignora la pausa
-que empieza en los primeros 3 s después de abrir el navegador, y un test lo verifica). Opciones: (a) mantenerlo como protección de la privacidad de los datos guardados (estado actual);
+que empieza en los primeros 3 s después de abrir el navegador, y un test lo verifica). Más tarde el bloqueo
+pasó a tapar toda la aplicación, también Horarios, Info, hojas y diálogos, y ninguna app abierta desde ella
+(navegador, correo, enlace de una novedad, ajustes del sistema) lo vuelve a activar a la vuelta
+([docs/design/09-pantallas.md](design/09-pantallas.md), «Bloqueo»). Opciones: (a) mantenerlo como protección de la privacidad de los datos guardados (estado actual);
 (b) quitar el bloqueo, `local_auth` y `USE_BIOMETRIC`/`NSFaceIDUsageDescription`: más simple, menos
 preguntas en la revisión de las tiendas. Recomendación: (a); viene desactivado por defecto y no cuesta nada.
 

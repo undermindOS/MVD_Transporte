@@ -136,7 +136,15 @@ TalkBack y VoiceOver escuchan una frase completa por cada cosa, no pedazos suelt
 - Lo decorativo no se escucha: `PixelIcon` sin `semanticLabel`, `LedMatrix`, `TimbreBus` y
   `LedLock` van envueltos en `ExcludeSemantics`.
 - Los carteles en mayúsculas se escuchan como frase normal: «MIS PARADAS» se lee «Mis paradas»,
-  «SIN PARADAS» se lee «Sin paradas guardadas», «BLOQUEADA» se lee «Aplicación bloqueada».
+  «SIN PARADAS» se lee «Sin paradas guardadas», «BLOQUEADA» se lee «Aplicación bloqueada». Las
+  secciones de Privacidad se leen como están en el archivo: «RESUMEN» se lee «Resumen».
+
+### Con la app bloqueada, solo el bloqueo
+
+Mientras está la pantalla de bloqueo, el lector no llega a nada de la app: `AppLock` la deja
+debajo dentro de un `Offstage`, que la saca del árbol de semántica, junto con las páginas, hojas,
+diálogos y snack bars abiertos. La pantalla de bloqueo es una pantalla aparte para el lector
+(`Semantics(scopesRoute: true)`), como una página.
 
 ### Las frases
 
@@ -168,16 +176,18 @@ TalkBack y VoiceOver escuchan una frase completa por cada cosa, no pedazos suelt
 | Placa de la barra | «Timbre MVD» | `CartelCompacto` |
 | Mosaico de Servicios | «Mi STM. Saldo y movimientos de tu tarjeta. Abre el sitio oficial en el navegador», como botón | `_SiteTile` |
 | Aviso de Info | «Aplicación no oficial. No está afiliada con la Intendencia de Montevideo, el STM ni ninguna empresa de transporte.» | `InfoPage` |
-| Enlaces de Info | «Código fuente, github.com/undermindOS/MVD_Transporte, se abre en el navegador»; «Contacto, zhongnanhaii@yahoo.com, se abre en tu app de correo» | `_LinkRow` |
+| Enlaces de Info | «Código fuente, github.com/undermindOS/MVD_Transporte, se abre en el navegador»; «Contacto, zhongnanhaii@yahoo.com, se abre en tu app de correo»; «Política de privacidad», sin «se abre en», porque abre una pantalla de la app | `_LinkRow` |
 | Bloqueo biométrico | la fila entera junto con la llave (`MergeSemantics`) | `InfoPage` |
 | Pantalla de bloqueo | «Aplicación bloqueada», como encabezado | `LockScreen` |
+| Privacidad | el título del archivo y cada sección («Resumen»), como encabezados; la viñeta de una lista no se escucha | `PrivacyPolicyPage` |
 | Widget de Android | «Línea 116 a POCITOS, alrededor de las 14:32, estimado» | `MVDTransporteWidgetProvider.kt` |
 
 Las marcas de confort se escuchan solo cuando el dato es `true`. Con proxy pueden ser
 «accesible», «aire acondicionado» y «cero emisiones»; sin proxy, solo «accesible».
 
 Son encabezados: el título de página, la barra de Horarios, los encabezados de hora, el título de
-Ajustes de aviso, «Tu tarjeta STM» y «Para moverte» en Servicios, y «BLOQUEADA».
+Ajustes de aviso, «Tu tarjeta STM» y «Para moverte» en Servicios, el título y las secciones de
+Privacidad, y «BLOQUEADA».
 
 ### Borrar sin deslizar
 
@@ -243,11 +253,13 @@ texto cortado hace fallar la prueba.
 | `test/screens_test.dart` | Servicios, Novedades, Horarios e Info sin desborde; la barra con subtítulo; el título más largo | 2× |
 | `test/stop_search_layout_test.dart` | Agregar parada con la búsqueda por calles | 2× |
 | `test/lock_screen_test.dart` | la pantalla de bloqueo sin desborde; el candado quieto con movimiento reducido | 2× |
+| `test/privacy_policy_test.dart` | Privacidad sin desborde hasta la última sección; «geoserver.montevideo.gub.uy» en una sola línea | 2× |
 | `test/cartel_test.dart` | Doto nunca por debajo de 19 px | 0.85× |
 
 Las frases del lector se prueban con `find.bySemanticsLabel` en `cartel_test`, `stops_page_test`,
-`stops_board_test`, `screens_test`, `stop_search_test`, `news_tab_test`, `proxy_bff_test` y
-`lock_screen_test`. Si cambiás una frase, cambiá también la prueba que la busca.
+`stops_board_test`, `screens_test`, `stop_search_test`, `news_tab_test`, `proxy_bff_test`,
+`lock_screen_test` y `privacy_policy_test`. Si cambiás una frase, cambiá también la prueba que la
+busca.
 
 ### Antes de dar por terminada una pantalla o un componente
 
@@ -272,8 +284,11 @@ Las frases del lector se prueban con `find.bySemanticsLabel` en `cartel_test`, `
 - **No hay pruebas automáticas de contraste ni de tamaño táctil** (`meetsGuideline` no se usa). La
   tabla de contrastes se calcula a mano; `test/design_tokens_test.dart` solo revisa que los
   valores de `tokens.json` sean los del código.
-- **Huecos en las pruebas de disposición.** Servicios, Novedades, Info, Agregar parada y la pantalla
-  de bloqueo se prueban solo a 2×. Agregar ruta, Ajustes de aviso y el detalle de una novedad no
-  tienen prueba de disposición.
+- **Huecos en las pruebas de disposición.** Servicios, Novedades, Info, Privacidad, Agregar parada y
+  la pantalla de bloqueo se prueban solo a 2×. Agregar ruta, Ajustes de aviso y el detalle de una
+  novedad no tienen prueba de disposición.
 - **Los tamaños de accesibilidad de iOS**, más grandes que 2×, no están probados.
+- **Privacidad en un teléfono angosto.** A 2× en una pantalla de 360 de ancho,
+  «geoserver.montevideo.gub.uy» se parte en dos líneas en medio de la palabra; desde 375 entra en
+  una. No se corta nada. La prueba usa 390 de ancho.
 - **Los bordes `lineaNoche`** quedan por debajo de 3:1 (ver «Contraste»).

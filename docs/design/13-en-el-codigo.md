@@ -52,20 +52,23 @@ docs/design/             este sistema; tokens.json lo verifica una prueba
 | `empty_state.dart` | `TimbreEmptyState(message, sign, detail)`: una lista vacía como cartel | Mis paradas, Horarios, Novedades |
 | `segmented.dart` | `TimbreSegmented<T>` | Tipo de día en Horarios; 3, 5 o 10 min en «Estoy esperando» |
 | `page_title_bar.dart` | `PageTitleBar`: el título grande y el subtítulo (hasta 4 líneas, `subtitleMaxLines`), con la altura medida según la letra del sistema | `buildTimbreAppBar` |
-| `timbre_app_bar.dart` | `buildTimbreAppBar(…)`: el tablero de arriba con sus LED, la placa y el título | `HomePage`, Horarios, Info |
+| `timbre_app_bar.dart` | `buildTimbreAppBar(…)`: el tablero de arriba con sus LED, la placa y el título | `HomePage`, Horarios, Info, Privacidad |
 | `led_matrix.dart` | `LedMatrix(pitch, dot, color, opacity, fadeFrom)`: los LED apagados | La barra de arriba, los mosaicos de Servicios, el bloqueo, Info, la fecha sin leer de Novedades, `TimbreEmptyState`, `TimbreAppIcon` |
 | `led_lock.dart` | `LedLock(pitch, scanning)`: el candado animado | Pantalla de bloqueo |
 | `pixel_icon.dart` | `PixelGlyph` (12 filas de 12 celdas) y `PixelIcon(glyph, size, color, glow, semanticLabel)` | Todos los íconos de la app |
 | `pixel_glyphs.dart` | `PixelGlyphs`: los 33 glifos. Es `part of 'pixel_icon.dart'` | Ver [04-iconos.md](04-iconos.md) |
 | `timbre_bus.dart` | `TimbreBusPalette`, `TimbreBusDetail`, `TimbreBus`, `TimbreAppIcon` y `TimbreBusPainter`: el ómnibus de la marca | La placa, `TimbreEmptyState`; `TimbreAppIcon(size: 64)` en Info |
 
-Dos archivos de apoyo están junto a las pantallas:
+Tres archivos de apoyo están junto a las pantallas:
 
 - `lib/ui/spoken_text.dart`: `spokenName()`, que pasa los nombres en
   mayúsculas de la API («PUNTA CARRETAS») a la forma en que los lee bien un
   lector de pantalla ([11-accesibilidad.md](11-accesibilidad.md)).
 - `lib/ui/safe_html.dart`: `SafeHtml` y `htmlToBlocks`. Muestran solo el
   texto del HTML de una novedad: sin WebView, sin scripts, sin imágenes.
+- `lib/ui/policy_markdown.dart`: `policyToBlocks`, que lee solo el Markdown
+  de `docs/privacy-policy.md` (`# `, `## `, párrafos, `- `, `**negrita**` y
+  `` `código` ``) y deja afuera las líneas citadas (`>`).
 
 Qué muestra cada componente y de qué campo sale: [08-componentes.md](08-componentes.md)
 y [pantalla-a-datos.md](pantalla-a-datos.md).
@@ -74,13 +77,15 @@ y [pantalla-a-datos.md](pantalla-a-datos.md).
 
 | Archivo | Qué es |
 |---|---|
-| `lib/main.dart` | `main()`: deja la pantalla de inicio hasta abrir Hive, las notificaciones, WorkManager y «Estoy esperando»; registra las licencias de las fuentes y de pixelarticons (`_registerFontLicenses`). `MiTransporteMVDApp`: `MaterialApp` con título «Timbre MVD» y `HomePage.routeObserver` |
-| `home_page.dart` | `HomePage`: la navegación de abajo (Mis paradas y Servicios), el bloqueo biométrico (`local_auth`), la apertura de Info y de los sitios en el navegador. `routeObserver` avisa a Mis paradas cuando una página la tapa |
+| `lib/main.dart` | `main()`: deja la pantalla de inicio hasta abrir Hive, las notificaciones, WorkManager y «Estoy esperando»; registra las licencias de las fuentes y de pixelarticons (`_registerFontLicenses`). `MiTransporteMVDApp`: `MaterialApp` con título «Timbre MVD», `HomePage.routeObserver` y `AppLock.routeGuard` en `navigatorObservers`, y `AppLock` en `builder`; recibe `deviceAuth` (`LocalDeviceAuth` por defecto, uno falso en las pruebas) |
+| `app_lock.dart` | `AppLock` y `AppLockState`: el bloqueo biométrico, encima del `Navigator`. Pide la autenticación, vuelve a bloquear después del segundo plano, escucha `ExternalApps.launches`, hace la preparación única del primer desbloqueo (`_setupAfterAuth`) y prende o apaga el bloqueo desde Info (`setEnabled`). `AppLock.of(context)` da `locked` y `enabled`; `routeGuard` no deja cerrar rutas mientras está bloqueada; `clock` lo adelantan las pruebas |
+| `home_page.dart` | `HomePage`: la navegación de abajo (Mis paradas y Servicios), la apertura de Info (con `enabled` y `setEnabled` de `AppLock`) y de los sitios en el navegador. `routeObserver` avisa a Mis paradas cuando una página la tapa; con la app bloqueada, también le pasa `active: false` |
 | `stops_page.dart` | `StopsPage`: las subpestañas Paradas, Rutas y Novedades; las tarjetas; `_refresh` (cada 30 s, `autoRefreshInterval`, solo con la pantalla a la vista); los datos viejos (`_staleFor`, `_staleRowGrace`, `_liveFor`; `_BoardView.receivedAt`, con el reloj `StopsPage.clock` que las pruebas adelantan); la hoja de «Estoy esperando» (`_showWaitSheet`); los diálogos `_AddStopDialog` y `_AddRouteDialog`; los ajustes de aviso (`_AlertSettingsSheet`); el aviso de GPS parcial |
 | `news_list.dart` | `NewsList`, `_NewsRow`, `_DateTile`, `_FailedBanner`; `showNewsDetail` y `openExternalLink` |
 | `schedule_page.dart` | `SchedulePage` (Horarios), `_HourHeader`, `_PassRow` |
 | `services_page.dart` | `ServicesPage`, `_SiteTile`, `_BrowserNote` |
 | `info_page.dart` | `InfoPage`, `_LinkRow` |
+| `privacy_policy_page.dart` | `PrivacyPolicyPage` (Privacidad): lee el asset `docs/privacy-policy.md` (declarado en `pubspec.yaml`) y lo muestra con `policyToBlocks` |
 | `lock_screen.dart` | `LockScreen`, con `LedLock` |
 
 Estados, datos y refresco de cada pantalla: [09-pantallas.md](09-pantallas.md).
@@ -109,7 +114,7 @@ armado en el teléfono ([contrato-v1.md](contrato-v1.md#en-la-app)).
 |---|---|
 | `mvd_api_service.dart` | `MvdApiService`, la fachada. `proxyUrl` sale de `--dart-define=MVD_PROXY_URL`; `usesProxy` y `source` eligen `ProxySource` o `DirectSource`. Llamadas: `getBoard`, `getBoards` (cada parada una vez, en paralelo), `getStopDetails`, `healPlaceholderStops`, `getSchedule` (guardado 6 h), `getStopCatalog` (guardado un día; uno sin líneas, 15 min, y nunca encima de una copia con líneas), `searchStops`, `getNews`, `getGpsStatus`, `isValidStopId`, `montevideoClock`. Después de un 429 no pide nada hasta `retryAfter`. Quedan por compatibilidad `getNextArrivals`, `resolveStop` (con `StopNotFoundException`), `parseArrivals` y `parseSchedule` |
 | `cache_service.dart` | `CacheService`: las cajas de Hive `settings`, `stops` y `routes`, y la caja diferida `catalog` (el cuerpo del catálogo y `fetched_at_ms`). La migración `cache_schema` = 2 borra el catálogo viejo de `settings` |
-| `nearby_stops_service.dart` | `NearbyStopsService`: `findNearMe`, `nearbyFrom`, `radiusMeters` = 400, `boxHalfSideMeters` = 472; `NearbyStopsError` |
+| `nearby_stops_service.dart` | `NearbyStopsService`: `findNearMe`, `nearbyFrom`, `radiusMeters` = 400, `boxHalfSideMeters` = 472, `openAppSettings` (con `ExternalApps.open`); `NearbyStopsError` |
 | `transport_news_service.dart` | `TransportNewsService`: refresco cada 10 min, o 30 s si lo pedís; guarda hasta 30 novedades; `unreadCount`, `markRead` |
 | `bus_status_service.dart` | `BusStatusService`: el GPS por empresa, una consulta por minuto como mucho; `partialWarning` |
 | `background_worker.dart` | `BackgroundWorker`: la tarea de WorkManager cada 15 min (`checkAlerts`), y `sync` para registrarla o cancelarla y para vaciar el widget cuando no queda ninguna ruta activa |
@@ -118,6 +123,8 @@ armado en el teléfono ([contrato-v1.md](contrato-v1.md#en-la-app)).
 | `bus_wait_service.dart` | `BusWaitService` («Estoy esperando»), `AndroidBusWait` (servicio en primer plano, canal `bus_wait`) y `ScheduledBusWait` (recordatorio en iOS); `WaitStart` |
 | `bus_wait_task.dart` | `BusWaitTaskHandler`: la consulta cada 30 s dentro del servicio de Android |
 | `official_sites.dart` | `OfficialSite` (`miStm`, `recarga`, `comoIr`, `avisos`), `comoIrStop` y `SystemBrowser.open`: los sitios oficiales se abren en el navegador, nunca dentro de la app |
+| `external_apps.dart` | `ExternalApps`: la única salida a otra app. `launch` abre una URL (navegador, correo, enlace de una novedad) y `open`, una llamada de plugin (los ajustes del sistema); las dos avisan antes a `launches`, que escucha el bloqueo |
+| `device_auth.dart` | `DeviceAuth`, el pedido de autenticación del sistema, y `LocalDeviceAuth`, con `local_auth` (`stickyAuth`, `biometricOnly: false`) |
 
 ## Modelos: `lib/models/`
 
@@ -144,9 +151,9 @@ no entiende los elementos de colección con `?` (`[?x]`): si los usás en
 
 | Grupo | Archivos |
 |---|---|
-| Diseño y marca | `design_tokens_test.dart` (`tokens.json` igual al código), `brand_assets_test.dart`, `cartel_test.dart`, `screens_test.dart`, `lock_screen_test.dart`, `info_page_test.dart`, `spoken_text_test.dart`, `safe_html_test.dart` |
+| Diseño y marca | `design_tokens_test.dart` (`tokens.json` igual al código), `brand_assets_test.dart`, `cartel_test.dart`, `screens_test.dart`, `lock_screen_test.dart`, `info_page_test.dart`, `privacy_policy_test.dart`, `spoken_text_test.dart`, `safe_html_test.dart` |
 | Letra grande | `stops_layout_test.dart`, `stop_search_layout_test.dart` |
-| Pantallas y flujos | `widget_test.dart`, `stops_page_test.dart`, `stops_board_test.dart`, `add_dialogs_test.dart`, `stop_search_test.dart`, `news_tab_test.dart`, `schedule_test.dart` |
+| Pantallas y flujos | `widget_test.dart`, `app_lock_test.dart` (el bloqueo sobre la app entera, con un `DeviceAuth` falso), `stops_page_test.dart`, `stops_board_test.dart`, `add_dialogs_test.dart`, `stop_search_test.dart`, `news_tab_test.dart`, `schedule_test.dart` |
 | Datos | `mvd_api_service_test.dart`, `cache_service_test.dart`, `nearby_stops_service_test.dart`, `transport_news_service_test.dart`, `bus_status_service_test.dart`, `background_worker_test.dart`, `bus_wait_test.dart`, `route_alert_test.dart`, `alert_schedule_test.dart` |
 | Privacidad | `proxy_privacy_test.dart` (cada servicio con proxy pide solo al proxy y nunca manda la posición), `proxy_bff_test.dart` (lo mismo, desde las pantallas) |
 | Contrato /v1 | `contract/contract_test.dart` (modo directo y modo proxy contra los goldens), `contract/rules_test.dart` (los vectores) |

@@ -177,6 +177,7 @@ desvanecen hacia el título (`LedMatrix` con `TimbreOpacity.ledUnlit`) y abajo e
 | Servicios | «Servicios» | «Sitios oficiales, en tu navegador» | título y subtítulo |
 | Horarios | «Horarios» | `BusStop.name` + « · » + `BusStop.id`, en Fira Sans Extra Condensed 17 `etiquetaCartel` | «Horarios de la parada 574, San Jose y Andes» |
 | Info | «Info» | — | «Info» |
+| Privacidad | «Privacidad» | — | «Privacidad» |
 
 El nombre de la parada en Horarios es el que guardaste (`BusStop.name`, que vino de /v1
 `name` o del catálogo).

@@ -140,8 +140,8 @@ Dónde se muestra (colores en [02-color.md](02-color.md)):
 - **Sobre una lista que se sigue viendo:** el panel `avisoNoche` con borde `ambarTenue` e ícono
   en `ambar`. Lo usan el fallo de Novedades y el aviso de GPS parcial.
 - **Después de una acción:** un snack bar. En `lib/ui/stops_page.dart` (`_showError`) lleva el
-  ícono `warning` en `rojoLed`. En `home_page.dart`, `info_page.dart` y `news_list.dart` es
-  texto solo.
+  ícono `warning` en `rojoLed`. En `home_page.dart`, `info_page.dart`, `app_lock.dart` y
+  `news_list.dart` es texto solo.
 
 ### Mis paradas: tarjetas de parada y de ruta
 
@@ -240,12 +240,16 @@ Código: `lib/ui/news_list.dart`.
 | Pie de la lista | «Publicadas por la Intendencia de Montevideo (Cómo Ir).» |
 | El enlace no se abrió | «No se pudo abrir el enlace. Probá de nuevo más tarde.» |
 
-### Servicios, Info y bloqueo
+### Servicios, Info, Privacidad y bloqueo
 
-Código: `lib/ui/home_page.dart`, `lib/ui/info_page.dart`, `lib/ui/lock_screen.dart`.
+Código: `lib/ui/home_page.dart`, `lib/ui/info_page.dart`, `lib/ui/privacy_policy_page.dart`,
+`lib/ui/app_lock.dart`, `lib/ui/lock_screen.dart`.
 
 | Situación | Texto |
 |---|---|
+| «FUENTE DE DATOS» de Info, solo con proxy | «Aire acondicionado y cero emisiones: API de transporte público de Montevideo.», «Las consultas pasan por el servidor del proyecto, que no guarda datos personales.» |
+| Enlace a la política, en Info | «Política de privacidad»; abre la pantalla «Privacidad» |
+| Pantalla Privacidad | el texto de `docs/privacy-policy.md` tal cual, sin las líneas `>`; cada `## ` en mayúsculas («RESUMEN») |
 | No se abrió el navegador | «No se pudo abrir el navegador. Revisá que tengas uno activado.» |
 | No se abrió el correo | «No se pudo abrir el correo. Revisá que tengas una app de correo configurada.» |
 | El teléfono no tiene bloqueo de pantalla | «Tu dispositivo no tiene bloqueo de pantalla. Configuralo en Ajustes.» |

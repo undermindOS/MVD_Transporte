@@ -95,8 +95,8 @@ Tamaño y color de cada uso, en ese orden.
 | `live` | Timbre | Un LED encendido: dato con GPS | Sin uso. El punto de los minutos en vivo es `LiveDot`, no este glifo. |
 | `code` | Timbre | Código fuente | Sin uso. La fila «Código fuente» de Info usa `external`. |
 | `grid` | pixelarticons | Servicios | Pestaña Servicios de la navegación (24). |
-| `back` | pixelarticons | Atrás | Flecha de las pantallas apiladas (Info, Horarios), desde `actionIconTheme` del tema (24, `papel`). |
-| `external` | pixelarticons | Se abre fuera de la app | Rincón de los mosaicos de Servicios (14, `ambarTenue`); nota del navegador en Servicios (22, `etiquetaCartel`); «Política de privacidad» y «Código fuente» en Info (20, `ambar`); «Ver más» de una novedad (20, `tinta`). |
+| `back` | pixelarticons | Atrás | Flecha de las pantallas apiladas (Info, Privacidad, Horarios), desde `actionIconTheme` del tema (24, `papel`). |
+| `external` | pixelarticons | Se abre fuera de la app | Rincón de los mosaicos de Servicios (14, `ambarTenue`); nota del navegador en Servicios (22, `etiquetaCartel`); «Código fuente» en Info (20, `ambar`); «Ver más» de una novedad (20, `tinta`). |
 | `card` | pixelarticons | Mi STM | Mosaico Mi STM de Servicios (48, `ambar`, brillo). |
 | `money` | pixelarticons | Recarga | Mosaico Recarga de Servicios (48, `ambar`, brillo). |
 | `map` | pixelarticons | Cómo Ir | «Ver en Cómo Ir» de la tarjeta (20, `ambar`); mosaico Cómo Ir de Servicios (48, `ambar`, brillo). |
@@ -105,7 +105,7 @@ Tamaño y color de cada uso, en ese orden.
 | `mail` | pixelarticons | Contacto | Fila «Contacto» de Info (20, `ambar`). |
 | `news` | pixelarticons | Novedades | Subpestaña Novedades (22), con la insignia de no leídas. |
 | `gps` | pixelarticons | Paradas cercanas | «Paradas cercanas» en Agregar parada (20, `ambar`). |
-| `chevronRight` | pixelarticons | Ver más opciones | Al final de la fila «Aviso N min antes» (14, `etiquetaCartel`). |
+| `chevronRight` | pixelarticons | Ver más opciones | Al final de la fila «Aviso N min antes» (14, `etiquetaCartel`); «Política de privacidad» en Info, que abre una pantalla de la app (20, `ambar`). |
 | `chevronDown` | pixelarticons | Desplegar | «Ver las N» bajo las filas de una tarjeta (20, `ambar`). |
 | `minus` | pixelarticons | Plegar | «Ver menos» (20, `ambar`). |
 | `close` | pixelarticons | Cerrar | Ícono de cierre del tema (`closeButtonIconBuilder`). Hoy ninguna pantalla muestra un botón de cierre. |
