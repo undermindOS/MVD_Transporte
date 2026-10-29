@@ -93,7 +93,6 @@ después la app.
 - `lib/ui/theme/` — el sistema de diseño Timbre: colores, medidas y opacidades (`timbre_tokens.dart`),
   estilos de texto (`timbre_text.dart`) y tema (`timbre_theme.dart`); los componentes están en
   `lib/ui/widgets/`. Guía: [docs/design/README.md](docs/design/README.md)
-- `android/.../MVDTransporteWidgetProvider.kt` — widget de la pantalla de inicio (la próxima ruta)
 - `android/.../TimbreStopWidget.kt`, `StopWidgetData.kt` y `lib/services/stop_widgets_feed.dart` — widgets de
   parada: Próximo (2 × 2), Parada (4 × 2) y Mis paradas (4 × 4)
 

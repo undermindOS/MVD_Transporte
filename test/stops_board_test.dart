@@ -97,7 +97,7 @@ String _board(int stopId, List<_Trip> trips, {DateTime? fetchedAt}) {
 void main() {
   late Directory hiveDir;
   final requests = <String>[];
-  // What the home widget would read
+  // What the stop widgets would read
   final widgetData = <String, Object?>{};
   late Future<http.Response> Function(http.Request request) answer;
 
@@ -555,7 +555,7 @@ void main() {
     }, () => client);
   });
 
-  testWidgets('the home widget follows each refresh', (tester) async {
+  testWidgets('the stop widgets follow each refresh', (tester) async {
     // The source stamped the boards 6 min before the phone's clock
     final fetchedAt =
         DateTime.now().toUtc().subtract(const Duration(minutes: 6));
@@ -563,33 +563,41 @@ void main() {
     answer = (request) async => failing
         ? http.Response('{"error":"upstream_timeout"}', 504)
         : boards(request, fetchedAt: fetchedAt);
+    Map<String, Object?> board(int id) =>
+        jsonDecode(widgetData['stop_board_$id']! as String)
+            as Map<String, Object?>;
 
     await http.runWithClient(() async {
       await tester.pumpWidget(app());
       await tester.pump();
       await tester.pump();
 
-      // The route's next bus at its origin: its own destination and time
-      expect(widgetData['route_status'], 'ok');
-      expect(widgetData['route_line'], '116');
-      expect(widgetData['route_dest'], 'POCITOS');
-      expect(widgetData['route_eta_min'], 9);
-      expect(widgetData['route_eta_at'], '20:01');
+      // The saved stops, in the order of Mis paradas
+      expect(jsonDecode(widgetData['stops_saved']! as String), [
+        {'id': 574, 'name': 'SAN JOSE y ANDES'},
+        {'id': 3140, 'name': 'AV RAMON ANADOR y TIBURCIO GOMEZ'},
+      ]);
+      // Every bus of the board, with its own destination and time
+      final arrivals = board(574)['arrivals']! as List;
+      expect(arrivals.map((a) => (a as Map)['line']), ['121', '116', '144']);
+      final bus116 = arrivals[1] as Map;
+      expect(bus116['dest'], 'POCITOS');
+      expect(bus116['clock'], '20:01');
       // Due 9 min after the stamp, kept on the phone's clock: 6 min later.
       // Real time: the board takes a moment to reach the widget
       final dueOnPhone = fetchedAt
           .add(const Duration(minutes: 9 + 6))
           .millisecondsSinceEpoch;
-      expect(int.parse(widgetData['route_expected_at_ms']! as String),
-          inInclusiveRange(dueOnPhone, dueOnPhone + 5000));
+      expect(bus116['dueMs'], inInclusiveRange(dueOnPhone, dueOnPhone + 5000));
+      expect(board(3140)['arrivals'], hasLength(1));
 
-      // Offline: the row stays while its bus is still due
+      // Offline: the buses stay, the board says it failed
       failing = true;
       await tester.pump(StopsPage.autoRefreshInterval);
       await tester.pump();
       await tester.pump();
-      expect(widgetData['route_status'], 'offline');
-      expect(widgetData['route_line'], '116');
+      expect(board(574)['arrivals'], hasLength(3));
+      expect(board(574)['failedAtMs'], isA<int>());
     }, () => client);
   });
 

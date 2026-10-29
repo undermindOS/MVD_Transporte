@@ -1,7 +1,7 @@
 // Periodic background check (WorkManager): stop and route alerts notify
 // about GPS-tracked buses within their threshold, only inside their
-// schedule, and the home widget shows the first route's next bus. HTTP,
-// the notifications plugin and the home widget are faked.
+// schedule, and the stop widgets get the boards of the stops they show.
+// HTTP, the notifications plugin and the home widget plugin are faked.
 
 import 'dart:convert';
 import 'dart:io';
@@ -17,7 +17,6 @@ import 'package:stm_app/models/bus_stop.dart';
 import 'package:stm_app/models/route_alert.dart';
 import 'package:stm_app/services/background_worker.dart';
 import 'package:stm_app/services/cache_service.dart';
-import 'package:stm_app/services/home_widget_feed.dart';
 import 'package:stm_app/services/mvd_api_service.dart';
 import 'package:stm_app/services/notification_service.dart';
 import 'package:stm_app/services/stop_widgets_feed.dart';
@@ -80,10 +79,8 @@ void main() {
   late Directory hiveDir;
   final shown = <String>[];
   final requests = <String>[];
-  // What the widget would read, and how often it was told to redraw
+  // What the widgets would read, and which were told to redraw
   final widget = <String, Object?>{};
-  var redraws = 0;
-  // Stop widgets told to redraw
   final stopRedraws = <String>[];
 
   var client = MockClient((request) async {
@@ -123,12 +120,7 @@ void main() {
         case 'getWidgetData':
           return widget[args!['id'] as String];
         case 'updateWidget':
-          if (args!['android'] case final String stopWidget) {
-            stopRedraws.add(stopWidget);
-          } else {
-            expect(args['name'], 'MVDTransporteWidgetProvider');
-            redraws++;
-          }
+          stopRedraws.add(args!['android'] as String);
       }
       return true;
     });
@@ -300,14 +292,12 @@ void main() {
     });
   });
 
-  group('home widget', () {
+  group('stop widgets', () {
     var proxyUp = true;
-    var destination = 'POCITOS';
     final proxy = MockClient((request) async {
       requests.add(request.url.path);
       if (!proxyUp) throw http.ClientException('offline');
-      return http.Response.bytes(
-          utf8.encode(_v1Answer(destination: destination)), 200);
+      return http.Response.bytes(utf8.encode(_v1Answer()), 200);
     });
     Future<List<String>> checkAt(DateTime now) async {
       shown.clear();
@@ -317,78 +307,80 @@ void main() {
       return [...shown];
     }
 
+    Map<String, Object?> board() =>
+        jsonDecode(widget[StopWidgetsFeed.keyBoard(574)] as String)
+            as Map<String, Object?>;
+
+    // What TimbreStopWidget writes for a placed Parada widget on 574
+    Future<void> placeWidget() async {
+      await CacheService.saveStop(BusStop(id: 574, name: 'SAN JOSE y ANDES'));
+      widget
+        ..[StopWidgetsFeed.keyShownStops] = '574'
+        ..[StopWidgetsFeed.keyPlacedWidgets] = '1';
+    }
+
     setUp(() {
       MvdApiService.proxyUrl = 'https://proxy.test';
       widget.clear();
-      redraws = 0;
       stopRedraws.clear();
       proxyUp = true;
-      destination = 'POCITOS';
     });
 
-    test('shows the next bus of the first route, then keeps it offline',
+    test('no widget placed: nothing is asked for widgets', () async {
+      await CacheService.saveStop(BusStop(id: 574, name: 'SAN JOSE y ANDES'));
+      expect(await checkAt(_t0), isEmpty);
+      expect(requests, isEmpty);
+      expect(widget, isEmpty);
+      expect(stopRedraws, isEmpty);
+    });
+
+    test('the stop widgets get their stops at any hour, without alerts',
         () async {
-      await saveRoute(lines: ['116']);
+      await placeWidget();
 
-      expect(await checkAt(_t0), ['Línea 116 → Trabajo']);
-      final due = _t0.add(const Duration(minutes: 4));
-      expect(widget, {
-        WidgetFeed.keyLine: '116',
-        // The bus's own destination, as in "Línea 116 a POCITOS"
-        WidgetFeed.keyDestination: 'POCITOS',
-        WidgetFeed.keyEtaMinutes: 4,
-        WidgetFeed.keyClockTime: '19:56',
-        WidgetFeed.keyExpectedAtMs: '${due.millisecondsSinceEpoch}',
-        WidgetFeed.keyCheckedAtMs: '${_t0.millisecondsSinceEpoch}',
-        WidgetFeed.keyStatus: 'ok',
+      expect(await checkAt(_t0), isEmpty);
+      expect(requests, ['/v1/stops/574/arrivals']);
+      expect(jsonDecode(widget[StopWidgetsFeed.keySavedStops] as String), [
+        {'id': 574, 'name': 'SAN JOSE y ANDES'},
+      ]);
+      expect(board()['checkedAtMs'], _t0.millisecondsSinceEpoch);
+      expect((board()['arrivals'] as List).first, {
+        'line': '116',
+        'dest': 'POCITOS',
+        'clock': '19:56',
+        'dueMs': _t0.add(const Duration(minutes: 4)).millisecondsSinceEpoch,
+        'acc': true,
       });
-      expect(redraws, 1);
-
-      // Offline before the bus is due: no alert, the row stays
-      proxyUp = false;
-      expect(await checkAt(_t0.add(const Duration(minutes: 2))), isEmpty);
-      expect(widget[WidgetFeed.keyLine], '116');
-      expect(widget[WidgetFeed.keyStatus], 'offline');
-      expect(widget[WidgetFeed.keyCheckedAtMs],
-          '${_t0.millisecondsSinceEpoch}');
-      expect(redraws, 2);
-
-      // Offline after it was due: the empty state
-      expect(await checkAt(_t0.add(const Duration(minutes: 5))), isEmpty);
-      expect(widget[WidgetFeed.keyLine], isNull);
-      expect(widget[WidgetFeed.keyStatus], 'offline');
-      expect(redraws, 3);
+      expect(stopRedraws, StopWidgetsFeed.providers);
     });
 
     test('a phone clock 6 min ahead of the proxy: the due time is kept on '
         'the phone\'s clock', () async {
-      await saveRoute(lines: ['116']);
+      await placeWidget();
       // The proxy stamped the board at _t0, the phone read _t0 + 6 min
       final phone = _t0.add(const Duration(minutes: 6));
       await checkAt(phone);
       // Due 4 min after the stamp: 10 min after _t0 on the phone's clock
       final dueOnPhone = _t0.add(const Duration(minutes: 10));
-      expect(widget[WidgetFeed.keyExpectedAtMs],
-          '${dueOnPhone.millisecondsSinceEpoch}');
+      final first = (board()['arrivals'] as List).first as Map;
+      expect(first['dueMs'], dueOnPhone.millisecondsSinceEpoch);
       // The time shown is still the source's
-      expect(widget[WidgetFeed.keyClockTime], '19:56');
-      expect(widget[WidgetFeed.keyCheckedAtMs],
-          '${phone.millisecondsSinceEpoch}');
+      expect(first['clock'], '19:56');
+      expect(board()['checkedAtMs'], phone.millisecondsSinceEpoch);
 
-      // Offline 3 min later: still due on the phone's clock, the row stays
+      // Offline 3 min later: the buses stay, the board says it failed
       proxyUp = false;
-      await checkAt(phone.add(const Duration(minutes: 3)));
-      expect(widget[WidgetFeed.keyLine], '116');
-      expect(widget[WidgetFeed.keyStatus], 'offline');
-      // 5 min later it was due: the empty state
-      await checkAt(phone.add(const Duration(minutes: 5)));
-      expect(widget[WidgetFeed.keyLine], isNull);
+      final later = phone.add(const Duration(minutes: 3));
+      await checkAt(later);
+      expect(board()['arrivals'], hasLength(2));
+      expect(board()['checkedAtMs'], phone.millisecondsSinceEpoch);
+      expect(board()['failedAtMs'], later.millisecondsSinceEpoch);
     });
 
     test('without the proxy, IM 6 min behind the phone: its Date header '
         'keeps the due time on the phone\'s clock', () async {
       MvdApiService.proxyUrl = '';
-      await saveRoute(lines: ['116']);
+      await placeWidget();
       // IM answered at imAt by its Date header, the phone read imAt + 6 min.
       // The test's clock, to the second as the header is: a Date a day off
       // the phone's clock is not taken
@@ -416,88 +408,10 @@ void main() {
           () => BackgroundWorker.checkAlerts(phone), () => im);
 
       // Due 4 min after IM's stamp: 10 min after imAt on the phone's clock
-      final dueOnPhone = imAt.add(const Duration(minutes: 10));
-      expect(widget[WidgetFeed.keyExpectedAtMs],
-          '${dueOnPhone.millisecondsSinceEpoch}');
-      expect(widget[WidgetFeed.keyClockTime], '19:56');
-    });
-
-    test('no bus of the route coming, or no route at all', () async {
-      final route = await saveRoute(lines: ['999']);
-      await checkAt(_t0);
-      expect(widget[WidgetFeed.keyLine], isNull);
-      expect(widget[WidgetFeed.keyStatus], 'none');
-      expect(widget[WidgetFeed.keyCheckedAtMs],
-          '${_t0.millisecondsSinceEpoch}');
-
-      // Only a stop alert left: nothing for the widget, only its stop asked
-      route.enabled = false;
-      await route.save();
-      await saveStop();
-      await checkAt(_t0);
-      expect(widget[WidgetFeed.keyLine], isNull);
-      expect(widget[WidgetFeed.keyStatus], 'off');
-      expect(requests, ['/v1/stops/574/arrivals']);
-    });
-
-    test('a bus without a destination shows the route\'s name', () async {
-      destination = '';
-      await saveRoute(lines: ['116']);
-      await checkAt(_t0);
-      expect(widget[WidgetFeed.keyDestination], 'Trabajo');
-    });
-
-    test('sync() without alerts empties the widget', () async {
-      widget[WidgetFeed.keyLine] = '116';
-      await BackgroundWorker.sync();
-      await pumpEventQueue(); // the widget is not awaited
-      expect(widget[WidgetFeed.keyLine], isNull);
-      expect(widget[WidgetFeed.keyStatus], 'off');
-      expect(redraws, 1);
-    });
-
-    test('sync() empties the widget when no route is left, even with a stop '
-        'alert', () async {
-      final route = await saveRoute(lines: ['116']);
-      await saveStop();
-      widget
-        ..[WidgetFeed.keyLine] = '116'
-        ..[WidgetFeed.keyStatus] = 'ok';
-
-      route.enabled = false;
-      await route.save();
-      await BackgroundWorker.sync();
-      await pumpEventQueue(); // the widget is not awaited
-      expect(widget[WidgetFeed.keyLine], isNull);
-      expect(widget[WidgetFeed.keyStatus], 'off');
-    });
-
-    test('the stop widgets get their stops at any hour, without alerts',
-        () async {
-      await CacheService.saveStop(BusStop(id: 574, name: 'SAN JOSE y ANDES'));
-      // What TimbreStopWidget writes for a placed Parada widget
-      widget
-        ..[StopWidgetsFeed.keyShownStops] = '574'
-        ..[StopWidgetsFeed.keyPlacedWidgets] = '1';
-
-      expect(await checkAt(_t0), isEmpty);
-      expect(requests, ['/v1/stops/574/arrivals']);
-      expect(jsonDecode(widget[StopWidgetsFeed.keySavedStops] as String), [
-        {'id': 574, 'name': 'SAN JOSE y ANDES'},
-      ]);
-      final board = jsonDecode(
-          widget[StopWidgetsFeed.keyBoard(574)] as String) as Map;
-      expect(board['checkedAtMs'], _t0.millisecondsSinceEpoch);
-      expect((board['arrivals'] as List).first, {
-        'line': '116',
-        'dest': 'POCITOS',
-        'clock': '19:56',
-        'dueMs': _t0.add(const Duration(minutes: 4)).millisecondsSinceEpoch,
-        'acc': true,
-      });
-      expect(stopRedraws, StopWidgetsFeed.providers);
-      // No route: the route widget only says so
-      expect(redraws, 1);
+      final first = (board()['arrivals'] as List).first as Map;
+      expect(first['dueMs'],
+          imAt.add(const Duration(minutes: 10)).millisecondsSinceEpoch);
+      expect(first['clock'], '19:56');
     });
   });
 }

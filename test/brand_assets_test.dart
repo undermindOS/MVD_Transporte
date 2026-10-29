@@ -7,7 +7,6 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:stm_app/services/home_widget_feed.dart';
 import 'package:stm_app/services/stop_widgets_feed.dart';
 
 String _read(String path) => File(path).readAsStringSync();
@@ -82,45 +81,6 @@ void main() {
     // turn brown, the navy stays itself
     expect(service, contains('color: TimbreColors.tinta'));
     expect(service, isNot(contains('TimbreColors.ambar')));
-  });
-
-  test('the home widget is a small night board', () {
-    final layout = _read('$res/layout/mvd_transporte_widget.xml');
-    expect(layout, contains('@drawable/widget_background'));
-    // Mi STM and Recarga are 44 dp touch targets
-    final heights = RegExp(r'android:minHeight="(\d+)dp"')
-        .allMatches(layout)
-        .map((m) => int.parse(m.group(1)!));
-    expect(heights, hasLength(2));
-    expect(heights, everyElement(greaterThanOrEqualTo(44)));
-    expect(layout, contains('@drawable/widget_plate'));
-    expect(layout, isNot(contains('#FFFFFFFF')));
-    expect(_read('$res/drawable/widget_background.xml'),
-        contains('@color/tinta'));
-    // The widget picker shows the real layout (Android 12+)
-    expect(_read('$res/xml/mvd_transporte_widget_info.xml'),
-        contains('android:previewLayout="@layout/mvd_transporte_widget"'));
-    // Every view the provider fills exists in the layout
-    final provider = _read('android/app/src/main/kotlin/com/liberontech/'
-        'stmapp/MVDTransporteWidgetProvider.kt');
-    for (final id in RegExp(r'R\.id\.(\w+)')
-        .allMatches(provider)
-        .map((m) => m.group(1)!)
-        .toSet()) {
-      expect(layout, contains('@+id/$id'), reason: id);
-    }
-    // It reads the keys the app writes, and hides the row 2 min after
-    // its bus was due
-    for (final key in [
-      WidgetFeed.keyLine,
-      WidgetFeed.keyDestination,
-      WidgetFeed.keyEtaMinutes,
-      WidgetFeed.keyClockTime,
-      WidgetFeed.keyExpectedAtMs,
-    ]) {
-      expect(provider, contains('"$key"'), reason: key);
-    }
-    expect(provider, contains('EXPIRED_AFTER_MS = 2 * 60 * 1000L'));
   });
 
   test('the stop widgets are night boards in three sizes', () {

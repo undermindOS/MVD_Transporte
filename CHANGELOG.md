@@ -282,6 +282,9 @@ versiones: [SemVer](https://semver.org/lang/es/).
   subió a 15.0 y el Podfile alinea el target de todos los pods.
 
 ### Eliminado
+- El widget de ruta de Android (3 × 2: el próximo ómnibus de la primera ruta con aviso), reemplazado por los
+  widgets de parada. Un widget de ruta que ya estaba en la pantalla de inicio deja de cargar: hay que quitarlo y
+  poner uno de parada. Los avisos de ruta siguen igual.
 - Saldo de la tarjeta en el widget de Android y `BalanceScraper`: desde el navegador del sistema no se puede leer
   el saldo, y no hay una API abierta de saldo (en `api.montevideo.gub.uy` solo están `transporte` y `playas`).
 - `ComoIrScraper` y el banner «Ruta detectada en Cómo Ir» (no funcionaba: Cómo Ir es una SPA de Ionic).

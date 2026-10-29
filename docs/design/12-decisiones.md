@@ -27,7 +27,6 @@ la pestaña Mapa. El contrato completo está en [contrato-v1.md](contrato-v1.md)
 - Datos y pantallas: [Datos viejos como estimado](#los-datos-viejos-se-muestran-como-estimado) ·
   [«NUEVA» en ámbar](#nueva-y-la-fecha-de-lo-no-leído-van-en-ámbar) ·
   [El brillo de `LiveDot`](#el-brillo-de-livedot) ·
-  [El widget muestra el destino del ómnibus](#el-widget-muestra-el-destino-del-ómnibus) ·
   [Los widgets de parada encienden la línea, no la hora](#los-widgets-de-parada-encienden-la-línea-no-la-hora) ·
   [El bloqueo va encima del `Navigator`](#el-bloqueo-va-encima-del-navigator) ·
   [El bloqueo vuelve solo después del segundo plano](#el-bloqueo-vuelve-solo-después-del-segundo-plano) ·
@@ -136,9 +135,9 @@ plantilla.
 dibujados por `PixelIcon`. En `lib/` no queda ningún `Icons.`.
 
 **Consecuencia.** Un ícono nuevo se dibuja en la grilla
-([04-iconos.md](04-iconos.md)). Los tres íconos del widget de Android son
+([04-iconos.md](04-iconos.md)). Los íconos de los widgets de Android son
 copias vectoriales de glifos y hay que rehacerlas a mano si el glifo cambia
-([10-superficies.md](10-superficies.md#cómo-se-ve)).
+([10-superficies.md](10-superficies.md#cómo-se-ven)).
 
 ### La parada es un cartel en un poste, no un marcador de mapa
 
@@ -212,9 +211,9 @@ pantallas se prueban con fuentes reales en un teléfono de 390 × 844 a 1×,
 1.3× y 2× (`test/support/layout.dart`).
 
 **Consecuencia.** Un texto nuevo tiene que pasar esas pruebas
-([11-accesibilidad.md](11-accesibilidad.md)). El widget de Android es la
-excepción: mide 3 × 2 celdas y corta el destino con «…» en una línea
-([10-superficies.md](10-superficies.md#cómo-se-ve)).
+([11-accesibilidad.md](11-accesibilidad.md)). Los widgets de Android son la
+excepción: tienen celdas fijas y cortan el destino con «…» en una línea (en
+Próximo, en dos) ([10-superficies.md](10-superficies.md#cómo-se-ven)).
 
 ### Riesgo: el sol
 
@@ -301,21 +300,6 @@ con el tamaño por defecto de 12).
 brillo de `PixelIcon(glow: true)`, la pestaña elegida, la campana de un
 aviso activado y los mosaicos de Servicios. Una sombra nueva que no sea luz
 de algo encendido no entra ([06-luz-y-movimiento.md](06-luz-y-movimiento.md)).
-
-### El widget muestra el destino del ómnibus
-
-**Contexto.** Una ruta guardada tiene un nombre que pone el usuario
-(«Centro»), y cada ómnibus tiene su destino oficial («POCITOS»). El diseño
-original mostraba «Línea 116 a POCITOS».
-
-**Decisión.** `route_dest` es el `destination` del ómnibus; si viene vacío,
-el nombre de la ruta (`RouteAlert.destinationName`). Lo escribe `WidgetFeed`
-(`lib/services/home_widget_feed.dart`).
-
-**Consecuencia.** El widget puede decir un destino distinto del nombre que el
-usuario ve en su tarjeta de ruta. El aviso de ruta, en cambio, usa el nombre
-de la ruta en el título («Línea 116 → Centro»)
-([10-superficies.md](10-superficies.md#textos)).
 
 ### Los widgets de parada encienden la línea, no la hora
 

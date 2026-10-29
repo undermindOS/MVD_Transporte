@@ -329,27 +329,27 @@ pudo consultar no da ningún aviso.
 | Parada | «Línea 116 — 4 min»; con 0 min, «Línea 116 — llegando» | «Tu ómnibus llega en 4 min a SAN JOSE y ANDES»; con 1 min o menos, «Tu ómnibus está llegando a SAN JOSE y ANDES» | `line` ← `linea`; `etaMinutes` ← `minutos`; nombre ← `BusStop.name` (guardado) |
 | Ruta | «Línea 116 → Trabajo» | «Sale en 4 min desde SAN JOSE y ANDES»; con 1 min o menos, «Tu ómnibus está llegando a SAN JOSE y ANDES» | `line`, `etaMinutes`; `RouteAlert.destinationName` y `originName` (guardados); además `RouteAlert.accepts` |
 
-## Widget de Android
+## Widgets de parada de Android
 
-`WidgetFeed` (`lib/services/home_widget_feed.dart`) escribe las claves y
-`MVDTransporteWidgetProvider.kt` las lee. Muestra la primera ruta activa, a
-cualquier hora, con el primer ómnibus de su parada de origen que pasa
-`RouteAlert.accepts`, tenga GPS o no. Lo escriben la tarea de fondo (cada
-15 min o más) y la app después de cada refresco que incluye esa parada.
-Cuando no queda ninguna ruta activa, `BackgroundWorker.sync()` lo vacía en el
-acto, aunque quede una alerta de parada.
+`StopWidgetsFeed` (`lib/services/stop_widgets_feed.dart`) escribe las claves y
+`TimbreStopWidget.kt` las lee. Cada widget muestra las paradas que eligió, o
+las primeras de Mis paradas, con los ómnibus de su tablero, tengan GPS o no.
+Escriben la app después de cada refresco de Mis paradas, la tarea de fondo
+(cada 15 min o más, a cualquier hora) y el botón de actualizar.
 
 | Qué se ve | Clave | Modelo | Campo /v1 | Fuente |
 |---|---|---|---|---|
-| Línea | `route_line` | `BusArrival.line` | `line` | `linea` |
-| Destino | `route_dest` | `destination`; si está vacío, `RouteAlert.destinationName` | `destination` | `destino` |
-| «~20:01» | `route_eta_at` | `clockTime` | `clockTime` | `horaDesc` |
-| La fila se oculta 2 min después de esa hora, en el reloj del teléfono | `route_expected_at_ms` | `expectedAt` más la hora del teléfono al consultar, menos `fetchedAt` | `expectedAt`, `fetchedAt` | `time` |
-| – (compatibilidad) | `route_eta_min` | `etaMinutes` | `etaMinutes` | `minutos` |
-| – (Kotlin no la lee) | `route_checked_at_ms`, `route_status` | hora del tablero; `ok`, `none`, `offline` u `off` | – | – |
+| Nombre y número de la parada | `stops_saved` | `BusStop.name`, `BusStop.id` (guardados) | – | – |
+| Línea | `stop_board_{id}` → `line` | `BusArrival.line` | `line` | `linea` |
+| Destino | `dest` | `destination`; si está vacío, «Línea 121» | `destination` | `destino` |
+| «~20:14» | `clock` | `clockTime` | `clockTime` | `horaDesc` |
+| Marca accesible | `acc` | `accessible` | `accessible` | `accesibilidad` |
+| La fila se va 1 min después de esa hora, en el reloj del teléfono | `dueMs` | `expectedAt` más la hora del teléfono al consultar, menos `fetchedAt` | `expectedAt`, `fetchedAt` | `time` |
+| «Datos de las 20:13» | `checkedAtMs` | la hora del teléfono al consultar | – | – |
+| «No se pudo actualizar» | `failedAtMs` | la hora del teléfono de la consulta fallida | – | – |
 
-Sin fila, el widget muestra «Sin próximos ómnibus en tus rutas». Los estados
-y la caducidad están en [10-superficies.md](10-superficies.md).
+Los estados, los textos y la caducidad están en
+[10-superficies.md](10-superficies.md#widgets-de-parada-android).
 
 ## Pantallas sin datos de /v1
 
@@ -389,4 +389,4 @@ app.
 | El viaje esperado | `BusWait` | el elemento de `arrivals` elegido | En cada consulta adopta el `tripId` y el `expectedAt` del viaje encontrado |
 | Novedades | `news_cache` (caja `settings`) | `/v1/news` | En cada refresco (cada 10 min como mucho; 30 s al deslizar) |
 | Catálogo | caja perezosa `catalog` | `/v1/catalog/stops`, el cuerpo tal como llegó | Una vez por día, cuando se usa; uno sin líneas, a los 15 min, y nunca encima de una copia con líneas |
-| Fila del widget | claves de `home_widget` | `/v1/stops/{id}/arrivals` del origen de la primera ruta | En cada tarea de fondo y en cada refresco de la app que incluye esa parada; se borra apenas no queda ninguna ruta activa |
+| Widgets de parada | claves de `home_widget` (`stops_saved`, `stop_board_{id}`) | `/v1/stops/{id}/arrivals` de las paradas que muestran | En cada refresco de Mis paradas, en cada tarea de fondo y al tocar actualizar; un 429 no cambia nada, un fallo marca `failedAtMs` y deja los ómnibus |

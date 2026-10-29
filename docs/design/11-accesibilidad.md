@@ -185,7 +185,7 @@ diálogos y snack bars abiertos. La pantalla de bloqueo es una pantalla aparte p
 | Bloqueo biométrico | la fila entera junto con la llave (`MergeSemantics`) | `InfoPage` |
 | Pantalla de bloqueo | «Aplicación bloqueada», como encabezado | `LockScreen` |
 | Privacidad | el título del archivo y cada sección («Resumen»), como encabezados; la viñeta de una lista no se escucha | `PrivacyPolicyPage` |
-| Widget de Android | «Línea 116 a POCITOS, alrededor de las 14:32, estimado» | `MVDTransporteWidgetProvider.kt` |
+| Widgets de parada de Android | Cada fila: «Línea 121 a PUNTA CARRETAS, alrededor de las 20:14, estimado, accesible»; el encabezado: «Parada SAN JOSE y ANDES, 574. Tocá para ver otra parada»; el botón: «Actualizar» | `TimbreStopWidget.spoken`, `TimbreStopWidget.header` |
 | Parada del Mapa | «Parada 574, San Jose y Andes, 2 ómnibus con GPS en camino», como botón; con uno, «1 ómnibus con GPS en camino»; sin ninguno, «sin ómnibus con GPS en camino»; con un tablero viejo, «2 ómnibus en camino, estimado»; sin tablero de menos de 5 min, o con uno viejo y ningún ómnibus, solo «Parada 574, San Jose y Andes» | `_StopMarker._phrase` |
 | Atribución del Mapa | «© OpenStreetMap», como enlace | `_Attribution` |
 | Hoja de un ómnibus del Mapa | «Línea 117 a Punta Carretas», como encabezado; cada parada, «A la parada 574, San Jose y Andes, llega en 4 minutos, con GPS», «…, llegando, con GPS» o «…, alrededor de las 19:56, estimado» | `BusSheet`, `_EtaRow._sentence` |
@@ -236,7 +236,7 @@ Todo lo que se toca mide al menos 44 × 44 (`TimbreSpace.touch`). Una fila de ó
 | Enlaces de Info | 52 de alto | `_LinkRow` |
 | «Desbloquear» | 220 × 56 | `lock_screen.dart` |
 | Chips y switches | 48 de alto: el tema no cambia `materialTapTargetSize`, así que en el teléfono vale el área táctil de Material | valor por defecto de Flutter |
-| Botones «Mi STM» y «Recarga» del widget | 44 dp de alto | `res/layout/mvd_transporte_widget.xml` |
+| Actualizar, «Mi STM» y «Recarga» de los widgets de parada | 44 dp | `res/layout/widget_stop_*.xml` |
 | Parada del Mapa | 44 × 44, con la baldosa de 26 en el medio | `_StopMarker` en `mapa_page.dart` |
 | «© OpenStreetMap» | 44 × 44 | `_Attribution` en `mapa_page.dart` |
 | Fila de la hoja de un ómnibus del Mapa | 52 de alto | `_EtaRow` en `map_sheets.dart` |
@@ -291,8 +291,8 @@ también la prueba que la busca.
 
 ## Lo que hoy no está resuelto
 
-- **El widget de Android** lee el destino en mayúsculas («Línea 116 a POCITOS, …»): el proveedor
-  en Kotlin no tiene un equivalente de `spokenName`.
+- **Los widgets de parada** leen el destino y la parada en mayúsculas («Línea 121 a PUNTA
+  CARRETAS, …»): el proveedor en Kotlin no tiene un equivalente de `spokenName`.
 - **`CartelTira` con destino vacío** dice «Línea 121 a , llega en 12 minutos, con GPS». La hoja de
   «Estoy esperando» cuida el destino vacío solo para los ómnibus sin GPS.
 - **La barra de Horarios** de una parada guardada sin nombre dice «Horarios de la parada 574,

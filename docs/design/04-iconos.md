@@ -144,10 +144,9 @@ un alfiler. Un marcador de mapa dice «un lugar cualquiera»; el cartel dice
   Material que aparece en pantalla. `showTimePicker` acepta
   `switchToInputEntryModeIcon` y `switchToTimerEntryModeIcon` para
   cambiarlos.
-- **Widgets de Android.** `widget_ic_clock.xml`, `widget_ic_route.xml` y
-  `widget_ic_external.xml` son copias vectoriales de `clock`, `route` y
-  `external`, con el mismo espacio de 0.14 celdas. Los widgets de parada
-  suman `widget_ic_stop` (`stop`, `ambar`), `widget_ic_refresh` (`refresh`,
+- **Widgets de Android.** Copias vectoriales de glifos, con el mismo
+  espacio de 0.14 celdas y el color fijo en cada archivo:
+  `widget_ic_external` (`external`, `ambarTenue`), `widget_ic_stop` (`stop`, `ambar`), `widget_ic_refresh` (`refresh`,
   `ambar`), `widget_ic_clock_dim` (`clock`, `ambarTenue`),
   `widget_ic_accessible` (`accessible`, `etiquetaCartel`),
   `widget_ic_warning` (`warning`, `rojoLed`) y `widget_ic_bus` (`bus`,

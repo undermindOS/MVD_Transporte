@@ -134,8 +134,7 @@ armado en el teléfono ([contrato-v1.md](contrato-v1.md#en-la-app)).
 | `stop_locations_service.dart` | `StopLocationsService.fillMissing`: la ubicación de las paradas guardadas que no la tienen, para el Mapa. Con proxy, del catálogo del teléfono; sin proxy, de `NearbyStopsService.fetchStop`, una por vez. Cada parada se busca como mucho cada 10 min (`retryInterval`) y la ubicación se guarda en `BusStop` |
 | `transport_news_service.dart` | `TransportNewsService`: refresco cada 10 min, o 30 s si lo pedís; guarda hasta 30 novedades; `unreadCount`, `markRead` |
 | `bus_status_service.dart` | `BusStatusService`: el GPS por empresa, una consulta por minuto como mucho; `partialWarning` |
-| `background_worker.dart` | `BackgroundWorker`: la tarea de WorkManager cada 15 min (`checkAlerts`, que también pide las paradas de los widgets de parada), y `sync` para registrarla o cancelarla (sigue mientras haya un widget de parada puesto) y para vaciar el widget cuando no queda ninguna ruta activa |
-| `home_widget_feed.dart` | `WidgetFeed`: escribe las claves del widget de Android (`update`, `clear`) ([10-superficies.md](10-superficies.md#qué-muestra-las-claves)) |
+| `background_worker.dart` | `BackgroundWorker`: la tarea de WorkManager cada 15 min (`checkAlerts`, que también pide las paradas de los widgets de parada), y `sync` para registrarla o cancelarla (sigue mientras haya un widget de parada puesto) |
 | `stop_widgets_feed.dart` | `StopWidgetsFeed`: las claves de los widgets de parada (`saveStops`, `updateBoards`, `shownStopIds`, `hasPlacedWidgets`, `refreshShown`); `initStopWidgets` y `stopWidgetsCallback`, lo que corre en segundo plano cuando un widget pide datos ([10-superficies.md](10-superficies.md#widgets-de-parada-android)) |
 | `notification_service.dart` | `NotificationService`: el canal `bus_alerts`, `showBusAlert`, `showRouteAlert`, `scheduleWaitReminder` |
 | `bus_wait_service.dart` | `BusWaitService` («Estoy esperando»), `AndroidBusWait` (servicio en primer plano, canal `bus_wait`) y `ScheduledBusWait` (recordatorio en iOS); `WaitStart` |
@@ -202,9 +201,9 @@ Qué tener en cuenta:
   `home_widget`, no termina nunca dentro de una prueba de widgets. Simulalo
   (`MethodChannel('home_widget')`) o no esperes esa llamada. La línea
   «Widget data error: MissingPluginException» en la salida no es un fallo.
-- **Lo que no prueban.** Los recursos de Android y el widget de ruta se
-  comprueban con `flutter build apk --debug` y con `brand_assets_test.dart`,
-  sin emulador. Los widgets de parada tienen además pruebas en la JVM, en
+- **Lo que no prueban.** Los recursos de Android se comprueban con
+  `flutter build apk --debug` y con `brand_assets_test.dart`, sin emulador.
+  Los widgets de parada tienen además pruebas en la JVM, en
   `android/app/src/test/`: `StopWidgetDataTest.kt` (las reglas) y
   `StopWidgetRenderTest.kt` (Robolectric: el provider llena los tres
   widgets, Android infla sus RemoteViews y las imágenes quedan en
@@ -250,11 +249,10 @@ el porqué, en [contrato-v1.md](contrato-v1.md#11-el-triángulo-de-pruebas).
 | `tool/map/` | El generador del estilo «Timbre Noche» (`gen_style.mjs`, `flavor_noche.json` y un `package.json` con versiones fijas). Cómo se usa: [assets/map/README.md](../../assets/map/README.md) |
 | `pubspec.yaml` | Las familias de fuentes, los archivos que viajan con la app (las licencias, la política y los dos archivos del mapa base, nunca la carpeta entera) y la configuración de `flutter_launcher_icons` |
 | `flutter_native_splash.yaml` | La pantalla de inicio |
-| `android/app/src/main/res/` | El widget (`layout/mvd_transporte_widget.xml`, `xml/mvd_transporte_widget_info.xml`, `drawable/widget_*`, `drawable-nodpi/widget_plate.png`), el ícono de notificación `drawable/ic_stat_timbre.xml`, `values/colors.xml`, `values/strings.xml` y los cuatro `styles.xml` |
-| `android/app/src/main/kotlin/com/liberontech/stmapp/MVDTransporteWidgetProvider.kt` | Lee las claves del widget y llena sus vistas |
+| `android/app/src/main/res/` | Los widgets de parada (`layout/widget_stop_*.xml`, `xml/widget_stop_*_info.xml`, `drawable/widget_*`, `drawable-xxhdpi/widget_led_dot*.png`, `drawable-nodpi/widget_plate.png` y `widget_sin_paradas.png`), el ícono de notificación `drawable/ic_stat_timbre.xml`, `values/colors.xml`, `values/strings.xml` y los cuatro `styles.xml` |
 | `android/app/src/main/kotlin/com/liberontech/stmapp/TimbreStopWidget.kt` | Los widgets de parada: `TimbreProximoWidget`, `TimbreParadaWidget`, `TimbreMisParadasWidget`. Dibujan, cambian de parada al tocar el nombre, piden datos a la app y programan el redibujo |
 | `android/app/src/main/kotlin/com/liberontech/stmapp/StopWidgetData.kt` | Las reglas de los widgets de parada, sin Android: qué paradas, qué ómnibus, qué dice el pie y cuándo redibujar |
-| `android/app/src/main/res/layout/widget_stop_*.xml` | Los tres widgets de parada, su fila (`widget_stop_row.xml`) y sus vistas previas del selector (`*_preview.xml`, con las paradas 574 y 3140), y `xml/widget_stop_*_info.xml` |
+| `android/app/src/main/res/layout/widget_stop_*.xml` | Los tres widgets de parada, su fila (`widget_stop_row.xml`) y sus vistas previas del selector (`*_preview.xml`, con las paradas 574 y 3140) |
 | `android/app/src/main/AndroidManifest.xml` | El nombre, el servicio en primer plano `dataSync` y el ícono del aviso fijo (`com.liberontech.stmapp.NOTIFICATION_ICON`) |
 | `ios/Runner/` | `Info.plist`, `Base.lproj/LaunchScreen.storyboard`, `AppDelegate.swift` |
 
@@ -288,7 +286,7 @@ mismo cambio) está en [README.md](README.md#cómo-proponer-un-cambio).
   caracteres, `#` encendido y `.` apagado, con un comentario de para qué se
   usa. Si sale de pixelarticons, marcalo `(pixelarticons)` en el comentario.
   Si cambiás `clock`, `route` o `external`, rehacé a mano su vector del
-  widget de Android ([10-superficies.md](10-superficies.md#cómo-se-ve)).
+  widget de Android ([10-superficies.md](10-superficies.md#cómo-se-ven)).
 - **Un componente.** En `lib/ui/widgets/`. Colores y letras solo de los
   tokens y de `TimbreText`. Para el lector de pantalla, una sola frase con
   `Semantics` (los nombres de la API, con `spokenName`). Una prueba de

@@ -11,7 +11,7 @@ import 'external_apps.dart';
 /// forbids apps that are "a webview of a website without permission", and
 /// the Mi STM login (SAML SSO → ID Uruguay) belongs in a browser the user
 /// can trust, where the app cannot read or inject into the page (RFC 8252).
-/// The Android widget (MVDTransporteWidgetProvider.kt) repeats two of these.
+/// The Mis paradas widget (TimbreStopWidget.kt) repeats two of these.
 enum OfficialSite {
   miStm('https://stm.gub.uy/app/mistm/cuenta/pages/principal.xhtml'),
   recarga('https://stm.gub.uy/app/mistm/cuenta/recargaRapida.xhtml'),

@@ -3,7 +3,6 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:workmanager/workmanager.dart';
 import 'cache_service.dart';
-import 'home_widget_feed.dart';
 import 'mvd_api_service.dart';
 import 'notification_service.dart';
 import 'stop_widgets_feed.dart';
@@ -65,15 +64,12 @@ class BackgroundWorker {
     final routes = CacheService.getEnabledRoutes();
     final scheduledRoutes =
         routes.where((r) => r.schedule.allows(now)).toList();
-    // The home widget shows the first route at any hour
-    final widgetRoute = routes.firstOrNull;
     // The stop widgets, at any hour
     final widgetStops = await StopWidgetsFeed.shownStopIds();
 
     final boards = await MvdApiService.getBoards({
       for (final stop in stops) stop.id,
       for (final route in scheduledRoutes) route.originStopId,
-      if (widgetRoute != null) widgetRoute.originStopId,
       ...widgetStops,
     });
 
@@ -96,7 +92,6 @@ class BackgroundWorker {
 
     // Catches its own errors: a widget failure (e.g. iOS without App
     // Group) must not swallow the notifications below
-    await WidgetFeed.update(enabledRoutes: routes, boards: boards, now: now);
     if (widgetStops.isNotEmpty) {
       // Names change only in the app, but a stop deleted there must not
       // stay on a widget
@@ -145,19 +140,12 @@ class BackgroundWorker {
       if (hasActiveAlerts) {
         await registerPeriodicTask();
       } else {
-        // Asking the widgets is a platform call: not awaited, as the
-        // widget below (the app unlocks after this)
+        // Asking the widgets is a platform call: not awaited, callers wait
+        // for the task only (the app unlocks after this)
         unawaited(_keepForStopWidgets(generation));
       }
     } catch (e) {
       debugPrint('⚠️ WorkManager sync error: $e');
-    }
-    // Without a route, or without the task, nothing refreshes the widget:
-    // no stale row on it, even while a stop alert keeps the task alive.
-    // Not awaited: callers wait for the task only (the app unlocks after
-    // this), and the widget catches its own errors
-    if (CacheService.getEnabledRoutes().isEmpty) {
-      unawaited(WidgetFeed.clear(WidgetFeed.statusOff));
     }
   }
 

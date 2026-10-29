@@ -432,7 +432,7 @@
 - What works: всё выше в контейнере; рендер трёх виджетов проверен Robolectric-ом (эмулятора нет, KVM нет).
 - What's broken/pending:
   - на телефоне не проверено: пикер, кнопка ⟳ (фоновый движок home_widget), будильник, ресайз;
-  - старый виджет маршрута (`MVDTransporteWidgetProvider`, 3×2) не тронут — 4 виджета в пикере;
+  - виджет маршрута (`MVDTransporteWidgetProvider`, 3×2) удалён по решению владельца (см. ниже);
   - при включённом биометрическом замке виджет всё равно показывает остановки на домашнем экране;
   - Maven Central через прокси контейнера отвечает 429: Gradle шёл через зеркало Google (init-скрипт в `~/.gradle/init.d/`, вне репо).
 ### Next steps
@@ -440,3 +440,12 @@
 ### Key decisions made
 - Остановка на виджете переключается тапом по имени, без экрана настройки: работает на всех launcher-ах и Android-версиях.
 - Шрифт виджетов — системный `sans-serif-condensed`, как у виджета маршрута; «SIN PARADAS» — картинка Doto.
+
+## 2026-10-29 — Удалён виджет маршрута
+### What was done
+- По решению владельца удалены `MVDTransporteWidgetProvider.kt`, его layout, info, `widget_badge_bg`, `widget_ic_route`, `widget_ic_clock`, строка `widget_description`, `WidgetFeed` (`lib/services/home_widget_feed.dart`) и все вызовы. Фоновая задача больше не тянет origin первой ruta ради виджета; avisos de ruta не тронуты.
+- Тесты часов виджета маршрута (телефон спешит на 6 мин, `Date` без прокси, офлайн) перенесены на виджеты остановок: `background_worker_test`, `stops_board_test`. Flutter 641/641, JVM 16/16, analyze чисто.
+- Доки: 10-superficies, 12-decisiones (решение «El widget muestra el destino del ómnibus» снято), 11-accesibilidad, pantalla-a-datos, 13-en-el-codigo, 04-iconos, 02-color, README, CHANGELOG («Eliminado»).
+### Current state
+- Уже поставленный виджет маршрута на телефоне после обновления перестанет грузиться: его нужно убрать с экрана вручную.
+- Ключи `route_*` остаются в `HomeWidgetPreferences` у тех, у кого был старый виджет: безвредно, не читаются.

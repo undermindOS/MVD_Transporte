@@ -154,9 +154,8 @@ No se enciende:
 - Las marcas pasivas: confort, íconos de lista (`listTileTheme.iconColor`
   es `etiquetaCartel`), íconos de los campos, candado de Info, nota del
   navegador en Servicios.
-- La hora estimada de los widgets de Android («~14:32»): `etiquetaCartel`
-  en el widget de ruta, `papel` en los widgets de parada, siempre con «~»
-  y reloj ([10-superficies.md](10-superficies.md)).
+- La hora estimada de los widgets de Android («~14:32»): `papel`, siempre
+  con «~» y reloj ([10-superficies.md](10-superficies.md#widgets-de-parada-android)).
 - En el Mapa: las paradas guardadas (`stop` en `papel` sobre `tinta`, con
   borde `etiquetaCartel`), un ómnibus estimado (píldora `tinta` con borde y
   número `etiquetaCartel`, o un aro `etiquetaCartel`), las notas (`tenue`) y

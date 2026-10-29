@@ -88,134 +88,12 @@ Android 12 con `@drawable/launch_background`; desde Android 12 con
 volvé a poner `@color/noche`. `test/brand_assets_test.dart` falla si falta en
 cualquiera de los cuatro archivos.
 
-## Widget de inicio (Android)
-
-Un tablero chico con el próximo ómnibus de una ruta y dos accesos a sitios
-oficiales. Existe solo en Android: en iOS no hay widget (ver
-[Plataformas](#plataformas)).
-
-Archivos:
-
-- `android/app/src/main/res/layout/mvd_transporte_widget.xml`: el diseño.
-- `android/app/src/main/res/xml/mvd_transporte_widget_info.xml`: tamaño y
-  refresco.
-- `android/app/src/main/kotlin/com/liberontech/stmapp/MVDTransporteWidgetProvider.kt`:
-  lee los datos y llena las vistas.
-- `lib/services/home_widget_feed.dart` (`WidgetFeed`): escribe los datos.
-
-### Cómo se ve
-
-- **Tamaño:** 3 × 2 celdas (`targetCellWidth` 3, `targetCellHeight` 2),
-  mínimo 250 × 110 dp, redimensionable. El selector de widgets de Android 12+
-  muestra el diseño real (`previewLayout`).
-- **Tablero:** fondo `tinta`, borde de 1 dp `linea_noche`, radio 20 dp
-  (`drawable/widget_background.xml`), margen interior 12 dp (en el diseño).
-- **Placa:** `drawable-nodpi/widget_plate.png`, de 20 dp de alto: el ómnibus
-  y «TIMBRE» en ámbar, «MVD» en ámbar tenue, en letras de puntos. TalkBack la
-  lee «Timbre MVD».
-- **Fila del ómnibus** (`widget_route_section`):
-  - número de línea en un contorno de 1.5 dp `etiqueta` con radio 6 dp
-    (`drawable/widget_badge_bg.xml`), texto `etiqueta` 14 sp en negrita;
-  - destino en `papel`, 15 sp en negrita, una sola línea, cortado con «…» si
-    no entra;
-  - ícono de reloj `tenue` de 13 dp;
-  - hora «~19:56» en `etiqueta`, 16 sp en negrita.
-
-  Es una estimación de la última consulta, así que nunca se enciende en
-  ámbar: contorno y reloj, como un horario en la app
-  ([08-componentes.md](08-componentes.md)).
-- **Sin ómnibus** (`widget_route_empty`): ícono de ruta `etiqueta` de 14 dp y
-  «Sin próximos ómnibus en tus rutas», `etiqueta` 13 sp, hasta dos líneas.
-- **Accesos:** «Mi STM» y «Recarga», texto `ambar` 13 sp en negrita, borde de
-  1 dp `ambar_tenue` con radio 10 dp (`drawable/widget_button_bg.xml`) y el
-  ícono de «se abre afuera». Cada uno mide al menos 44 dp de alto
-  (`minHeight="44dp"`). Abren en el navegador las mismas páginas que
-  `OfficialSite.miStm` y `OfficialSite.recarga`
-  (`lib/services/official_sites.dart`).
-- **Letra:** la del sistema, no las fuentes de la app. La fila del ómnibus
-  usa `sans-serif-condensed`; el estado vacío y los accesos, la letra por
-  defecto.
-- **Colores:** `res/values/colors.xml` repite los tokens con nombres de
-  Android: `etiqueta` = `etiquetaCartel`, `linea_noche` = `lineaNoche`,
-  `ambar_tenue` = `ambarTenue`. Contraste sobre `tinta`: `papel` 14.6:1,
-  `etiqueta` 7.9:1, `ambar` 9.5:1, el reloj `tenue` 5.3:1.
-- **Íconos:** `drawable/widget_ic_clock.xml`, `widget_ic_route.xml` y
-  `widget_ic_external.xml` son los glifos `clock`, `route` y `external` de
-  `PixelGlyphs` pasados a vector, con el color fijo en cada archivo. No hay un
-  script en el repositorio que los genere: si cambiás uno de esos glifos,
-  rehacé su vector a mano: cada celda encendida de la grilla de 12 × 12, en
-  la columna `x` y la fila `y`, es un cuadrado
-  `M{x}.07,{y}.07h0.86v0.86h-0.86z` en un `viewport` de 12 × 12
-  ([04-iconos.md](04-iconos.md)).
-- **TalkBack:** lee la fila como una frase: «Línea 116 a POCITOS, alrededor
-  de las 19:56, estimado».
-
-### Qué muestra: las claves
-
-`WidgetFeed` escribe estas claves con `home_widget` y
-`MVDTransporteWidgetProvider` las lee. Los nombres están en constantes de
-`WidgetFeed` (`keyLine`, `keyDestination`, etc.).
-
-| Clave | Tipo | Valor | ¿La lee Kotlin? |
-|---|---|---|---|
-| `route_line` | String o nada | La línea del ómnibus. Si no está, el widget muestra el estado vacío | Sí |
-| `route_dest` | String | El `destination` del ómnibus; si viene vacío, el nombre que el usuario le puso a la ruta (`RouteAlert.destinationName`) | Sí |
-| `route_eta_min` | int | `etaMinutes` en el momento de la consulta | Sí, solo como respaldo |
-| `route_eta_at` | String | El `clockTime` del ómnibus, «H:MM» sin cero adelante («8:07», «19:56») | Sí |
-| `route_expected_at_ms` | String | `expectedAt` pasado al reloj del teléfono (más la hora del teléfono al consultar, menos el `fetchedAt` del tablero), en milisegundos desde 1970, en decimal | Sí |
-| `route_checked_at_ms` | String | Cuándo se consultó el tablero, en milisegundos | No |
-| `route_status` | String | `ok`, `none`, `offline` u `off` | No |
-
-### Reglas
-
-- **Qué ruta:** la primera ruta con el aviso activado, en el orden de la
-  pestaña Rutas, a cualquier hora (el horario del aviso no cuenta para el
-  widget).
-- **Qué ómnibus:** el primero del tablero de la parada de origen de esa ruta
-  que pasa `RouteAlert.accepts` (sus líneas y su dirección).
-- **Estados que escribe `WidgetFeed.update`:**
-  - tablero bien y hay ómnibus → `ok`, se escribe la fila;
-  - tablero bien y no hay ómnibus → `none`, `route_line` se borra;
-  - el tablero falló o falta → `offline`; la fila anterior se queda mientras
-    `route_expected_at_ms` esté en el futuro del reloj del teléfono, si no
-    `route_line` se borra;
-  - no hay ninguna ruta con aviso → `off`, `route_line` se borra.
-- **`WidgetFeed.clear('off')`:** lo llama `BackgroundWorker.sync()` cada vez
-  que no queda ninguna ruta con el aviso activado, aunque una alerta de
-  parada mantenga viva la tarea periódica. Sin ruta, la app no escribe el
-  widget y la tarea lo pondría en `off` recién en su próxima pasada, 15 min o
-  más después, así que no debe quedar una fila vieja. Sin ningún aviso, la
-  tarea además se cancela.
-- **Quién escribe:**
-  - la consulta periódica de fondo (`BackgroundWorker.checkAlerts`), al menos
-    cada 15 min;
-  - la app, después de cada actualización de Mis paradas que incluyó la
-    parada de origen de esa ruta (`_refresh` en `lib/ui/stops_page.dart`).
-- **Redibujo:** después de escribir, `WidgetFeed` siempre llama a
-  `HomeWidget.updateWidget`, con su propio manejo de errores. Además Android
-  redibuja cada 30 min (`updatePeriodMillis` = 1800000).
-- **Caducidad:** Kotlin oculta la fila cuando la hora del teléfono pasa
-  `route_expected_at_ms` + 2 min (`EXPIRED_AFTER_MS`). Las dos están en el
-  reloj del teléfono, así que uno con la hora corrida respecto de la fuente
-  no oculta la fila antes ni después de tiempo, con proxy o sin él. Sin
-  proxy, `fetchedAt` es el encabezado `Date` de la respuesta de
-  transporteRest, en el mismo reloj que `time`; si no viene, la hora del
-  teléfono cuando llega la respuesta, y la diferencia da cero. Solo se
-  comprueba al redibujar, así que entre redibujos un ómnibus que ya pasó
-  puede verse hasta unos 30 min. Es un tema abierto: un redibujo programado a
-  esa hora lo cerraría.
-- **Respaldos de Kotlin:** con `route_eta_at` muestra «~H:MM». Sin esa clave
-  (filas guardadas por versiones viejas) muestra «ahora» si `route_eta_min`
-  es 0 o «N min». La fila se muestra solo si hay `route_line`, `route_dest` y
-  `route_eta_min` ≥ 0. Una fila sin `route_expected_at_ms` no caduca.
-- **Por qué el destino del ómnibus y no el nombre de la ruta:**
-  [12-decisiones.md](12-decisiones.md#el-widget-muestra-el-destino-del-ómnibus).
-
 ## Widgets de parada (Android)
 
 Tres tableros con los próximos ómnibus de tus paradas guardadas, del mismo
-material que la tarjeta de Mis paradas. Existen solo en Android, junto al
-widget de ruta de arriba.
+material que la tarjeta de Mis paradas. Existen solo en Android: en iOS no
+hay widget (ver [Plataformas](#plataformas)). Reemplazan al widget de ruta
+(3 × 2, la próxima ruta con aviso), que se quitó.
 
 | Widget (selector) | Clase | Celdas, mínimo | Qué muestra |
 |---|---|---|---|
@@ -238,14 +116,16 @@ Archivos:
 
 ### Cómo se ven
 
-- **Tablero:** el mismo fondo que el widget de ruta (`widget_background.xml`).
-  Arriba, LEDs apagados (`widget_led_band.xml`: un punto `ambar` al 16 %
+- **Tablero:** fondo `tinta`, borde de 1 dp `linea_noche`, radio 20 dp
+  (`widget_background.xml`), margen interior de 10 a 14 dp. Arriba, LEDs apagados (`widget_led_band.xml`: un punto `ambar` al 16 %
   cada 6 dp, que se apaga hacia la izquierda y hacia abajo, como la app
   bar). Desde Android 12 el contenido se recorta a las esquinas
   (`clipToOutline`).
 - **Encabezado:** `stop` en `ambar`, el nombre de la parada en `papel` y
   « · 574» más chico en `etiqueta` (Próximo muestra solo el nombre). Mis
-  paradas lleva arriba la placa TIMBRE MVD (`widget_plate.png`).
+  paradas lleva arriba la placa TIMBRE MVD (`drawable-nodpi/widget_plate.png`,
+  20 dp de alto: el ómnibus y «TIMBRE» en ámbar, «MVD» en ámbar tenue, en
+  letras de puntos; TalkBack la lee «Timbre MVD»).
 - **Fila** (`widget_stop_row.xml`, 30 dp):
   - número de línea en un contorno `ambarTenue` de 1.5 dp, radio 8 dp,
     cifras `ambar` 16 sp en negrita (`widget_badge_lit_bg.xml`);
@@ -274,8 +154,8 @@ Archivos:
   11 % (`widget_led_field.xml`), `bus` en `ambar`, «SIN PARADAS» en Doto
   (`drawable-nodpi/widget_sin_paradas.png`, 20 dp de alto) y «Agregá una
   parada en Mis paradas para verla acá.».
-- **Letra:** la del sistema (`sans-serif-condensed`), como el widget de
-  ruta. «SIN PARADAS» es una imagen hecha con Doto.
+- **Letra:** la del sistema (`sans-serif-condensed`), no las fuentes de la
+  app. «SIN PARADAS» es una imagen hecha con Doto.
 - **Ámbar:** la línea, el cartel de la parada, actualizar y los LEDs. La
   hora nunca: es una estimación ([02-color.md](02-color.md#excepciones-documentadas),
   [12-decisiones.md](12-decisiones.md#los-widgets-de-parada-encienden-la-línea-no-la-hora)).
@@ -293,18 +173,20 @@ Archivos:
 - **Actualizar** (y «Sin datos recientes»): pide los arribos sin abrir la
   app.
 - **El resto del widget:** abre la app. En Mis paradas, «Mi STM» y
-  «Recarga» abren esas páginas en el navegador, como el widget de ruta.
+  «Recarga» (texto `ambar` en un borde `ambarTenue`, 44 dp de alto,
+  `widget_button_bg.xml` y `widget_ic_external.xml`) abren en el navegador
+  las mismas páginas que `OfficialSite.miStm` y `OfficialSite.recarga`.
 
 ### Las claves de los widgets de parada
 
-Viven en las preferencias de `home_widget` (`HomeWidgetPreferences`), como
-las del widget de ruta. Los nombres están en constantes de
+Viven en las preferencias de `home_widget` (`HomeWidgetPreferences`). Los
+nombres están en constantes de
 `StopWidgetsFeed` y de `TimbreStopWidget`.
 
 | Clave | La escribe | Valor |
 |---|---|---|
 | `stops_saved` | La app (`StopWidgetsFeed.saveStops`): al cargar Mis paradas y en cada consulta de fondo con un widget puesto | JSON `[{"id", "name"}]`, en el orden de Mis paradas |
-| `stop_board_{id}` | La app (`StopWidgetsFeed.updateBoards`): después de cada actualización de Mis paradas, en la consulta de fondo y al tocar actualizar | JSON `{"checkedAtMs", "failedAtMs", "arrivals"}` con hasta 6 ómnibus `{"line", "dest", "clock", "dueMs", "acc"}`. `dueMs` es `expectedAt` pasado al reloj del teléfono, como `route_expected_at_ms`; un `destination` vacío se escribe «Línea 121»; `failedAtMs` aparece cuando una consulta falla, y los ómnibus quedan |
+| `stop_board_{id}` | La app (`StopWidgetsFeed.updateBoards`): después de cada actualización de Mis paradas, en la consulta de fondo y al tocar actualizar | JSON `{"checkedAtMs", "failedAtMs", "arrivals"}` con hasta 6 ómnibus `{"line", "dest", "clock", "dueMs", "acc"}`. `dueMs` es `expectedAt` pasado al reloj del teléfono (más la hora del teléfono al consultar, menos el `fetchedAt` del tablero; sin proxy, `fetchedAt` es el encabezado `Date` de transporteRest), así un teléfono con la hora corrida no saca un ómnibus antes ni después de tiempo; un `destination` vacío se escribe «Línea 121»; `failedAtMs` aparece cuando una consulta falla, y los ómnibus quedan |
 | `stops_shown` | El widget | Los ids de las paradas que muestran los widgets puestos, separados por comas |
 | `stop_widgets_placed` | El widget | Cuántos widgets de parada hay en la pantalla de inicio |
 
@@ -476,8 +358,8 @@ Lo que dice la app alrededor de «Estoy esperando» (`_showWaitSheet` en
 
 ## Plataformas
 
-- **iOS sin widget:** no hay extensión de widget ni App Group. `WidgetFeed`
-  y `StopWidgetsFeed` intentan escribir igual y atrapan el error.
+- **iOS sin widget:** no hay extensión de widget ni App Group.
+  `StopWidgetsFeed` intenta escribir igual y atrapa el error.
 - **iOS sin consulta de fondo:** `Info.plist` no declara
   `BGTaskSchedulerPermittedIdentifiers` y `AppDelegate.swift` no registra la
   tarea, así que en iOS la tarea periódica no corre. `BackgroundWorker.sync`
@@ -498,10 +380,10 @@ Lo que dice la app alrededor de «Estoy esperando» (`_showWaitSheet` en
 - **Lo que no cambia con el nombre:** el id de la app
   `com.liberontech.stmapp` (Android e iOS; Google Play trata un
   `applicationId` nuevo como otra app, dice
-  `android/app/build.gradle.kts`), el paquete Dart `stm_app` y la clase
-  `MVDTransporteWidgetProvider`.
-- **Descripción del widget** en el selector: «Próximo ómnibus de tus rutas y
-  accesos a Mi STM y Recarga» (`widget_description`).
+  `android/app/build.gradle.kts`) y el paquete Dart `stm_app`.
+- **Widgets en el selector:** «Timbre · Próximo», «Timbre · Parada» y
+  «Timbre · Mis paradas», con sus descripciones en `res/values/strings.xml`
+  (`widget_*_label`, `widget_*_description`).
 - **Permiso de ubicación en iOS:** «Timbre MVD usa tu ubicación para
   mostrarte las paradas cercanas.», en `NSLocationWhenInUseUsageDescription`
   y en `NSLocationAlwaysAndWhenInUseUsageDescription` (geolocator hace
