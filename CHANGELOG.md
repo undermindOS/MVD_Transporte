@@ -77,8 +77,8 @@ versiones: [SemVer](https://semver.org/lang/es/).
   saturado) tampoco muestra minutos en vivo: los ómnibus quedan como estimados, sin los que tenían que pasar hace
   más de un minuto, y pasados 5 minutos la tarjeta espera el tablero nuevo. El minuto y los 5 minutos se cuentan
   desde que el tablero llegó al teléfono, con o sin error, y la hora de cada ómnibus se compara con el reloj del
-  servidor (sin proxy, el encabezado `Date` de la Intendencia): un teléfono con la hora corrida no da minutos
-  viejos por nuevos ni borra estimados antes de tiempo.
+  servidor (sin proxy, el encabezado `Date` de la Intendencia; si no viene, el del teléfono): un teléfono con la
+  hora corrida no da minutos viejos por nuevos ni borra estimados antes de tiempo.
 - Si una parada guardada dejó de existir, la tarjeta dice «Esta parada ya no existe. Deslizá la tarjeta para
   borrarla.».
 - Una parada que agregás sin conexión queda como «Parada N» y toma su nombre y sus líneas la próxima vez que abrís

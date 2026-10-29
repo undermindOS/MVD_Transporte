@@ -381,8 +381,13 @@ void main() {
         'keeps the due time on the phone\'s clock', () async {
       MvdApiService.proxyUrl = '';
       await saveRoute(lines: ['116']);
-      // IM answered at _t0 by its Date header, the phone read _t0 + 6 min
-      final due = _t0.add(const Duration(minutes: 4));
+      // IM answered at imAt by its Date header, the phone read imAt + 6 min.
+      // The test's clock, to the second as the header is: a Date a day off
+      // the phone's clock is not taken
+      final imAt = DateTime.fromMillisecondsSinceEpoch(
+          DateTime.now().millisecondsSinceEpoch ~/ 1000 * 1000,
+          isUtc: true);
+      final due = imAt.add(const Duration(minutes: 4));
       final im = MockClient((request) async => http.Response(
           jsonEncode([
             {
@@ -397,13 +402,13 @@ void main() {
             }
           ]),
           200,
-          headers: {'date': HttpDate.format(_t0)}));
-      final phone = _t0.add(const Duration(minutes: 6));
+          headers: {'date': HttpDate.format(imAt)}));
+      final phone = imAt.add(const Duration(minutes: 6));
       await http.runWithClient(
           () => BackgroundWorker.checkAlerts(phone), () => im);
 
-      // Due 4 min after IM's stamp: 10 min after _t0 on the phone's clock
-      final dueOnPhone = _t0.add(const Duration(minutes: 10));
+      // Due 4 min after IM's stamp: 10 min after imAt on the phone's clock
+      final dueOnPhone = imAt.add(const Duration(minutes: 10));
       expect(widget[WidgetFeed.keyExpectedAtMs],
           '${dueOnPhone.millisecondsSinceEpoch}');
       expect(widget[WidgetFeed.keyClockTime], '19:56');

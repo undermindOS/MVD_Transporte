@@ -141,7 +141,7 @@ igual que si viniera del proxy.
 | Forma | Fuente y adaptador | Máscara frente al golden |
 |---|---|---|
 | parada | `transporteRest/lineas/{id}` → `TransporteRestAdapter.stopToV1` | `directions` |
-| arribos | `transporteRest/siguientesParada/{id}` → `TransporteRestAdapter.arrivalsToV1` (`fetchedAt` = el encabezado `Date` de la respuesta; si no viene o no se puede leer, cuando llegó) | `arrivals[].airConditioning`, `arrivals[].zeroEmission` |
+| arribos | `transporteRest/siguientesParada/{id}` → `TransporteRestAdapter.arrivalsToV1` (`fetchedAt` = el encabezado `Date` de la respuesta; si no viene, no se puede leer o está a más de un día del reloj del teléfono, cuando llegó) | `arrivals[].airConditioning`, `arrivals[].zeroEmission` |
 | horario | `transporteRest/siguientesParada/{id}/{HABIL\|SABADO\|DOMINGO}/{H:MM}` → `TransporteRestAdapter.scheduleToV1` | ninguna |
 | catálogo | ninguna: `DirectSource.catalogStops()` contesta `ApiFailure.unavailable` | – |
 | cercanas | caja WFS (sección 8) → `WfsAdapter.featuresToCatalogItems` → los elementos del catálogo | – |
@@ -218,8 +218,9 @@ esta sección.
   - arribos: cuando contestó transporteRest. Con el proxy es el reloj del
     Worker, y desde la caché de borde puede tener hasta 15 s más; en modo
     directo, el encabezado `Date` de transporteRest, en el mismo reloj que
-    `time` (si no viene o no se puede leer, el reloj del teléfono cuando
-    llegó la respuesta);
+    `time`. Si no viene, no se puede leer o está a más de un día del reloj
+    del teléfono (un año de dos cifras, de la forma vieja de RFC 850, se lee
+    como el año 26), es ese reloj cuando llegó la respuesta;
   - novedades y GPS: el reloj del Worker al armar la respuesta;
   - catálogo: cuando `ImGateway` cargó las paradas de la API oficial. Esa
     copia vive solo en la memoria del objeto: se renueva al día, o antes si

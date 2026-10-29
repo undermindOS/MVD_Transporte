@@ -116,7 +116,7 @@ Línea {line} a {spokenName(destination)}, {cuándo}[, accesible][, aire acondic
 
 | Qué se ve | Modelo | Campo /v1 | Fuente |
 |---|---|---|---|
-| «No se pudo actualizar. Datos de las 19:52. Deslizá para reintentar.» | `MvdApiService.montevideoClock(ArrivalsBoard.fetchedAt)` | `fetchedAt` | el reloj del Worker cuando contestó transporteRest; modo directo: el encabezado `Date` de transporteRest (si no viene, el reloj del teléfono cuando llegó la respuesta) |
+| «No se pudo actualizar. Datos de las 19:52. Deslizá para reintentar.» | `MvdApiService.montevideoClock(ArrivalsBoard.fetchedAt)` | `fetchedAt` | el reloj del Worker cuando contestó transporteRest; modo directo: el encabezado `Date` de transporteRest (si no viene, no se puede leer o está a más de un día del reloj del teléfono, ese reloj cuando llegó la respuesta) |
 | Filas estimadas debajo de esa nota | `BusArrival.expectedAt` desde hace 1 min o después | `arrivals[].expectedAt` | `time` (ms); si no viene, `fetchedAt` más los minutos |
 | Solo «No se pudo actualizar. Deslizá para reintentar» | no hay tablero bueno, o llegó al teléfono hace 5 min o más | – (la hora en que llegó al teléfono) | – |
 | Filas estimadas sin nota (no hubo fallo) | el tablero llegó hace 1 min o más (`_BoardView.receivedAt`); quedan las de `expectedAt` desde hace 1 min o después. Desde los 5 min, o sin filas, el indicador de carga | `arrivals[].expectedAt` | – |

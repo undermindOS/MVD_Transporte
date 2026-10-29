@@ -448,8 +448,10 @@ void main() {
 
     test('arrivals are stamped with the Date header, on the source\'s clock',
         () async {
-      // The Date of a live answer: IM's clock, not the test's
-      final date = DateTime.utc(2026, 10, 29, 13, 58, 21);
+      // IM 5 min behind the test's clock, to the second as the header is
+      final date = DateTime.fromMillisecondsSinceEpoch(
+          (DateTime.now().millisecondsSinceEpoch ~/ 1000 - 300) * 1000,
+          isUtc: true);
       Future<DateTime> fetchedAt(Map<String, String> headers) async {
         final dated = MockClient((_) async => http.Response.bytes(
             utf8.encode(_siguientesParada3140), 200, headers: headers));
@@ -459,10 +461,14 @@ void main() {
       }
 
       expect(await fetchedAt({'date': HttpDate.format(date)}), date);
-      // No header, or one that does not parse: the phone's clock, as before
+      // No header, one that does not parse, or one more than a day off the
+      // phone's clock (an obsolete two-digit year parses as year 26, a zero
+      // as 1970): the phone's clock, as before
       for (final headers in [
         <String, String>{},
         {'date': 'yesterday'},
+        {'date': 'Thursday, 29-Oct-26 13:58:21 GMT'},
+        {'date': 'Thu, 01 Jan 1970 00:00:00 GMT'},
       ]) {
         final before = DateTime.now().millisecondsSinceEpoch;
         final stamp = (await fetchedAt(headers)).millisecondsSinceEpoch;

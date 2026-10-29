@@ -24,6 +24,9 @@ class DirectSource implements V1Source {
   static const _timeout = Duration(seconds: 10);
   static const _headers = {'Accept': 'application/json'};
 
+  /// A `Date` further than this from the phone's clock is not IM's clock.
+  static const _dateSkew = Duration(days: 1);
+
   @override
   Future<SourceAnswer> stop(int id) async {
     final raw = await _get(TransporteRestAdapter.stopUrl(id),
@@ -100,12 +103,15 @@ class DirectSource implements V1Source {
   /// When transporteRest answered, on its clock: the `Date` header [date]
   /// shares the clock of the rows' `time`, so the due times can be moved
   /// to the phone's clock as with the proxy. The phone's clock when there
-  /// is no header, or it does not parse.
+  /// is no header, it does not parse, or it is more than [_dateSkew] off
+  /// (an obsolete two-digit year parses as year 26, a zero as 1970).
   static DateTime _answeredAt(String? date) {
+    final now = DateTime.now();
     try {
-      return HttpDate.parse(date ?? '');
+      final answered = HttpDate.parse(date ?? '');
+      return answered.difference(now).abs() > _dateSkew ? now : answered;
     } catch (_) {
-      return DateTime.now();
+      return now;
     }
   }
 
