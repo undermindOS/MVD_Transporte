@@ -1,4 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="ic_launcher_background">#0066CC</color>
+    <color name="ic_launcher_background">#0A1A3A</color>
+    <!-- The night board (lib/ui/theme/timbre_tokens.dart) -->
+    <!-- Behind the Flutter view (keyboard and resize gaps) -->
+    <color name="noche">#070F22</color>
+    <color name="tinta">#0A1A3A</color>
+    <color name="linea_noche">#22396A</color>
+    <color name="papel">#F1ECE2</color>
+    <color name="etiqueta">#9FB0D0</color>
+    <color name="ambar">#FFB21E</color>
+    <color name="ambar_tenue">#C68B1E</color>
 </resources>

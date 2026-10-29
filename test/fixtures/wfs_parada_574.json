@@ -1,0 +1,1 @@
+{"type":"FeatureCollection","totalFeatures":15,"features":[{"type":"Feature","id":"v_uptu_paradas.fid--a3c86fc_1a18444e817_-170","geometry":{"type":"Point","coordinates":[-56.198255,-34.90739436]},"geometry_name":"the_geom","properties":{"cod_ubic_parada":574}}],"crs":{"type":"name","properties":{"name":"urn:ogc:def:crs:EPSG::4326"}}}

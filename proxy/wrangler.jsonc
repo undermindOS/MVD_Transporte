@@ -1,0 +1,31 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "mvd-transporte-proxy",
+  "main": "src/index.js",
+  "compatibility_date": "2026-10-13",
+
+  // Workers Caching: Cloudflare checks its cache before running the Worker and
+  // keeps each response for its Cache-Control max-age (src/index.js).
+  // Concurrent misses for one URL run the Worker once.
+  "cache": { "enabled": true },
+
+  // The only caller of the official IM API, one instance for all locations
+  // (src/im_gateway.js). Its key comes from secrets, never from this file:
+  // `wrangler secret put IM_CLIENT_ID` and `IM_CLIENT_SECRET`; locally — .dev.vars.
+  "durable_objects": {
+    "bindings": [{ "name": "IM_GATEWAY", "class_name": "ImGateway" }]
+  },
+  // The Workers Free plan only has SQLite-backed Durable Objects
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["ImGateway"] }],
+
+  "ratelimits": [
+    {
+      "name": "IP_LIMITER",
+      // Any integer unique within the Cloudflare account
+      "namespace_id": "1001",
+      // Counted per Cloudflare location, on cache misses only. Mobile carriers
+      // put many users behind one IP (CGNAT), so keep this generous.
+      "simple": { "limit": 300, "period": 60 }
+    }
+  ]
+}

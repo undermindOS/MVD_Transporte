@@ -1,13 +1,16 @@
 /// Timetable day type of `siguientesParada/{parada}/{tipoDia}/{H:MM}`.
 enum DayType {
-  habil('HABIL', 'Hábiles'),
-  sabado('SABADO', 'Sábados'),
-  domingo('DOMINGO', 'Domingos');
+  habil('HABIL', 'weekday', 'Hábiles'),
+  sabado('SABADO', 'saturday', 'Sábados'),
+  domingo('DOMINGO', 'sunday', 'Domingos');
 
   final String apiValue;
+
+  /// Same day type in the proxy route `/v1/stops/{id}/schedule/{day}/{H:MM}`.
+  final String proxyValue;
   final String label;
 
-  const DayType(this.apiValue, this.label);
+  const DayType(this.apiValue, this.proxyValue, this.label);
 
   /// Same rule as Cómo Ir (holidays are not taken into account).
   static DayType of(DateTime date) => switch (date.weekday) {

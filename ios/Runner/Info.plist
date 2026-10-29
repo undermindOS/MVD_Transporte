@@ -7,7 +7,7 @@
 		<key>CFBundleDevelopmentRegion</key>
 		<string>$(DEVELOPMENT_LANGUAGE)</string>
 		<key>CFBundleDisplayName</key>
-		<string>MVD Transporte</string>
+		<string>Timbre MVD</string>
 		<key>CFBundleExecutable</key>
 		<string>$(EXECUTABLE_NAME)</string>
 		<key>CFBundleIdentifier</key>
@@ -15,7 +15,7 @@
 		<key>CFBundleInfoDictionaryVersion</key>
 		<string>6.0</string>
 		<key>CFBundleName</key>
-		<string>stm_app</string>
+		<string>Timbre MVD</string>
 		<key>CFBundlePackageType</key>
 		<string>APPL</string>
 		<key>CFBundleShortVersionString</key>
@@ -49,11 +49,11 @@
 			</dict>
 		</dict>
 		<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
-		<string>MVD Transporte necesita acceso a tu ubicación para mostrarte rutas de transporte cercanas.</string>
+		<string>Timbre MVD usa tu ubicación para mostrarte las paradas cercanas.</string>
 		<key>NSLocationWhenInUseUsageDescription</key>
-		<string>MVD Transporte necesita acceso a tu ubicación para mostrarte rutas de transporte cercanas en la función Cómo Ir.</string>
+		<string>Timbre MVD usa tu ubicación para mostrarte las paradas cercanas.</string>
 		<key>NSFaceIDUsageDescription</key>
-		<string>MVD Transporte usa Face ID para proteger tu información de transporte.</string>
+		<string>Timbre MVD usa Face ID para proteger tu información de transporte.</string>
 		<key>UIApplicationSceneManifest</key>
 		<dict>
 			<key>UIApplicationSupportsMultipleScenes</key>
@@ -96,5 +96,7 @@
 		</array>
 		<key>UIStatusBarHidden</key>
 		<false/>
+		<key>UIStatusBarStyle</key>
+		<string>UIStatusBarStyleLightContent</string>
 	</dict>
 </plist>

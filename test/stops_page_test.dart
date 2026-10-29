@@ -5,13 +5,25 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/semantics.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 
+import 'package:stm_app/models/bus_arrival.dart';
+import 'package:stm_app/models/bus_stop.dart';
+import 'package:stm_app/models/bus_wait.dart';
+import 'package:stm_app/services/bus_wait_service.dart';
 import 'package:stm_app/services/cache_service.dart';
+import 'package:stm_app/services/mvd_api_service.dart';
 import 'package:stm_app/ui/stops_page.dart';
+import 'package:stm_app/ui/theme/timbre_text.dart';
+import 'package:stm_app/ui/theme/timbre_theme.dart';
+import 'package:stm_app/ui/widgets/cartel.dart';
+import 'package:stm_app/ui/widgets/pixel_icon.dart';
 
 const _lineas574 =
     '{"descripcion":"SAN JOSE y ANDES","lineas":[{"descripcion":"116","codigo":38},'
@@ -37,9 +49,22 @@ void main() {
   });
 
   Widget app() => MaterialApp(
+      theme: buildTimbreTheme(),
       home: StopsPage(onOpenStopInComoIr: opened.add));
 
+  // Live minutes in lit digits, and the comfort marks of a row
+  Finder liveMinutes(int m) =>
+      find.byWidgetPredicate((w) => w is MinutosEnVivo && w.minutes == m);
+  Finder mark(String label) => find.byWidgetPredicate(
+      (w) => w is PixelIcon && w.semanticLabel == label);
+
   setUpAll(() async {
+    // Enabling an alert asks for the notification permission
+    AndroidFlutterLocalNotificationsPlugin.registerWith();
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(
+            const MethodChannel('dexterous.com/flutter/local_notifications'),
+            (_) async => true);
     hiveDir = await Directory.systemTemp.createTemp('mvd_stops_test');
     await CacheService.init(path: hiveDir.path);
     wfsBody =
@@ -61,7 +86,7 @@ void main() {
       (tester) async {
     await http.runWithClient(() async {
       await tester.pumpWidget(app());
-      await tester.tap(find.byIcon(Icons.add));
+      await tester.tap(find.byTooltip('Agregar parada'));
       await tester.pumpAndSettle();
 
       expect(find.text('Agregar parada'), findsWidgets);
@@ -78,8 +103,21 @@ void main() {
 
       // Nearest first, with stop number, distance and lines
       expect(find.text('ANDES y AV 18 DE JULIO'), findsOneWidget);
+      // One phrase per tile, the street names in words
+      final handle = tester.ensureSemantics();
+      expect(
+          tester.getSemantics(find.bySemanticsLabel(RegExp(
+              r'^Parada 5109, Andes y Av 18 de Julio, a 48 metros, '
+              r'líneas 124, 124 SD, 125'))),
+          isSemantics(isButton: true, hasTapAction: true));
+      handle.dispose();
       expect(find.textContaining('#5109 · 48 m · 124, 124 SD, 125'),
           findsOneWidget);
+      // In the app font, not the platform one
+      final details = tester.widget<RichText>(find.descendant(
+          of: find.textContaining('#5109 · 48 m'),
+          matching: find.byType(RichText)));
+      expect(details.text.style?.fontFamily, TimbreFonts.fira);
       expect(find.text('SAN JOSE y ANDES'), findsOneWidget);
 
       await tester.tap(find.text('SAN JOSE y ANDES'));
@@ -89,13 +127,16 @@ void main() {
           () => Future<void>.delayed(const Duration(milliseconds: 100)));
       await tester.pumpAndSettle();
 
-      // Saved through resolveStop (transporteRest/lineas)
+      // Saved as listed, with the lines geoserver gives: no lookup
       expect(requests.map((u) => u.path),
-          contains('/transporteRest/lineas/574'));
+          isNot(contains('/transporteRest/lineas/574')));
       final saved = CacheService.getStop(574);
       expect(saved, isNotNull);
       expect(saved!.name, 'SAN JOSE y ANDES');
-      expect(saved.lines, ['116', '117', '121']);
+      expect(saved.lines, ['116', '117', '121', '141', '142', '144', '538']);
+      // and where geoserver puts it, for the Mapa
+      expect((saved.latitude, saved.longitude), (-34.90739436, -56.198255));
+      expect(find.text('Buscando parada…'), findsNothing);
       expect(find.text('#574'), findsOneWidget);
     }, () => client);
   });
@@ -111,22 +152,448 @@ void main() {
     }, () => client);
   });
 
+  testWidgets('Arrival times refresh every 30 s and on return to the app',
+      (tester) async {
+    var minutes = 7;
+    final etaRequests = <Uri>[];
+    final etaClient = MockClient((request) async {
+      if (request.url.path == '/transporteRest/siguientesParada/574') {
+        etaRequests.add(request.url);
+        return http.Response(
+            '[{"linea":"116","destino":"POCITOS","minutos":$minutes,'
+            '"real":true,"idEmpresa":50,"horaDesc":"8:00"}]',
+            200);
+      }
+      return http.Response('[]', 200);
+    });
+    // Hive writes to disk for real: start in the test zone (awaiting it
+    // inside runAsync hangs after a test that used Hive), let the IO finish
+    CacheService.saveStop(BusStop(id: 574, name: 'SAN JOSE y ANDES'));
+    await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 100)));
+    await tester.pump();
+
+    void lifecycle(List<AppLifecycleState> states) {
+      for (final state in states) {
+        tester.binding.handleAppLifecycleStateChanged(state);
+      }
+    }
+
+    await http.runWithClient(() async {
+      await tester.pumpWidget(app());
+      await tester.pump();
+      expect(liveMinutes(7), findsOneWidget);
+      final initial = etaRequests.length;
+
+      minutes = 6;
+      await tester.pump(
+          StopsPage.autoRefreshInterval - const Duration(seconds: 1));
+      expect(etaRequests.length, initial);
+      await tester.pump(const Duration(seconds: 1));
+      await tester.pump();
+      expect(etaRequests.length, initial + 1);
+      expect(liveMinutes(6), findsOneWidget);
+
+      // A system dialog (inactive) keeps the timer, no extra request
+      lifecycle([AppLifecycleState.inactive, AppLifecycleState.resumed]);
+      await tester.pump();
+      expect(etaRequests.length, initial + 1);
+
+      // Nothing is requested in the background
+      lifecycle([
+        AppLifecycleState.inactive,
+        AppLifecycleState.hidden,
+        AppLifecycleState.paused,
+      ]);
+      minutes = 3;
+      await tester.pump(const Duration(minutes: 5));
+      expect(etaRequests.length, initial + 1);
+
+      // Back in the foreground: refreshed at once, then every 30 s again
+      lifecycle([
+        AppLifecycleState.hidden,
+        AppLifecycleState.inactive,
+        AppLifecycleState.resumed,
+      ]);
+      // The refresh starts after the first frame back (the app may lock
+      // on its way back), the board shows on the next one
+      await tester.pump();
+      expect(etaRequests.length, initial + 2);
+      await tester.pump();
+      expect(liveMinutes(3), findsOneWidget);
+      await tester.pump(StopsPage.autoRefreshInterval);
+      expect(etaRequests.length, initial + 3);
+    }, () => etaClient);
+  });
+
+  testWidgets('GPS buses from the proxy show air conditioning and zero emission',
+      (tester) async {
+    MvdApiService.proxyUrl = 'https://proxy.test';
+    addTearDown(() => MvdApiService.proxyUrl = '');
+    // Live proxy answer for stop 574: 121 ❄️⚡, 116 and 117 ❄️, 538 no data
+    final body = File('test/fixtures/proxy_arrivals.json').readAsBytesSync();
+    final proxyClient = MockClient((request) async =>
+        request.url.path == '/v1/stops/574/arrivals'
+            ? http.Response.bytes(body, 200)
+            : http.Response('{"error":"not_found"}', 404));
+    CacheService.saveStop(BusStop(id: 574, name: 'SAN JOSE y ANDES'));
+    await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 100)));
+    await tester.pump();
+
+    await http.runWithClient(() async {
+      final handle = tester.ensureSemantics();
+      await tester.pumpWidget(app());
+      await tester.pump();
+
+      expect(find.text('121'), findsOneWidget);
+      // Three buses per card, the rest on request
+      expect(find.text('116'), findsNothing);
+      await tester.tap(find.text('Ver las 6'));
+      await tester.pump();
+      expect(find.text('116'), findsOneWidget);
+      expect(mark('Aire acondicionado'), findsNWidgets(3));
+      expect(mark('Cero emisiones'), findsOneWidget);
+      // Screen readers hear the whole row, marks included
+      expect(
+          find.bySemanticsLabel(RegExp(
+              r'^Línea 121 a Punta Carretas, .*con GPS.*, '
+              r'aire acondicionado, cero emisiones$')),
+          findsOneWidget);
+
+      // The zero-emission mark is on the 121 row
+      final row121 = find.ancestor(
+          of: find.text('121'), matching: find.byType(InkWell));
+      expect(find.descendant(of: row121, matching: mark('Cero emisiones')),
+          findsOneWidget);
+      handle.dispose();
+    }, () => proxyClient);
+  });
+
+  testWidgets('Tapping a bus starts and stops "Estoy esperando"',
+      (tester) async {
+    final fake = _FakeWaitPlatform();
+    final previous = BusWaitService.platform;
+    BusWaitService.platform = fake;
+    addTearDown(() {
+      BusWaitService.platform = previous;
+      BusWaitService.current.value = null;
+    });
+    final etaClient = MockClient((request) async {
+      if (request.url.path == '/transporteRest/siguientesParada/574') {
+        return http.Response(
+            '[{"linea":"121","destino":"CENTRO","minutos":2,"real":true,'
+            '"idEmpresa":50,"horaDesc":"8:00"},'
+            '{"linea":"116","destino":"POCITOS","minutos":9,"real":true,'
+            '"idEmpresa":50,"horaDesc":"8:07"}]',
+            200);
+      }
+      return http.Response('[]', 200);
+    });
+    CacheService.saveStop(BusStop(id: 574, name: 'SAN JOSE y ANDES'));
+    await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 100)));
+    await tester.pump();
+
+    Finder bell(String line) => find.descendant(
+        of: find.widgetWithText(InkWell, line),
+        matching: find.byWidgetPredicate(
+            (w) => w is PixelIcon && w.glyph == PixelGlyphs.bellRing));
+
+    await http.runWithClient(() async {
+      final handle = tester.ensureSemantics();
+      await tester.pumpWidget(app());
+      await tester.pump();
+
+      // 2 min away with the default 5 min threshold: nothing to wait for
+      await tester.tap(find.text('121'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Avisarme cuando llegue'));
+      await tester.pumpAndSettle();
+      expect(fake.started, isEmpty);
+      expect(find.text('El 121 ya está a 2 min'), findsOneWidget);
+      await tester.pump(const Duration(seconds: 5)); // snack bar goes away
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('116'));
+      await tester.pumpAndSettle();
+      // The followed bus on its LED strip, with the stop under it
+      expect(
+          find.byWidgetPredicate((w) =>
+              w is CartelTira &&
+              w.line == '116' &&
+              w.destination == 'POCITOS' &&
+              w.etaMinutes == 9),
+          findsOneWidget);
+      expect(find.text('SAN JOSE y ANDES · con GPS'), findsOneWidget);
+      // Words for screen readers, not the uppercase sign
+      expect(
+          find.descendant(
+              of: find.byType(CartelTira),
+              matching: find.bySemanticsLabel(
+                  'Línea 116 a Pocitos, llega en 9 minutos, con GPS')),
+          findsOneWidget);
+      expect(find.bySemanticsLabel('San Jose y Andes, con GPS'),
+          findsOneWidget);
+      await tester.tap(find.text('3 min'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Avisarme cuando llegue'));
+      await tester.pumpAndSettle();
+
+      final wait = fake.started.single;
+      expect(
+          (wait.stopId, wait.stopName, wait.line, wait.destination,
+              wait.alertMinutes),
+          (574, 'SAN JOSE y ANDES', '116', 'POCITOS', 3));
+      expect(find.text('Te avisamos cuando el 116 esté a 3 min'),
+          findsOneWidget);
+      expect(bell('116'), findsOneWidget);
+      expect(bell('121'), findsNothing);
+
+      await tester.tap(find.text('116'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Dejar de esperar'));
+      await tester.pumpAndSettle();
+      expect(fake.stopped, isTrue);
+      expect(bell('116'), findsNothing);
+      handle.dispose();
+    }, () => etaClient);
+  });
+
   testWidgets('Denied location explains how to enable it', (tester) async {
     geolocator.answer = LocationPermission.deniedForever;
     await http.runWithClient(() async {
       await tester.pumpWidget(app());
-      await tester.tap(find.byIcon(Icons.add));
+      await tester.tap(find.byTooltip('Agregar parada'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Paradas cercanas'));
       await tester.pumpAndSettle();
 
-      expect(find.text('El permiso de ubicación está desactivado para la app.'),
+      expect(
+          find.text('El permiso de ubicación está desactivado para la app. '
+              'Activalo en Ajustes.'),
           findsOneWidget);
       expect(find.text('Abrir ajustes'), findsOneWidget);
       expect(requests.where((u) => u.host == 'geoserver.montevideo.gub.uy'),
           isEmpty);
     }, () => client);
   });
+
+  testWidgets('Alert threshold and schedule are set from the stop card',
+      (tester) async {
+    // A small phone: the sheet and the chips must fit
+    tester.view.physicalSize = const Size(360, 690) * 3;
+    tester.view.devicePixelRatio = 3;
+    addTearDown(tester.view.reset);
+    CacheService.saveStop(BusStop(
+        id: 574, name: 'SAN JOSE y ANDES', notificationsEnabled: true));
+    await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 100)));
+    await tester.pump();
+
+    await http.runWithClient(() async {
+      await tester.pumpWidget(app());
+      await tester.pump();
+
+      await tester.tap(find.text('Aviso 5 min antes · Siempre'));
+      await tester.pumpAndSettle();
+      // Day chips are said in full
+      final handle = tester.ensureSemantics();
+      expect(find.bySemanticsLabel(RegExp(r'^Sábado')), findsOneWidget);
+      handle.dispose();
+      await tester.tap(find.text('10 min'));
+      await tester.tap(find.text('Sá'));
+      await tester.tap(find.text('Do'));
+      await tester.tap(find.text('Todo el día'));
+      await tester.pumpAndSettle();
+
+      // 7:00–9:00 is offered; the start is changed to 7:30
+      expect(find.text('Hasta 9:00'), findsOneWidget);
+      await tester.tap(find.text('Desde 7:00'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byIcon(Icons.keyboard_outlined));
+      await tester.pumpAndSettle();
+      final fields = find.descendant(
+          of: find.byType(Dialog), matching: find.byType(TextField));
+      await tester.enterText(fields.at(1), '30');
+      await tester.tap(find.text('OK'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Guardar'));
+      await tester.pumpAndSettle();
+      await tester.runAsync(
+          () => Future<void>.delayed(const Duration(milliseconds: 100)));
+      await tester.pumpAndSettle();
+
+      final saved = CacheService.getStop(574)!;
+      expect(saved.etaAlertMinutes, 10);
+      expect(saved.alertDays, [1, 2, 3, 4, 5]);
+      expect((saved.alertFromMinute, saved.alertToMinute),
+          (7 * 60 + 30, 9 * 60));
+      expect(find.text('Aviso 10 min antes · Lun a Vie 7:30–9:00'),
+          findsOneWidget);
+    }, () => client);
+  });
+
+  testWidgets('Agregar ruta picks the lines and direction of the stop',
+      (tester) async {
+    // A small phone: the sheet and the chips must fit
+    tester.view.physicalSize = const Size(360, 690) * 3;
+    tester.view.devicePixelRatio = 3;
+    addTearDown(tester.view.reset);
+    final routeClient = MockClient((request) async {
+      requests.add(request.url);
+      if (request.url.path == '/transporteRest/lineas/574') {
+        return http.Response(_lineas574, 200);
+      }
+      if (request.url.path == '/transporteRest/siguientesParada/574') {
+        return http.Response(
+            '[{"linea":"121","destino":"CENTRO","minutos":2,"real":true,'
+            '"idEmpresa":50,"horaDesc":"8:00","variante":7884},'
+            '{"linea":"116","destino":"POCITOS","minutos":9,"real":true,'
+            '"idEmpresa":50,"horaDesc":"8:07","variante":630},'
+            '{"linea":"116","destino":"CIUDAD VIEJA","minutos":14,'
+            '"real":true,"idEmpresa":50,"horaDesc":"8:12","variante":631}]',
+            200);
+      }
+      return http.Response('[]', 200);
+    });
+    Finder inDialog(String text) => find.descendant(
+        of: find.byType(AlertDialog), matching: find.text(text));
+    Finder chip(String text) => find.descendant(
+        of: find.byType(AlertDialog),
+        matching: find.widgetWithText(FilterChip, text));
+
+    await http.runWithClient(() async {
+      await tester.pumpWidget(app());
+      await tester.pump();
+      await tester.tap(find.text('Rutas'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byTooltip('Agregar ruta'));
+      await tester.pumpAndSettle();
+      final handle = tester.ensureSemantics();
+      // "obligatorio", not "asterisco"
+      expect(find.bySemanticsLabel(RegExp('Parada de origen, obligatorio')),
+          findsOneWidget);
+      expect(find.bySemanticsLabel(RegExp('Destino, obligatorio')),
+          findsOneWidget);
+
+      await tester.enterText(
+          find.widgetWithText(TextField, 'Parada de origen *'), '574');
+      await tester.enterText(
+          find.widgetWithText(TextField, 'Destino *'), 'Trabajo');
+      await tester.tap(find.byTooltip('Ver líneas'));
+      await tester.pumpAndSettle();
+
+      // The stop's lines (transporteRest/lineas), not typed by hand
+      expect(inDialog('SAN JOSE y ANDES'), findsOneWidget);
+      for (final line in ['116', '117', '121']) {
+        expect(chip(line), findsOneWidget);
+      }
+      // Without the proxy the stop has no directions: those of the
+      // upcoming buses, narrowed to the picked lines
+      expect(chip('CENTRO'), findsOneWidget);
+      await tester.tap(chip('116'));
+      await tester.pumpAndSettle();
+      expect(chip('CENTRO'), findsNothing);
+      await tester.tap(chip('121'));
+      await tester.pumpAndSettle();
+      // The taller night dialog scrolls on a small phone
+      await tester.ensureVisible(chip('POCITOS'));
+      await tester.pumpAndSettle();
+      await tester.tap(chip('POCITOS'));
+      await tester.pumpAndSettle();
+
+      requests.clear();
+      await tester.tap(find.text('Guardar'));
+      await tester.pumpAndSettle();
+      await tester.runAsync(
+          () => Future<void>.delayed(const Duration(milliseconds: 100)));
+      await tester.pumpAndSettle();
+
+      final route = CacheService.getAllRoutes().single;
+      expect(
+          (route.originStopId, route.originName, route.destinationName),
+          (574, 'SAN JOSE y ANDES', 'Trabajo'));
+      expect(route.preferredLines, ['116', '121']);
+      expect(route.preferredDestinations, ['POCITOS']);
+      // The variant of the picked direction's bus, too
+      expect(route.preferredVariantIds, [630]);
+      // The dialog already resolved the stop
+      expect(requests.map((u) => u.path),
+          isNot(contains('/transporteRest/lineas/574')));
+      expect(find.text('Líneas: 116, 121 · Hacia: POCITOS'), findsOneWidget);
+      expect(find.text('Aviso 5 min antes · Siempre'), findsOneWidget);
+      // The card is one phrase
+      expect(
+          find.bySemanticsLabel(
+              'De San Jose y Andes a Trabajo, líneas 116, 121, hacia Pocitos'),
+          findsOneWidget);
+      handle.dispose();
+    }, () => routeClient);
+
+    CacheService.deleteRoute(CacheService.getAllRoutes().single.id);
+    await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 100)));
+  });
+
+  testWidgets('A card is one phrase; screen readers delete it without a swipe',
+      (tester) async {
+    CacheService.saveStop(BusStop(
+        id: 574, name: 'SAN JOSE y ANDES', notificationsEnabled: true));
+    await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 100)));
+    await tester.pump();
+    const delete = CustomSemanticsAction(label: 'Borrar');
+
+    await http.runWithClient(() async {
+      final handle = tester.ensureSemantics();
+      await tester.pumpWidget(app());
+      await tester.pump();
+
+      const header = 'Parada 574, San Jose y Andes';
+      expect(tester.getSemantics(find.bySemanticsLabel(header)),
+          isSemantics(customActions: const [delete]));
+      // The alert settings under the bell open like a button
+      expect(
+          tester.getSemantics(
+              find.bySemanticsLabel('Aviso 5 min antes · Siempre')),
+          isSemantics(isButton: true, hasTapAction: true));
+
+      tester.semantics.customAction(find.semantics.byLabel(header), delete);
+      await tester.pump();
+      expect(find.text('#574'), findsNothing);
+      expect(find.text('SIN PARADAS'), findsOneWidget);
+      handle.dispose();
+    }, () => client);
+    await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 100)));
+  });
+}
+
+class _FakeWaitPlatform implements BusWaitPlatform {
+  final started = <BusWait>[];
+  bool stopped = false;
+
+  @override
+  Future<void> init({required ValueChanged<DateTime> onEnded}) async {}
+
+  @override
+  Future<BusWait?> restore() async => null;
+
+  @override
+  Future<bool> start(BusWait wait, BusArrival trip) async {
+    started.add(wait);
+    return true;
+  }
+
+  @override
+  Future<void> stop() async => stopped = true;
+
+  @override
+  Future<bool> onArrivals(BusWait wait, List<BusArrival>? arrivals,
+          {DateTime? fetchedAt}) async =>
+      false;
 }
 
 class _FakeGeolocator extends GeolocatorPlatform {

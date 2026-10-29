@@ -1,4 +1,6 @@
 import 'package:hive_flutter/hive_flutter.dart';
+import 'alert_schedule.dart';
+import 'bus_arrival.dart';
 
 part 'route_alert.g.dart';
 
@@ -29,12 +31,50 @@ class RouteAlert extends HiveObject {
   @HiveField(6)
   int alertMinutes;
 
+  // Alert schedule (see [schedule]); routes saved before it are "always"
+  @HiveField(7, defaultValue: AlertSchedule.allDays)
+  List<int> alertDays;
+
+  @HiveField(8, defaultValue: 0)
+  int alertFromMinute;
+
+  @HiveField(9, defaultValue: AlertSchedule.dayMinutes)
+  int alertToMinute;
+
+  /// Direction filter: API `destino` values ("POCITOS").
+  /// If empty — every direction.
+  @HiveField(10, defaultValue: <String>[])
+  List<String> preferredDestinations;
+
+  /// Direction filter by transporteRest `variante`, picked together with
+  /// [preferredDestinations]: a bus of one of these variants matches even
+  /// when its destination label reads differently.
+  @HiveField(11, defaultValue: <int>[])
+  List<int> preferredVariantIds;
+
+  AlertSchedule get schedule => AlertSchedule(
+      days: alertDays, fromMinute: alertFromMinute, toMinute: alertToMinute);
+
+  set schedule(AlertSchedule value) {
+    alertDays = [...value.days];
+    alertFromMinute = value.fromMinute;
+    alertToMinute = value.toMinute;
+  }
+
   /// Case-insensitive ("64d" == "64D"); an empty list accepts every line.
   bool acceptsLine(String line) {
     final wanted = line.toUpperCase();
     return preferredLines.isEmpty ||
         preferredLines.any((l) => l.toUpperCase() == wanted);
   }
+
+  /// Preferred line and direction (by variant or by destination label).
+  bool accepts(BusArrival bus) =>
+      acceptsLine(bus.line) &&
+      ((preferredDestinations.isEmpty && preferredVariantIds.isEmpty) ||
+          (bus.variantId != null &&
+              preferredVariantIds.contains(bus.variantId)) ||
+          preferredDestinations.contains(bus.destination));
 
   RouteAlert({
     required this.id,
@@ -44,5 +84,10 @@ class RouteAlert extends HiveObject {
     this.preferredLines = const [],
     this.enabled = true,
     this.alertMinutes = 5,
+    this.alertDays = AlertSchedule.allDays,
+    this.alertFromMinute = 0,
+    this.alertToMinute = AlertSchedule.dayMinutes,
+    this.preferredDestinations = const [],
+    this.preferredVariantIds = const [],
   });
 }

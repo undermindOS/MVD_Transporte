@@ -1,0 +1,13 @@
+{
+  "name": "timbre-mapa-estilo",
+  "private": true,
+  "type": "module",
+  "description": "Genera assets/map/style_noche.json (estilo «Timbre Noche») a partir de @protomaps/basemaps y flavor_noche.json",
+  "scripts": {
+    "estilo": "node gen_style.mjs node_modules/@protomaps/basemaps/dist/esm/index.js node_modules/@maplibre/maplibre-gl-style-spec/dist/index.mjs flavor_noche.json ../../assets/map/style_noche.json"
+  },
+  "devDependencies": {
+    "@maplibre/maplibre-gl-style-spec": "26.4.4",
+    "@protomaps/basemaps": "5.7.2"
+  }
+}

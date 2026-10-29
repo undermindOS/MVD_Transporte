@@ -1,14 +1,19 @@
+# Native splash: the lit amber bus on the night board, no text (the
+# Android 12+ system splash cannot show text anyway). Same #070F22 as the
+# app background, day and night: the app is always dark, so the splash
+# opens into it without a flash. Regenerate with:
+#   dart run flutter_native_splash:create
 flutter_native_splash:
-  color: "#0066CC"
-  image: assets/app_icon_foreground.png
-  color_dark: "#004499"
-  image_dark: assets/app_icon_foreground.png
+  color: "#070F22"
+  image: assets/splash_icon.png
+  color_dark: "#070F22"
+  image_dark: assets/splash_icon.png
   android_12:
-    color: "#0066CC"
-    icon_background_color: "#0066CC"
-    image: assets/app_icon_foreground.png
-    color_dark: "#004499"
-    icon_background_color_dark: "#004499"
-    image_dark: assets/app_icon_foreground.png
+    color: "#070F22"
+    image: assets/splash_icon_android12.png
+    icon_background_color: "#070F22"
+    color_dark: "#070F22"
+    image_dark: assets/splash_icon_android12.png
+    icon_background_color_dark: "#070F22"
   ios: true
   web: false

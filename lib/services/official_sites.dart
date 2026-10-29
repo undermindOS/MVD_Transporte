@@ -2,6 +2,8 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import 'external_apps.dart';
+
 /// Web services of the Intendencia de Montevideo the app links to.
 ///
 /// They open in the system browser — Chrome Custom Tabs on Android,
@@ -38,7 +40,7 @@ class SystemBrowser {
       final mode = await supportsLaunchMode(LaunchMode.inAppBrowserView)
           ? LaunchMode.inAppBrowserView
           : LaunchMode.externalApplication;
-      final opened = await launchUrl(uri, mode: mode);
+      final opened = await ExternalApps.launch(uri, mode: mode);
       // On iOS the result describes the page's first load, not the browser:
       // false = closed before the page loaded.
       return opened || isIOS;

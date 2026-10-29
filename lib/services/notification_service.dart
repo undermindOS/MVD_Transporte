@@ -1,18 +1,20 @@
-import 'dart:ui';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:timezone/timezone.dart' as tz;
+
+import '../ui/theme/timbre_tokens.dart';
 
 class NotificationService {
   static final _plugin = FlutterLocalNotificationsPlugin();
 
   static const _channelId = 'bus_alerts';
-  static const _channelName = 'Alertas de colectivo';
+  static const _channelName = 'Alertas de ómnibus';
   static const _channelDesc =
-      'Notificaciones cuando tu colectivo está por llegar';
+      'Avisos cuando tu ómnibus está por llegar';
 
   static Future<void> init() async {
     const androidSettings =
-        AndroidInitializationSettings('@mipmap/ic_launcher');
+        AndroidInitializationSettings('@drawable/ic_stat_timbre');
     const iosSettings = DarwinInitializationSettings(
       requestAlertPermission: false,
       requestBadgePermission: false,
@@ -66,10 +68,12 @@ class NotificationService {
     required String stopName,
     required int etaMinutes,
   }) async {
-    final title = 'Línea $line — $etaMinutes min';
+    final title = etaMinutes <= 0
+        ? 'Línea $line — llegando'
+        : 'Línea $line — $etaMinutes min';
     final body = etaMinutes <= 1
-        ? 'Tu colectivo está llegando a $stopName'
-        : 'Tu colectivo llega en $etaMinutes min a $stopName';
+        ? 'Tu ómnibus está llegando a $stopName'
+        : 'Tu ómnibus llega en $etaMinutes min a $stopName';
 
     final details = NotificationDetails(
       android: AndroidNotificationDetails(
@@ -78,8 +82,8 @@ class NotificationService {
         channelDescription: _channelDesc,
         importance: Importance.high,
         priority: Priority.high,
-        icon: '@mipmap/ic_launcher',
-        color: const Color(0xFF0066CC),
+        icon: '@drawable/ic_stat_timbre',
+        color: TimbreColors.tinta,
       ),
       iOS: const DarwinNotificationDetails(
         presentAlert: true,
@@ -101,7 +105,7 @@ class NotificationService {
   }) async {
     final title = 'Línea $line → $destinationName';
     final body = etaMinutes <= 1
-        ? 'Tu colectivo está llegando a $originName'
+        ? 'Tu ómnibus está llegando a $originName'
         : 'Sale en $etaMinutes min desde $originName';
 
     final details = NotificationDetails(
@@ -111,8 +115,8 @@ class NotificationService {
         channelDescription: _channelDesc,
         importance: Importance.high,
         priority: Priority.high,
-        icon: '@mipmap/ic_launcher',
-        color: const Color(0xFF0066CC),
+        icon: '@drawable/ic_stat_timbre',
+        color: TimbreColors.tinta,
         styleInformation: BigTextStyleInformation(body),
       ),
       iOS: const DarwinNotificationDetails(
@@ -125,6 +129,47 @@ class NotificationService {
     await _plugin.show(id, title, body, details);
     debugPrint('🗺️ Alerta ruta: $title');
   }
+
+  // "Estoy esperando" on iOS: one reminder at a time
+  static const _waitReminderId = 7001;
+
+  /// iOS cannot poll in the background, so "Estoy esperando" schedules a
+  /// reminder for the predicted time and moves it on every refresh.
+  static Future<void> scheduleWaitReminder({
+    required DateTime at,
+    required String line,
+    required String stopName,
+    required int alertMinutes,
+  }) async {
+    final details = NotificationDetails(
+      android: AndroidNotificationDetails(
+        _channelId,
+        _channelName,
+        channelDescription: _channelDesc,
+        importance: Importance.high,
+        priority: Priority.high,
+        icon: '@drawable/ic_stat_timbre',
+        color: TimbreColors.tinta,
+      ),
+      iOS: const DarwinNotificationDetails(
+        presentAlert: true,
+        presentSound: true,
+      ),
+    );
+    await _plugin.zonedSchedule(
+      _waitReminderId,
+      'Línea $line — ~$alertMinutes min',
+      'Debería llegar en unos $alertMinutes min a $stopName',
+      // No time zone database needed: an absolute instant in UTC
+      tz.TZDateTime.from(at, tz.UTC),
+      details,
+      uiLocalNotificationDateInterpretation:
+          UILocalNotificationDateInterpretation.absoluteTime,
+      androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+    );
+  }
+
+  static Future<void> cancelWaitReminder() => _plugin.cancel(_waitReminderId);
 
   static Future<void> cancelAll() => _plugin.cancelAll();
 
