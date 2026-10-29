@@ -11,7 +11,8 @@ Ver también:
 - [07-textos.md](07-textos.md): cómo se escriben las frases que escucha el lector de pantalla.
 - [08-componentes.md](08-componentes.md) y [09-pantallas.md](09-pantallas.md): cada pieza y cada
   pantalla.
-- [06-luz-y-movimiento.md](06-luz-y-movimiento.md): la única animación.
+- [06-luz-y-movimiento.md](06-luz-y-movimiento.md): las dos animaciones propias (el candado y
+  los ómnibus del Mapa).
 
 ## Contraste
 

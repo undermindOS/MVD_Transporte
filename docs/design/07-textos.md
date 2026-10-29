@@ -145,6 +145,11 @@ Dónde se muestra (colores en [02-color.md](02-color.md)):
   ícono `warning` en `rojoLed`. En `home_page.dart`, `info_page.dart`, `app_lock.dart`,
   `news_list.dart` y `map/mapa_page.dart` es texto solo.
 
+**Excepción.** Las notas del Mapa sobre paradas sin ubicar («No se pudo ubicar en el mapa la
+parada 574.», «No se pudieron ubicar en el mapa 2 paradas.») van en `tenue` y tienen una sola
+frase: no hay nada que hacer, porque la app vuelve a buscar esas paradas sola, como mucho cada
+10 minutos, al volver al Mapa.
+
 ### Mis paradas: tarjetas de parada y de ruta
 
 Código: `_buildArrivals` y `_buildGpsWarning` en `lib/ui/stops_page.dart`.

@@ -15,10 +15,11 @@ versiones: [SemVer](https://semver.org/lang/es/).
   primera vez que la abrís y pide los arribos cada 30 s solo mientras está a la vista, con los mismos tableros que
   «Mis paradas»: si «Mis paradas» los trajo hace menos de 30 s, no los vuelve a pedir. Después de un fallo, los
   últimos ómnibus quedan sin encender hasta 5 minutos. «© OpenStreetMap» se ve siempre en una esquina y abre la
-  página de derechos de OpenStreetMap. Las paradas elegidas en «Buscar por calles» o en «Paradas cercanas» se
-  guardan con su ubicación; a las demás se la busca la app al abrir el Mapa: con el proxy, en el catálogo de
-  paradas; sin proxy, en geoserver, por número de parada. Glifo nuevo para la pestaña: dos calles que se cruzan
-  y un ómnibus.
+  página de derechos de OpenStreetMap. Info nombra la posición de los ómnibus entre las fuentes de datos y suma
+  «Mapa: © colaboradores de OpenStreetMap, con licencia ODbL. Viene dentro de la app.», con y sin proxy. Las
+  paradas elegidas en «Buscar por calles» o en «Paradas cercanas» se guardan con su ubicación; a las demás se la
+  busca la app al abrir el Mapa: con el proxy, en el catálogo de paradas; sin proxy, en geoserver, por número de
+  parada. Glifo nuevo para la pestaña: dos calles que se cruzan y un ómnibus.
 - «Buscar por calles» en el diálogo «Agregar parada»: la parada se encuentra por los nombres de sus calles
   («18 de julio ejido» → «AV 18 DE JULIO y EJIDO», «san jose andes» → 574). Las palabras van en cualquier orden,
   sin distinguir mayúsculas, tildes, Ñ ni apóstrofos («ohiggins» = «O´HIGGINS»; «ordoñez» encuentra también

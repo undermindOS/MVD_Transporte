@@ -1,12 +1,12 @@
 # MVD_Transporte
 
-Timbre MVD: app no oficial en Flutter para el transporte público de Montevideo. Tiene dos
+Timbre MVD: app no oficial en Flutter para el transporte público de Montevideo. Tiene tres
 pestañas nativas: «Mis paradas» —paradas y rutas guardadas con los tiempos de arribo de los
-ómnibus, horarios, novedades, notificaciones y un widget de Android— y «Mapa», con tus paradas
-guardadas y los ómnibus con GPS que se acercan a ellas, sobre un mapa que viene dentro de la app.
-Además, accesos rápidos a los sitios oficiales (Mi STM, recarga de la tarjeta, Cómo Ir, Avisos),
-que se abren en el navegador del sistema (Custom Tabs / SFSafariViewController) y no en un
-WebView integrado.
+ómnibus, horarios, novedades, notificaciones y un widget de Android—, «Mapa», con tus paradas
+guardadas y los ómnibus con GPS que se acercan a ellas, sobre un mapa que viene dentro de la app,
+y «Servicios», con accesos rápidos a los sitios oficiales (Mi STM, recarga de la tarjeta, Cómo Ir,
+Avisos), que se abren en el navegador del sistema (Custom Tabs / SFSafariViewController) y no en
+un WebView integrado.
 
 No está afiliada a la Intendencia de Montevideo.
 

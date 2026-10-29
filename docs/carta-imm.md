@@ -26,10 +26,12 @@ versión web de Cómo Ir:
 - `geoserver.montevideo.gub.uy` (WFS `imm:v_uptu_paradas`) para buscar paradas cercanas y ubicar
   en el mapa las paradas guardadas, pedidas por número
 
-Frecuencia: una consulta cuando el usuario abre o actualiza una parada y, en
-segundo plano, como máximo una cada 15 minutos por parada con alerta activa.
-Para el mapa, una consulta a geoserver por cada parada guardada que todavía no
-tiene ubicación; después queda guardada en el teléfono.
+Frecuencia: una consulta cuando el usuario abre o actualiza una parada;
+mientras Mis paradas o el mapa están a la vista, una consulta cada 30 s por
+parada guardada, y, en segundo plano, como máximo una cada 15 minutos por parada
+con alerta activa. Para el mapa, una consulta a geoserver por cada parada
+guardada que todavía no tiene ubicación; después queda guardada en el teléfono.
+Si no se encuentra, se vuelve a intentar como mucho cada 10 minutos.
 
 Quisiera hacer las cosas de la forma que ustedes prefieran, por eso les
 consulto:

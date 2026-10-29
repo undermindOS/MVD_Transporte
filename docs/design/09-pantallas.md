@@ -642,8 +642,9 @@ Lo anotamos para corregirlo en el código cuando se toque ese archivo:
 - **Agregar ruta:** «Guardar» sin número o sin destino no hace nada y no dice por qué.
 - **Estoy esperando** muestra los minutos del momento en que tocaste la fila y no se actualiza
   mientras la hoja está abierta.
-- **El Mapa cuenta la edad de un tablero desde `fetchedAt`**, la hora del servidor, y no desde que
-  llegó al teléfono, como Mis paradas (`_BoardView.receivedAt`). Con el reloj del teléfono
-  adelantado un minuto o más, sus ómnibus salen sin encender aunque el tablero acabe de llegar; con
-  el reloj atrasado, o adelantado más de 30 s, el Mapa vuelve a pedir los tableros que Mis paradas
-  acaba de traer.
+- **Con proxy, el Mapa cuenta la edad de un tablero desde `fetchedAt`**, la hora del servidor, y no
+  desde que llegó al teléfono, como Mis paradas (`_BoardView.receivedAt`). Con el reloj del
+  teléfono adelantado un minuto o más, sus ómnibus salen sin encender aunque el tablero acabe de
+  llegar; con el reloj atrasado, o adelantado más de 30 s, el Mapa vuelve a pedir los tableros que
+  Mis paradas acaba de traer. Sin proxy, `fetchedAt` es la hora del teléfono cuando llega la
+  respuesta (`DirectSource.arrivals`) y esto no pasa.
