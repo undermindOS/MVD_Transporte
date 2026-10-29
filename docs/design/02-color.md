@@ -138,6 +138,7 @@ Se enciende:
 | Los contadores | Insignia de novedades sin leer en la pestaña Novedades |
 | Los avisos | Ícono del panel `avisoNoche`; texto del aviso de Novedades |
 | La textura | LEDs apagados de `LedMatrix`: ámbar al 9 a 11 % |
+| Los widgets de parada de Android | El número de línea (contorno `ambarTenue`, cifras `ambar`), el cartel `stop` del encabezado, el botón de actualizar, los números de línea de «538 ~20:16 · 144 ~20:17» en Próximo y los LEDs apagados del encabezado (16 %) ([10-superficies.md](10-superficies.md#widgets-de-parada-android)) |
 
 No se enciende:
 
@@ -153,8 +154,9 @@ No se enciende:
 - Las marcas pasivas: confort, íconos de lista (`listTileTheme.iconColor`
   es `etiquetaCartel`), íconos de los campos, candado de Info, nota del
   navegador en Servicios.
-- La estimación del widget de Android («~14:32»,
-  [10-superficies.md](10-superficies.md)).
+- La hora estimada de los widgets de Android («~14:32»): `etiquetaCartel`
+  en el widget de ruta, `papel` en los widgets de parada, siempre con «~»
+  y reloj ([10-superficies.md](10-superficies.md)).
 - En el Mapa: las paradas guardadas (`stop` en `papel` sobre `tinta`, con
   borde `etiquetaCartel`), un ómnibus estimado (píldora `tinta` con borde y
   número `etiquetaCartel`, o un aro `etiquetaCartel`), las notas (`tenue`) y
@@ -173,8 +175,14 @@ No se enciende:
    propio halo (`BoxShadow` del mismo color al 60 %), además de
    `TimbreShadow.ledGlow`, que es solo de LLEGANDO. Es luz sobre un dato
    en vivo ([06-luz-y-movimiento.md](06-luz-y-movimiento.md)).
+3. **La línea en los widgets de parada.** Un widget solo muestra
+   estimaciones, pero el número de línea va en ámbar: contorno
+   `ambarTenue` de 1.5 dp, nunca relleno (el relleno ámbar es GPS en la
+   app), y cifras `ambar`. Es la identidad de la línea, como el cartel de
+   la parada; la hora, que es el dato, queda en `papel` con «~» y reloj.
+   Código: `android/app/src/main/res/drawable/widget_badge_lit_bg.xml`.
 
-El porqué de ambas está en [12-decisiones.md](12-decisiones.md).
+El porqué de las tres está en [12-decisiones.md](12-decisiones.md).
 
 ### Donde el código todavía no cumple
 

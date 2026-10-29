@@ -28,6 +28,7 @@ la pestaña Mapa. El contrato completo está en [contrato-v1.md](contrato-v1.md)
   [«NUEVA» en ámbar](#nueva-y-la-fecha-de-lo-no-leído-van-en-ámbar) ·
   [El brillo de `LiveDot`](#el-brillo-de-livedot) ·
   [El widget muestra el destino del ómnibus](#el-widget-muestra-el-destino-del-ómnibus) ·
+  [Los widgets de parada encienden la línea, no la hora](#los-widgets-de-parada-encienden-la-línea-no-la-hora) ·
   [El bloqueo va encima del `Navigator`](#el-bloqueo-va-encima-del-navigator) ·
   [El bloqueo vuelve solo después del segundo plano](#el-bloqueo-vuelve-solo-después-del-segundo-plano) ·
   [El mapa viene dentro de la app](#el-mapa-viene-dentro-de-la-app)
@@ -131,7 +132,7 @@ letra del sistema más chica no los achique.
 plantilla.
 
 **Decisión.** Íconos y letras comparten la misma grilla de puntos:
-`PixelGlyphs` (34 glifos de 12 × 12 en `lib/ui/widgets/pixel_glyphs.dart`),
+`PixelGlyphs` (35 glifos de 12 × 12 en `lib/ui/widgets/pixel_glyphs.dart`),
 dibujados por `PixelIcon`. En `lib/` no queda ningún `Icons.`.
 
 **Consecuencia.** Un ícono nuevo se dibuja en la grilla
@@ -315,6 +316,22 @@ el nombre de la ruta (`RouteAlert.destinationName`). Lo escribe `WidgetFeed`
 usuario ve en su tarjeta de ruta. El aviso de ruta, en cambio, usa el nombre
 de la ruta en el título («Línea 116 → Centro»)
 ([10-superficies.md](10-superficies.md#textos)).
+
+### Los widgets de parada encienden la línea, no la hora
+
+**Contexto.** Un widget se redibuja con datos de hasta 15 min (la consulta
+de fondo) o de cuando tocaste actualizar: nunca es GPS en vivo. Con todo
+apagado, en la pantalla de inicio se veía como una lista gris, no como
+Timbre. El dueño del producto pidió más ámbar (2026-10-29).
+
+**Decisión.** Se encienden la identidad y la acción: el número de línea
+(contorno `ambarTenue`, cifras `ambar`), el cartel `stop`, el botón de
+actualizar y los LEDs apagados del encabezado. La hora queda en `papel`,
+con «~» y reloj `ambarTenue`, y nunca es un conteo («5 min»).
+
+**Consecuencia.** En los widgets la forma separa lo vivo de lo estimado,
+no el color: el relleno ámbar sigue siendo solo GPS en la app. Es la
+excepción 3 de [02-color.md](02-color.md#excepciones-documentadas).
 
 ### El bloqueo va encima del `Navigator`
 

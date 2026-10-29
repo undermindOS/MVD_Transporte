@@ -1,6 +1,6 @@
 # Íconos
 
-Un solo juego de íconos: `PixelGlyphs`, 34 glifos de 12 × 12 en
+Un solo juego de íconos: `PixelGlyphs`, 35 glifos de 12 × 12 en
 `lib/ui/widgets/pixel_glyphs.dart`, dibujados por `PixelIcon`
 (`lib/ui/widgets/pixel_icon.dart`). La app no usa los íconos de Material
 (`Icons.`), ni emoji, ni íconos de línea de otros juegos.
@@ -73,9 +73,9 @@ tiene lo que está «prendido»:
 El resto de la luz del sistema está en
 [06-luz-y-movimiento.md](06-luz-y-movimiento.md).
 
-## Los 34 glifos
+## Los 35 glifos
 
-15 se dibujaron para Timbre. Los otros 19 son de pixelarticons (Gerrit
+16 se dibujaron para Timbre. Los otros 19 son de pixelarticons (Gerrit
 Halfmann, licencia MIT), pasados a la grilla de 12 × 12; en el código
 llevan `(pixelarticons)` en su comentario. La licencia está en
 `assets/licenses/MIT-pixelarticons.txt` y se registra junto con las de las
@@ -120,6 +120,7 @@ Tamaño y color de cada uso, en ese orden.
 | `search` | pixelarticons | Buscar | Campo «Buscar por calles» de Agregar parada (20, `etiquetaCartel`); botón «Ver líneas» de Agregar ruta (20, `papel`). |
 | `bolt` | pixelarticons | Cero emisiones | Marca de confort en `ArrivalRow` y en `CartelParada` (14, `etiquetaCartel`). |
 | `signal` | pixelarticons | Calidad del GPS | Panel de GPS parcial sobre Paradas y Rutas (20, `ambar`). |
+| `refresh` | Timbre | Actualizar: un arco en el sentido del reloj con la punta a la derecha | Solo fuera de la app: el botón de los widgets de parada de Android (18, `ambar`, en `widget_ic_refresh.xml`). |
 
 Las pestañas de la navegación son `ambar` con brillo cuando están
 elegidas y `tenue` cuando no; las subpestañas, `ambar` y `tenue` sin
@@ -143,10 +144,16 @@ un alfiler. Un marcador de mapa dice «un lugar cualquiera»; el cartel dice
   Material que aparece en pantalla. `showTimePicker` acepta
   `switchToInputEntryModeIcon` y `switchToTimerEntryModeIcon` para
   cambiarlos.
-- **Widget de Android.** `widget_ic_clock.xml`, `widget_ic_route.xml` y
+- **Widgets de Android.** `widget_ic_clock.xml`, `widget_ic_route.xml` y
   `widget_ic_external.xml` son copias vectoriales de `clock`, `route` y
-  `external`, con el mismo espacio de 0.14 celdas. Si cambiás uno de esos
-  glifos, rehacé su vector ([10-superficies.md](10-superficies.md)).
+  `external`, con el mismo espacio de 0.14 celdas. Los widgets de parada
+  suman `widget_ic_stop` (`stop`, `ambar`), `widget_ic_refresh` (`refresh`,
+  `ambar`), `widget_ic_clock_dim` (`clock`, `ambarTenue`),
+  `widget_ic_accessible` (`accessible`, `etiquetaCartel`),
+  `widget_ic_warning` (`warning`, `rojoLed`) y `widget_ic_bus` (`bus`,
+  `ambar`). Si cambiás uno de esos glifos, rehacé su vector: cada celda
+  encendida es un cuadrado `M{x}.07,{y}.07h0.86v0.86h-0.86z` en un
+  `viewport` de 12 × 12 ([10-superficies.md](10-superficies.md)).
 - **Notificaciones e ícono de la app.** Usan el ómnibus de Timbre, no un
   glifo de este juego ([10-superficies.md](10-superficies.md)).
 

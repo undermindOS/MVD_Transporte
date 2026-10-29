@@ -43,7 +43,7 @@ Lenguaje visual:
 - [03-tipografia.md](03-tipografia.md): Doto, Fira Sans Extra Condensed y
   Fira Sans; todos los estilos de `TimbreText`; el mínimo de 19 px y la
   letra grande.
-- [04-iconos.md](04-iconos.md): los 34 íconos de `PixelGlyphs` y dónde se
+- [04-iconos.md](04-iconos.md): los 35 íconos de `PixelGlyphs` y dónde se
   usa cada uno, tamaños, colores y brillo.
 - [05-formas-y-espacio.md](05-formas-y-espacio.md): radios, espacios,
   tamaño táctil, bordes y la tarjeta de parada.

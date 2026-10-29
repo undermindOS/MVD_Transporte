@@ -211,6 +211,151 @@ Archivos:
 - **Por qué el destino del ómnibus y no el nombre de la ruta:**
   [12-decisiones.md](12-decisiones.md#el-widget-muestra-el-destino-del-ómnibus).
 
+## Widgets de parada (Android)
+
+Tres tableros con los próximos ómnibus de tus paradas guardadas, del mismo
+material que la tarjeta de Mis paradas. Existen solo en Android, junto al
+widget de ruta de arriba.
+
+| Widget (selector) | Clase | Celdas, mínimo | Qué muestra |
+|---|---|---|---|
+| Timbre · Próximo | `TimbreProximoWidget` | 2 × 2, 140 × 140 dp | Una parada: el próximo ómnibus grande («~20:14») y los dos siguientes en una línea («538 ~20:16 · 144 ~20:17») |
+| Timbre · Parada | `TimbreParadaWidget` | 4 × 2, 250 × 150 dp | Una parada y sus próximos tres ómnibus, en filas |
+| Timbre · Mis paradas | `TimbreMisParadasWidget` | 4 × 4, 250 × 320 dp | Dos paradas con tres ómnibus cada una, la placa TIMBRE MVD y los accesos a Mi STM y Recarga |
+
+Archivos:
+
+- `android/app/src/main/kotlin/com/liberontech/stmapp/TimbreStopWidget.kt`:
+  los tres providers. Dibujan, cambian de parada, piden datos y programan
+  el redibujo.
+- `android/app/src/main/kotlin/com/liberontech/stmapp/StopWidgetData.kt`:
+  las reglas, sin Android.
+- `res/layout/widget_stop_small.xml`, `widget_stop_medium.xml`,
+  `widget_stop_large.xml`, la fila `widget_stop_row.xml` y las vistas
+  previas `*_preview.xml`; `res/xml/widget_stop_*_info.xml`.
+- `lib/services/stop_widgets_feed.dart` (`StopWidgetsFeed`): escribe los
+  datos y atiende el botón de actualizar.
+
+### Cómo se ven
+
+- **Tablero:** el mismo fondo que el widget de ruta (`widget_background.xml`).
+  Arriba, LEDs apagados (`widget_led_band.xml`: un punto `ambar` al 16 %
+  cada 6 dp, que se apaga hacia la izquierda y hacia abajo, como la app
+  bar). Desde Android 12 el contenido se recorta a las esquinas
+  (`clipToOutline`).
+- **Encabezado:** `stop` en `ambar`, el nombre de la parada en `papel` y
+  « · 574» más chico en `etiqueta` (Próximo muestra solo el nombre). Mis
+  paradas lleva arriba la placa TIMBRE MVD (`widget_plate.png`).
+- **Fila** (`widget_stop_row.xml`, 30 dp):
+  - número de línea en un contorno `ambarTenue` de 1.5 dp, radio 8 dp,
+    cifras `ambar` 16 sp en negrita (`widget_badge_lit_bg.xml`);
+  - destino en `papel` 16 sp, una línea, con «…» si no entra;
+  - marca accesible `etiqueta` de 14 dp, si el ómnibus lo es;
+  - reloj `ambarTenue` de 13 dp y la hora «~20:14» en `papel` 18 sp.
+
+  Entre filas, una línea `linea_noche` de 1 dp. En Próximo el próximo
+  ómnibus va aparte: número de 17 sp, destino en hasta dos líneas y la hora
+  en 34 sp; los dos siguientes, con sus números en `ambar`.
+- **Actualizar:** `refresh` en `ambar`, 18 dp dentro de un blanco táctil de
+  44 dp. En Parada y Mis paradas va arriba a la derecha; en Próximo, abajo,
+  para que el nombre de la parada use todo el ancho.
+- **Pie** (`tenue` 11 sp):
+  - «Datos de las 20:13», la consulta más vieja de las paradas que muestra
+    (Parada suma « · horas estimadas»);
+  - «Actualizando…» hasta 30 s después de tocar actualizar, o hasta que
+    llegan los datos;
+  - si la última consulta falló: `warning` y «No se pudo actualizar. Datos
+    de las 19:58.» en `rojoLed`;
+  - sin datos todavía: «Tocá para actualizar».
+- **Sin ómnibus:** «Sin próximos ómnibus en esta parada» en `etiqueta`
+  14 sp. Si el tablero tiene más de 10 min, «Sin datos recientes. Tocá para
+  actualizar», y tocarlo actualiza: sus ómnibus pueden haber pasado.
+- **Sin paradas guardadas:** el cartel vacío de la app. LEDs apagados al
+  11 % (`widget_led_field.xml`), `bus` en `ambar`, «SIN PARADAS» en Doto
+  (`drawable-nodpi/widget_sin_paradas.png`, 20 dp de alto) y «Agregá una
+  parada en Mis paradas para verla acá.».
+- **Letra:** la del sistema (`sans-serif-condensed`), como el widget de
+  ruta. «SIN PARADAS» es una imagen hecha con Doto.
+- **Ámbar:** la línea, el cartel de la parada, actualizar y los LEDs. La
+  hora nunca: es una estimación ([02-color.md](02-color.md#excepciones-documentadas),
+  [12-decisiones.md](12-decisiones.md#los-widgets-de-parada-encienden-la-línea-no-la-hora)).
+- **Selector de widgets** (Android 12+): `previewLayout` con datos de
+  muestra de las paradas 574 y 3140 (`test/fixtures`).
+- **TalkBack:** cada fila es una frase: «Línea 121 a PUNTA CARRETAS,
+  alrededor de las 20:14, estimado, accesible». El encabezado dice
+  «Parada SAN JOSE y ANDES, 574. Tocá para ver otra parada».
+
+### Qué se toca
+
+- **El nombre de la parada:** muestra la siguiente parada guardada que el
+  widget no muestra, en el orden de Mis paradas. Cada widget recuerda la
+  suya. Si no hay otra, abre la app.
+- **Actualizar** (y «Sin datos recientes»): pide los arribos sin abrir la
+  app.
+- **El resto del widget:** abre la app. En Mis paradas, «Mi STM» y
+  «Recarga» abren esas páginas en el navegador, como el widget de ruta.
+
+### Las claves de los widgets de parada
+
+Viven en las preferencias de `home_widget` (`HomeWidgetPreferences`), como
+las del widget de ruta. Los nombres están en constantes de
+`StopWidgetsFeed` y de `TimbreStopWidget`.
+
+| Clave | La escribe | Valor |
+|---|---|---|
+| `stops_saved` | La app (`StopWidgetsFeed.saveStops`): al cargar Mis paradas y en cada consulta de fondo con un widget puesto | JSON `[{"id", "name"}]`, en el orden de Mis paradas |
+| `stop_board_{id}` | La app (`StopWidgetsFeed.updateBoards`): después de cada actualización de Mis paradas, en la consulta de fondo y al tocar actualizar | JSON `{"checkedAtMs", "failedAtMs", "arrivals"}` con hasta 6 ómnibus `{"line", "dest", "clock", "dueMs", "acc"}`. `dueMs` es `expectedAt` pasado al reloj del teléfono, como `route_expected_at_ms`; un `destination` vacío se escribe «Línea 121»; `failedAtMs` aparece cuando una consulta falla, y los ómnibus quedan |
+| `stops_shown` | El widget | Los ids de las paradas que muestran los widgets puestos, separados por comas |
+| `stop_widgets_placed` | El widget | Cuántos widgets de parada hay en la pantalla de inicio |
+
+La parada que eligió cada widget y las horas de actualizar viven aparte, en
+las preferencias `timbre_stop_widgets` (`widget_{id}_stops`,
+`refresh_tap_ms`, `refresh_asked_ms`).
+
+### Reglas
+
+- **Qué paradas:** las que eligió el widget y siguen guardadas; si no, las
+  primeras de Mis paradas. Nunca la misma dos veces.
+- **Qué ómnibus:** los del tablero hasta 1 min después de su `dueMs`
+  (`EXPIRED_AFTER_MS`, como Mis paradas), por hora. Sin conexión, cada uno
+  se va solo a su hora.
+- **Redibujo:** una alarma no exacta (`AlarmManager.set`, RTC: no despierta
+  el teléfono) a la hora en que se va el primer ómnibus a la vista, cuando
+  termina «Actualizando…» o cuando un tablero cumple 10 min. Además,
+  `updatePeriodMillis` = 30 min.
+- **Datos nuevos:**
+  - la app, después de cada actualización de Mis paradas (cada 30 s con la
+    pantalla a la vista);
+  - la consulta de fondo (`BackgroundWorker.checkAlerts`), al menos cada
+    15 min y a cualquier hora, para las paradas de `stops_shown`. Con un
+    widget de parada puesto, `BackgroundWorker.sync` mantiene la tarea
+    aunque no haya avisos;
+  - actualizar: el botón manda `ACTION_REFRESH` al widget, que anota la
+    hora y le pide datos a la app (`HomeWidgetBackgroundReceiver`,
+    `timbre://refresh`). La app corre `stopWidgetsCallback` en segundo
+    plano: pide los tableros de `stops_shown`, los escribe, redibuja y
+    registra la tarea de fondo si hay widgets. El widget también pide datos
+    solo cuando muestra una parada sin tablero (recién puesto, o al cambiar
+    de parada). Como mucho un pedido cada 15 s (`REFRESH_GAP_MS`).
+- **Un 429** no cambia nada: ni datos ni error.
+- **Con el bloqueo biométrico activado** el widget muestra igual las
+  paradas y los horarios: están en la pantalla de inicio, fuera de la app.
+
+### Cómo se prueban
+
+- `test/stop_widgets_feed_test.dart` y `test/background_worker_test.dart`:
+  lo que escribe la app.
+- `test/brand_assets_test.dart`: los recursos (cada vista que llena el
+  provider existe, blancos de 44 dp, ninguna vista que RemoteViews no
+  admita, la hora en `papel`).
+- `android/app/src/test/.../StopWidgetDataTest.kt`: las reglas, en la JVM.
+- `android/app/src/test/.../StopWidgetRenderTest.kt` (Robolectric): pone
+  los tres widgets, los llena el provider de verdad y Android infla sus
+  RemoteViews, así una vista no admitida falla acá y no en el teléfono.
+  Guarda las imágenes en `build/widget-previews/`.
+
+Desde `android/`: `./gradlew :app:testDebugUnitTest`.
+
 ## Notificaciones
 
 Todas se generan en el teléfono (`flutter_local_notifications` y
@@ -332,7 +477,7 @@ Lo que dice la app alrededor de «Estoy esperando» (`_showWaitSheet` en
 ## Plataformas
 
 - **iOS sin widget:** no hay extensión de widget ni App Group. `WidgetFeed`
-  intenta escribir igual y atrapa el error.
+  y `StopWidgetsFeed` intentan escribir igual y atrapan el error.
 - **iOS sin consulta de fondo:** `Info.plist` no declara
   `BGTaskSchedulerPermittedIdentifiers` y `AppDelegate.swift` no registra la
   tarea, así que en iOS la tarea periódica no corre. `BackgroundWorker.sync`

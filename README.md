@@ -2,7 +2,7 @@
 
 Timbre MVD: app no oficial en Flutter para el transporte público de Montevideo. Tiene tres
 pestañas nativas: «Mis paradas» —paradas y rutas guardadas con los tiempos de arribo de los
-ómnibus, horarios, novedades, notificaciones y un widget de Android—, «Mapa», con tus paradas
+ómnibus, horarios, novedades, notificaciones y widgets de Android—, «Mapa», con tus paradas
 guardadas y los ómnibus con GPS que se acercan a ellas, sobre un mapa que viene dentro de la app,
 y «Servicios», con accesos rápidos a los sitios oficiales (Mi STM, recarga de la tarjeta, Cómo Ir,
 Avisos), que se abren en el navegador del sistema (Custom Tabs / SFSafariViewController) y no en
@@ -50,6 +50,13 @@ flutter test
 flutter run
 ```
 
+Las pruebas de los widgets de parada de Android corren en la JVM (Robolectric) y guardan sus
+imágenes en `build/widget-previews/`:
+
+```bash
+cd android && ./gradlew :app:testDebugUnitTest
+```
+
 Con el proxy (la dirección del Worker después del deploy, o `http://127.0.0.1:8787` con
 `npm run dev` en `proxy/`):
 
@@ -86,6 +93,8 @@ después la app.
 - `lib/ui/theme/` — el sistema de diseño Timbre: colores, medidas y opacidades (`timbre_tokens.dart`),
   estilos de texto (`timbre_text.dart`) y tema (`timbre_theme.dart`); los componentes están en
   `lib/ui/widgets/`. Guía: [docs/design/README.md](docs/design/README.md)
-- `android/.../MVDTransporteWidgetProvider.kt` — widget de la pantalla de inicio
+- `android/.../MVDTransporteWidgetProvider.kt` — widget de la pantalla de inicio (la próxima ruta)
+- `android/.../TimbreStopWidget.kt`, `StopWidgetData.kt` y `lib/services/stop_widgets_feed.dart` — widgets de
+  parada: Próximo (2 × 2), Parada (4 × 2) y Mis paradas (4 × 4)
 
 Historial de cambios: [CHANGELOG.md](CHANGELOG.md).

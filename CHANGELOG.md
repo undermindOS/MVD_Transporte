@@ -6,6 +6,12 @@ versiones: [SemVer](https://semver.org/lang/es/).
 ## [Unreleased]
 
 ### Agregado
+- Widgets de parada para Android, en tres tamaños: «Timbre · Próximo» (2 × 2, el próximo ómnibus de una parada,
+  grande), «Timbre · Parada» (4 × 2, sus próximos tres) y «Timbre · Mis paradas» (4 × 4, dos paradas y los
+  accesos a Mi STM y Recarga). Muestran tus paradas guardadas en el orden de «Mis paradas»; tocar el nombre de la
+  parada pasa a la siguiente. Las horas son estimadas («~20:14», nunca un conteo) y cada ómnibus desaparece un
+  minuto después de su hora, sin conexión. El botón de actualizar pide los arribos sin abrir la app; con un widget
+  puesto, la consulta de fondo sigue cada 15 min aunque no tengas avisos. Glifo nuevo: `refresh`.
 - Pestaña «Mapa», entre «Mis paradas» y «Servicios»: tus paradas guardadas y los ómnibus con GPS que vienen a
   ellas, sobre un mapa nocturno de Montevideo y alrededores. El mapa viene dentro de la app (datos de
   OpenStreetMap, estilo «Timbre Noche», unos 15 MB en `assets/map/`): moverlo o acercarlo no hace pedidos y la

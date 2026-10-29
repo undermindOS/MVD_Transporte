@@ -59,7 +59,7 @@ docs/design/             este sistema; tokens.json lo verifica una prueba
 | `led_matrix.dart` | `LedMatrix(pitch, dot, color, opacity, fadeFrom)`: los LED apagados | La barra de arriba, los mosaicos de Servicios, el bloqueo, Info, la fecha sin leer de Novedades, `TimbreEmptyState`, `TimbreAppIcon` |
 | `led_lock.dart` | `LedLock(pitch, scanning)`: el candado animado | Pantalla de bloqueo |
 | `pixel_icon.dart` | `PixelGlyph` (12 filas de 12 celdas) y `PixelIcon(glyph, size, color, glow, semanticLabel)` | Todos los íconos de la app |
-| `pixel_glyphs.dart` | `PixelGlyphs`: los 34 glifos. Es `part of 'pixel_icon.dart'` | Ver [04-iconos.md](04-iconos.md) |
+| `pixel_glyphs.dart` | `PixelGlyphs`: los 35 glifos. Es `part of 'pixel_icon.dart'` | Ver [04-iconos.md](04-iconos.md) |
 | `timbre_bus.dart` | `TimbreBusPalette`, `TimbreBusDetail`, `TimbreBus`, `TimbreAppIcon` y `TimbreBusPainter`: el ómnibus de la marca | La placa, `TimbreEmptyState`; `TimbreAppIcon(size: 64)` en Info |
 
 Tres archivos de apoyo están junto a las pantallas:
@@ -134,8 +134,9 @@ armado en el teléfono ([contrato-v1.md](contrato-v1.md#en-la-app)).
 | `stop_locations_service.dart` | `StopLocationsService.fillMissing`: la ubicación de las paradas guardadas que no la tienen, para el Mapa. Con proxy, del catálogo del teléfono; sin proxy, de `NearbyStopsService.fetchStop`, una por vez. Cada parada se busca como mucho cada 10 min (`retryInterval`) y la ubicación se guarda en `BusStop` |
 | `transport_news_service.dart` | `TransportNewsService`: refresco cada 10 min, o 30 s si lo pedís; guarda hasta 30 novedades; `unreadCount`, `markRead` |
 | `bus_status_service.dart` | `BusStatusService`: el GPS por empresa, una consulta por minuto como mucho; `partialWarning` |
-| `background_worker.dart` | `BackgroundWorker`: la tarea de WorkManager cada 15 min (`checkAlerts`), y `sync` para registrarla o cancelarla y para vaciar el widget cuando no queda ninguna ruta activa |
+| `background_worker.dart` | `BackgroundWorker`: la tarea de WorkManager cada 15 min (`checkAlerts`, que también pide las paradas de los widgets de parada), y `sync` para registrarla o cancelarla (sigue mientras haya un widget de parada puesto) y para vaciar el widget cuando no queda ninguna ruta activa |
 | `home_widget_feed.dart` | `WidgetFeed`: escribe las claves del widget de Android (`update`, `clear`) ([10-superficies.md](10-superficies.md#qué-muestra-las-claves)) |
+| `stop_widgets_feed.dart` | `StopWidgetsFeed`: las claves de los widgets de parada (`saveStops`, `updateBoards`, `shownStopIds`, `hasPlacedWidgets`, `refreshShown`); `initStopWidgets` y `stopWidgetsCallback`, lo que corre en segundo plano cuando un widget pide datos ([10-superficies.md](10-superficies.md#widgets-de-parada-android)) |
 | `notification_service.dart` | `NotificationService`: el canal `bus_alerts`, `showBusAlert`, `showRouteAlert`, `scheduleWaitReminder` |
 | `bus_wait_service.dart` | `BusWaitService` («Estoy esperando»), `AndroidBusWait` (servicio en primer plano, canal `bus_wait`) y `ScheduledBusWait` (recordatorio en iOS); `WaitStart` |
 | `bus_wait_task.dart` | `BusWaitTaskHandler`: la consulta cada 30 s dentro del servicio de Android |
@@ -172,7 +173,7 @@ no entiende los elementos de colección con `?` (`[?x]`): si los usás en
 | Letra grande | `stops_layout_test.dart`, `stop_search_layout_test.dart`, `map/mapa_layout_test.dart` |
 | Pantallas y flujos | `widget_test.dart` (también: el Mapa no se arma hasta que se elige y pide solo a la vista), `app_lock_test.dart` (el bloqueo sobre la app entera, con un `DeviceAuth` falso; tampoco el Mapa pide nada bloqueado), `stops_page_test.dart`, `stops_board_test.dart`, `add_dialogs_test.dart`, `stop_search_test.dart`, `news_tab_test.dart`, `schedule_test.dart` |
 | Mapa | `map/mapa_page_test.dart` (la pestaña con proxy y sin proxy, con un mapa base sin teselas), `map/mapa_camera_test.dart` (una parada ubicada con el mapa ya abierto entra en la cámara), `map/map_buses_test.dart`, `map/bus_layer_test.dart`, `map/basemap_test.dart` (la copia del archivo), `map/local_pmtiles_provider_test.dart`, `map/basemap_assets_test.dart` (los archivos de `assets/map/`: SHA-256, bordes y el estilo compilado, sin ámbar) |
-| Datos | `mvd_api_service_test.dart`, `cache_service_test.dart`, `nearby_stops_service_test.dart`, `stop_locations_service_test.dart`, `transport_news_service_test.dart`, `bus_status_service_test.dart`, `background_worker_test.dart`, `bus_wait_test.dart`, `route_alert_test.dart`, `alert_schedule_test.dart` |
+| Datos | `mvd_api_service_test.dart`, `cache_service_test.dart`, `nearby_stops_service_test.dart`, `stop_locations_service_test.dart`, `transport_news_service_test.dart`, `bus_status_service_test.dart`, `background_worker_test.dart`, `bus_wait_test.dart`, `route_alert_test.dart`, `alert_schedule_test.dart`, `stop_widgets_feed_test.dart` |
 | Privacidad | `proxy_privacy_test.dart` (cada servicio con proxy pide solo al proxy y nunca manda la posición), `proxy_bff_test.dart` (lo mismo, desde las pantallas) |
 | Contrato /v1 | `contract/contract_test.dart` (modo directo y modo proxy contra los goldens), `contract/rules_test.dart` (los vectores) |
 | Apoyo | `support/layout.dart` (`loadBundledFonts()`, `usePhoneScreen()`: 390 × 844), `support/contract_cases.dart` (lee `proxy/contract/v1`), `support/pmtiles_builder.dart` (archivos PMTiles chicos para las pruebas, copiado de `flutter_map_vector_tiles` con su licencia BSD-3) |
@@ -201,9 +202,14 @@ Qué tener en cuenta:
   `home_widget`, no termina nunca dentro de una prueba de widgets. Simulalo
   (`MethodChannel('home_widget')`) o no esperes esa llamada. La línea
   «Widget data error: MissingPluginException» en la salida no es un fallo.
-- **Lo que no prueban.** Los recursos de Android y el widget se comprueban
-  con `flutter build apk --debug` y con `brand_assets_test.dart`, sin
-  emulador. Los cambios de iOS (`Info.plist`, storyboard) no se compilaron
+- **Lo que no prueban.** Los recursos de Android y el widget de ruta se
+  comprueban con `flutter build apk --debug` y con `brand_assets_test.dart`,
+  sin emulador. Los widgets de parada tienen además pruebas en la JVM, en
+  `android/app/src/test/`: `StopWidgetDataTest.kt` (las reglas) y
+  `StopWidgetRenderTest.kt` (Robolectric: el provider llena los tres
+  widgets, Android infla sus RemoteViews y las imágenes quedan en
+  `build/widget-previews/`). Se corren desde `android/` con
+  `./gradlew :app:testDebugUnitTest`; `flutter test` no las corre. Los cambios de iOS (`Info.plist`, storyboard) no se compilaron
   en esta versión.
 
 ## Proxy: `proxy/`
@@ -246,6 +252,9 @@ el porqué, en [contrato-v1.md](contrato-v1.md#11-el-triángulo-de-pruebas).
 | `flutter_native_splash.yaml` | La pantalla de inicio |
 | `android/app/src/main/res/` | El widget (`layout/mvd_transporte_widget.xml`, `xml/mvd_transporte_widget_info.xml`, `drawable/widget_*`, `drawable-nodpi/widget_plate.png`), el ícono de notificación `drawable/ic_stat_timbre.xml`, `values/colors.xml`, `values/strings.xml` y los cuatro `styles.xml` |
 | `android/app/src/main/kotlin/com/liberontech/stmapp/MVDTransporteWidgetProvider.kt` | Lee las claves del widget y llena sus vistas |
+| `android/app/src/main/kotlin/com/liberontech/stmapp/TimbreStopWidget.kt` | Los widgets de parada: `TimbreProximoWidget`, `TimbreParadaWidget`, `TimbreMisParadasWidget`. Dibujan, cambian de parada al tocar el nombre, piden datos a la app y programan el redibujo |
+| `android/app/src/main/kotlin/com/liberontech/stmapp/StopWidgetData.kt` | Las reglas de los widgets de parada, sin Android: qué paradas, qué ómnibus, qué dice el pie y cuándo redibujar |
+| `android/app/src/main/res/layout/widget_stop_*.xml` | Los tres widgets de parada, su fila (`widget_stop_row.xml`) y sus vistas previas del selector (`*_preview.xml`, con las paradas 574 y 3140), y `xml/widget_stop_*_info.xml` |
 | `android/app/src/main/AndroidManifest.xml` | El nombre, el servicio en primer plano `dataSync` y el ícono del aviso fijo (`com.liberontech.stmapp.NOTIFICATION_ICON`) |
 | `ios/Runner/` | `Info.plist`, `Base.lproj/LaunchScreen.storyboard`, `AppDelegate.swift` |
 
