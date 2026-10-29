@@ -603,8 +603,13 @@ void main() {
       BusWaitService.platform = previous;
       BusWaitService.current.value = null;
     });
-    final fetchedAt =
-        DateTime.now().toUtc().subtract(const Duration(minutes: 6));
+    // The board reaches the phone at a fixed instant, whole milliseconds
+    final arrivedAt = DateTime.fromMillisecondsSinceEpoch(
+        DateTime.now().millisecondsSinceEpoch,
+        isUtc: true);
+    StopsPage.clock = () => arrivedAt;
+    addTearDown(() => StopsPage.clock = DateTime.now);
+    final fetchedAt = arrivedAt.subtract(const Duration(minutes: 6));
     answer = (request) async => boards(request, fetchedAt: fetchedAt);
 
     await http.runWithClient(() async {
@@ -614,9 +619,7 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.text('Avisarme cuando llegue'));
       await tester.pumpAndSettle();
-      // Real time: the board reached the phone a moment after the stamp
-      expect(fake.started.single.clockOffset.inSeconds,
-          inInclusiveRange(360, 365));
+      expect(fake.started.single.clockOffset, const Duration(minutes: 6));
 
       await tester.pump(StopsPage.autoRefreshInterval);
       await tester.pump();

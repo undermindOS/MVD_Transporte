@@ -292,8 +292,11 @@ menos de 10 min, y adopta su `tripId` y su `expectedAt`.
 arribos. Para «ya pasó» y el recordatorio de iOS se usa
 `BusWait.expectedOnPhone`: `expectedAt` más `clockOffset`, la hora del
 teléfono menos el `fetchedAt` del tablero, que `check` mide con cada tablero
-(al empezar, `_showWaitSheet` le pasa la del tablero de la fila). Así un
-teléfono con la hora corrida no termina la espera ni avisa antes de tiempo.
+(al empezar, `_showWaitSheet` le pasa la del tablero de la fila). Con proxy,
+así un teléfono con la hora corrida no termina la espera ni avisa antes de
+tiempo. Sin proxy, `fetchedAt` es la hora del teléfono cuando llega la
+respuesta: `clockOffset` da casi cero y «ya pasó» y el recordatorio siguen
+comparando la hora que da la Intendencia (`time`) con la del teléfono.
 
 ### Aviso fijo (Android) y recordatorio (iOS)
 

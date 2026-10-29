@@ -114,9 +114,8 @@ La fachada ofrece `getBoard`, `getBoards` (cada parada una vez, todas en
 paralelo, y una parada que ya se está pidiendo comparte ese pedido),
 `getStopDetails`, `getSchedule`, `getStopCatalog`, `getNews`,
 `getGpsStatus`, `healPlaceholderStops`, `isValidStopId` y
-`montevideoClock`. Quedan dos envoltorios viejos: `getNextArrivals`, que
-todavía usa `bus_wait_task.dart`, y `resolveStop`, que ya solo usan las
-pruebas.
+`montevideoClock`. Quedan dos envoltorios viejos, `getNextArrivals` y
+`resolveStop`, que ya solo usan las pruebas.
 
 ### Fuentes
 

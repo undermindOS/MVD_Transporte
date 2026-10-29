@@ -53,9 +53,10 @@ versiones: [SemVer](https://semver.org/lang/es/).
 - «Estoy esperando»: tocar un ómnibus → «Avisarme cuando llegue» con 3/5/10 min de anticipación. El viaje se sigue
   por su identificador (`tripId`), así que otro ómnibus de la misma línea y el mismo destino que llegue unos
   minutos antes no se confunde con el tuyo, y se sigue también cuando un viaje por horario pasa a tener GPS. La
-  fila del ómnibus que seguís se destaca con una campanita. La hora del viaje se pasa al reloj del teléfono con la
-  diferencia de relojes que se mide con cada tablero: un teléfono con la hora corrida no da tu ómnibus por pasado
-  ni avisa antes (o después) de tiempo.
+  fila del ómnibus que seguís se destaca con una campanita. Con el proxy, la hora del viaje se pasa al reloj del
+  teléfono con la diferencia de relojes que se mide con cada tablero: un teléfono con la hora corrida no da tu
+  ómnibus por pasado ni avisa antes (o después) de tiempo. Sin proxy, el tablero lleva la hora del teléfono, la
+  diferencia da cero y la hora que da la Intendencia se sigue comparando con la del teléfono.
   - Android: un servicio en primer plano (`flutter_foreground_task`, tipo `dataSync`) consulta la parada
     cada 30 s, también con la pantalla apagada, muestra una notificación fija con el botón
     «Dejar de esperar» y avisa solo por un ómnibus con GPS. Termina solo después del aviso,
@@ -247,8 +248,9 @@ versiones: [SemVer](https://semver.org/lang/es/).
 - El widget muestra la hora de llegada (`~08:14`), no un «N min» que queda desactualizado.
 - El widget ya no se queda mostrando un ómnibus viejo. Lo deja de mostrar 2 minutos después de la hora en que
   tenía que pasar, queda vacío apenas no te queda ninguna ruta activada (aunque tengas una alerta de parada) y,
-  sin conexión, muestra el último ómnibus solo hasta su hora. Esa hora se guarda en el reloj del teléfono, así que
-  uno con la hora corrida no oculta el ómnibus antes ni después de tiempo.
+  sin conexión, muestra el último ómnibus solo hasta su hora. Con el proxy, esa hora se guarda en el reloj del
+  teléfono, así que uno con la hora corrida no oculta el ómnibus antes ni después de tiempo; sin proxy sigue
+  siendo la hora que da la Intendencia.
 - Los enlaces «Mi STM» y «Recarga» del widget miden 44 dp de alto, así son más fáciles de tocar, y el widget sigue
   entrando en 3 × 2.
 - Un error de red o una respuesta de arribos con forma inesperada se muestra como «No se pudo actualizar», no como

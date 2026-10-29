@@ -40,7 +40,9 @@ class BusWait {
   /// When the trip is due, on the source's clock, as the boards give it.
   DateTime expectedAt;
 
-  /// The phone's clock minus the source's, measured when a board arrives.
+  /// The phone's clock minus the board's fetchedAt, measured when a board
+  /// arrives: how far the phone is from the proxy. In direct mode fetchedAt
+  /// is the phone's clock, so this stays about zero.
   Duration clockOffset;
 
   /// The wait ends on its own after this long.

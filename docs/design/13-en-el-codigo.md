@@ -158,7 +158,7 @@ armado en el teléfono ([contrato-v1.md](contrato-v1.md#en-la-app)).
 | `bus_stop.dart` | `BusStop`, guardado en Hive (`typeId` 0, caja `stops`); el adaptador está en `bus_stop.g.dart`. `latitude` y `longitude` en 0, 0 quieren decir «sin ubicación» (`hasLocation`, que no se guarda) |
 | `route_alert.dart` | `RouteAlert`, guardado en Hive (`typeId` 1, caja `routes`), campos 0 a 11; el 11 es `preferredVariantIds`. `accepts` decide si un ómnibus sirve a la ruta. El adaptador está en `route_alert.g.dart` |
 | `alert_schedule.dart` | `AlertSchedule`: días y horas de un aviso |
-| `bus_wait.dart` | `BusWait`, `WaitCheck`, `WaitOutcome`: el viaje que esperás; `expectedAt` en el reloj de la fuente, `clockOffset` y `expectedOnPhone` en el del teléfono |
+| `bus_wait.dart` | `BusWait`, `WaitCheck`, `WaitOutcome`: el viaje que esperás; `expectedAt` en el reloj de la fuente; `clockOffset`, la diferencia teléfono − fuente; `expectedOnPhone`, en el reloj del teléfono |
 
 Los `*.g.dart` se generan con `dart run build_runner build`. `hive_generator`
 no entiende los elementos de colección con `?` (`[?x]`): si los usás en

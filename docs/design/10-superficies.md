@@ -195,9 +195,12 @@ Archivos:
   `HomeWidget.updateWidget`, con su propio manejo de errores. Además Android
   redibuja cada 30 min (`updatePeriodMillis` = 1800000).
 - **Caducidad:** Kotlin oculta la fila cuando la hora del teléfono pasa
-  `route_expected_at_ms` + 2 min (`EXPIRED_AFTER_MS`). Las dos están en el
-  reloj del teléfono, así que uno con la hora corrida respecto de la fuente
-  no oculta la fila antes ni después de tiempo. Solo se comprueba al
+  `route_expected_at_ms` + 2 min (`EXPIRED_AFTER_MS`). Con proxy las dos
+  están en el reloj del teléfono, así que uno con la hora corrida respecto
+  de la fuente no oculta la fila antes ni después de tiempo. Sin proxy,
+  `fetchedAt` es la hora del teléfono cuando llega la respuesta: la
+  diferencia da cero y `route_expected_at_ms` queda en la hora que da la
+  Intendencia (`time`). Solo se comprueba al
   redibujar, así que entre redibujos un ómnibus que ya pasó puede verse hasta
   unos 30 min. Es un tema abierto: un redibujo programado a esa hora lo
   cerraría.
