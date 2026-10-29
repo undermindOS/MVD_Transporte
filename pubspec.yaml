@@ -75,14 +75,17 @@ dependencies:
   # The basemap archive is copied once to the app cache directory
   path_provider: ^2.1.5
 
+  # The app's code is kept as a PBKDF2-HMAC-SHA256 hash
+  # (lib/services/app_passcode.dart); test/map/basemap_assets_test.dart
+  # checks the SHA-256 of the bundled basemap
+  crypto: ^3.0.7
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
   # Fake browser launcher and biometrics for widget tests
   url_launcher_platform_interface: ^2.3.2
   local_auth_platform_interface: ^1.1.0
-  # SHA-256 of the bundled basemap (test/map/basemap_assets_test.dart)
-  crypto: ^3.0.7
 
   # The "flutter_lints" package below contains a set of recommended lints to
   # encourage good coding practices. The lint set provided by the package is
