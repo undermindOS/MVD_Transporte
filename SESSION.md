@@ -336,3 +336,40 @@
 ### Key decisions made
 - Решение «La app no dibuja mapas ni ubicaciones» отменяется, документы переписываются вместе с кодом.
 - Иконки и подложку Cómo Ir не копируем: подложка из OSM/Protomaps, значки свои, Timbre.
+
+## 2026-10-28 — Mapa, фаза 1: вкладка на flutter_map
+### What was done
+- Владелец выбрал flutter_map. Спецификация фазы 1 лежит в scratchpad сессии (design-phase1.md, slice-m-brief.md).
+- Три основы сделаны в отдельных ветках, прошли ревью и влиты в feat/mapa (4f0f965):
+  - `mapa/contract`: в /v1 у каждого прибытия есть `location`. Правило записано дважды (rules.js и contract_rules.dart), есть векторы и golden-файлы, V1Parser терпит отсутствие поля.
+  - `mapa/stop-locations`:
+    - `BusStop.hasLocation`;
+    - координаты сохраняются при выборе остановки из списка;
+    - `StopLocationsService.fillMissing`: с прокси берёт координаты из каталога, без прокси — WFS по номеру (CQL_FILTER), раз в 10 минут на остановку.
+  - `mapa/basemap`: в git лежат `assets/map/mvd-20261028.pmtiles` (14,86 МБ) и стиль «Timbre Noche», плюс `LocalPmTilesProvider`, `Basemap` и генератор в `tool/map/`.
+- Вкладка Mapa:
+  - `MvdApiService.latestBoards`;
+  - `lib/ui/map/` (map_buses, bus_layer, map_sheets, mapa_page);
+  - третья вкладка с глифом `streets`; строится при первом открытии, работает только когда активна, обёрнута в TickerMode.
+- Ревью вкладки (поведение, дизайн, тесты) нашло 5 серьёзных замечаний, все исправлены.
+- Документация на испанском: decisiones, pantallas, iconos, color, movimiento, accesibilidad, código, privacy-policy (дата 2026-10-28), store-listing, Info, carta-imm, REVIEW, README, CHANGELOG.
+- Проверено на эмуляторе 5556 (AVD MVD_mapa_spike_API_36.1, release APK 37,26 МБ, было 21,74) и на симуляторе «MVD mapa spike».
+  - Падений, ANR и ошибок Flutter нет.
+  - Найдено и исправлено: камера подстраивалась только под первую найденную остановку (52925d7, тест mapa_camera_test).
+### Current state
+- What works: 616 тестов Flutter, 325 тестов прокси, analyze чистый. Вкладка работает на Android и iOS. Ничего не запушено.
+- What's broken/pending:
+  - исправление камеры проверено только тестом, на устройстве не перепроверялось;
+  - таблички автобусов перекрывают друг друга, маркеры остановок и подписи подложки;
+  - возраст данных считается по fetchedAt: в сборке с прокси телефон со спешащими часами покажет автобусы тусклыми;
+  - Mapa не передаёт данные в «Estoy esperando»;
+  - экрана лицензий нет;
+  - коммит b146306 без scope.
+### Next steps
+- Решения владельца: исправлять ли часы (receivedAt в latestBoards), подключать ли BusWait к Mapa, делать ли экран лицензий, куда открывать PR (feat/timbre-bff или main), проверять ли на его телефоне.
+- Убрать влитые рабочие копии mapa-contract, mapa-stops, mapa-basemap и спайковые рабочие копии.
+### Key decisions made
+- Без companyId и busId в контракте: автобус опознаётся по tripId `bus-{idEmpresa}-{idBus}`.
+- Без bbox в контракте: точки вне границ подложки отбрасывает интерфейс.
+- pmtiles закоммичен обычным git отдельным коммитом (90fefc9); перевести на LFS решает владелец.
+- Подписи подложки рисуются системным шрифтом, глифы PBF не поставляются.
