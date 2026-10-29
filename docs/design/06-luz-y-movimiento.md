@@ -129,8 +129,8 @@ entrada de las pantallas apiladas, las hojas y los diálogos, el indicador
 de las subpestañas, el switch, los indicadores de carga y deslizar para
 actualizar se mueven como en cualquier app de Flutter. El mapa del Mapa se
 arrastra, se acerca y sigue de largo al soltarlo como lo hace `flutter_map`
-(todos sus gestos menos girar); el encuadre de las paradas al abrirlo es un
-salto, sin animación.
+(todos sus gestos menos girar); el encuadre de las paradas, al abrirlo y
+cuando se ubica una parada más, es un salto, sin animación.
 
 Si algún día se agrega otra animación propia, que haga lo mismo que
 `LedLock` y los ómnibus del Mapa con reducir movimiento: quedarse en su

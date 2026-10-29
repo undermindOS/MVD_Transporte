@@ -553,28 +553,32 @@ class _MapaViewState extends State<_MapaView> {
   final _handle = BusLayerHandle();
   // Kept across rebuilds: the map asserts on a changed camera constraint
   late final MapOptions _options;
-  // The camera was fitted to the saved stops once
-  late bool _fitted;
+  // The stops the camera was last fitted to
+  final _fittedIds = <int>{};
+  // The person moved the map: the camera is theirs from then on
+  bool _moved = false;
   bool _ready = false;
 
   static List<LatLng> _points(List<BusStop> stops) => [
     for (final s in stops) LatLng(s.latitude, s.longitude),
   ];
 
+  // Style z15 at most: one stop alone still shows the streets its buses
+  // come along
   static CameraFit _fit(List<BusStop> stops) => CameraFit.coordinates(
     coordinates: _points(stops),
     padding: const EdgeInsets.all(48),
-    maxZoom: Basemap.fmZoom(16),
+    maxZoom: Basemap.fmZoom(15),
   );
 
   @override
   void initState() {
     super.initState();
-    _fitted = widget.located.isNotEmpty;
+    _fittedIds.addAll(widget.located.map((s) => s.id));
     _options = MapOptions(
       initialCenter: MapaPage.centro,
       initialZoom: Basemap.fmZoom(14),
-      initialCameraFit: _fitted ? _fit(widget.located) : null,
+      initialCameraFit: widget.located.isEmpty ? null : _fit(widget.located),
       minZoom: Basemap.fmZoom(10),
       maxZoom: Basemap.fmZoom(18),
       cameraConstraint: CameraConstraint.containCenter(
@@ -586,9 +590,12 @@ class _MapaViewState extends State<_MapaView> {
       ),
       backgroundColor: TimbreColors.noche,
       onTap: _onTap,
+      onPositionChanged: (_, hasGesture) {
+        if (hasGesture) _moved = true;
+      },
       onMapReady: () {
         _ready = true;
-        _fitOnce();
+        _follow();
       },
     );
   }
@@ -596,17 +603,25 @@ class _MapaViewState extends State<_MapaView> {
   @override
   void didUpdateWidget(_MapaView oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (!_fitted && widget.located.isNotEmpty) {
+    if (!_moved && !_fittedIds.containsAll(_ids)) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) _fitOnce();
+        if (mounted) _follow();
       });
     }
   }
 
-  /// The first stops placed after the map opened: the camera goes to them.
-  void _fitOnce() {
-    if (_fitted || !_ready || widget.located.isEmpty) return;
-    _fitted = true;
+  Set<int> get _ids => {for (final s in widget.located) s.id};
+
+  /// Stops are placed one lookup at a time, so the map may open with only
+  /// some of them: the camera takes in each newly placed stop, until the
+  /// person moves the map.
+  void _follow() {
+    if (_moved || !_ready || widget.located.isEmpty) return;
+    final ids = _ids;
+    if (_fittedIds.containsAll(ids)) return;
+    _fittedIds
+      ..clear()
+      ..addAll(ids);
     _map.fitCamera(_fit(widget.located));
   }
 

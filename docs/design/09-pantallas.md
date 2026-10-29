@@ -459,8 +459,11 @@ vienen a ellas. La barra dice «Mapa», sin subtítulo: el lugar queda para el m
   mapa base a su caché (`Basemap.load`); las siguientes lo abre de ahí.
 - **El mapa base viene dentro de la app** (`assets/map/`): moverlo o acercarlo no le pide nada a
   ningún servidor. Va del zoom 10 al 18 del estilo y no gira; el centro de la cámara no sale del
-  recorte (`Basemap.bounds`). Apenas hay paradas ubicadas, la cámara las encuadra una vez (margen
-  de 48, como mucho el zoom 16); antes, muestra el centro (-34.9058, -56.1913) en el zoom 14.
+  recorte (`Basemap.bounds`). Apenas hay paradas ubicadas, la cámara las encuadra (margen de 48,
+  como mucho el zoom 15, para que se vean las calles por donde llegan los ómnibus); antes, muestra
+  el centro (-34.9058, -56.1913) en el zoom 14. Las paradas se ubican de a una, así que cada
+  parada que aparece después vuelve a encuadrarlas todas, hasta que movés el mapa: desde ahí la
+  cámara es tuya.
 - **No usa la ubicación del teléfono.**
 - **Las paradas guardadas** que tienen ubicación son el glifo `stop` sobre una baldosa `tinta` de
   26 px con borde `etiquetaCartel`, sin encender, en un área táctil de 44. Tocar una abre su hoja.
