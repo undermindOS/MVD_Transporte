@@ -11,6 +11,9 @@ y la paginación de las novedades) describen ahora el proxy `/v1`, un Backend-fo
 cada ruta, el presupuesto de la API oficial y el índice de paradas (§2.5). El resto del documento es la revisión
 del 17/10. El contrato completo está en [design/contrato-v1.md](design/contrato-v1.md).
 
+**Actualización 2026-10-28** (rama `feat/mapa`): la propuesta 9 de §6 (el mapa del ómnibus) dice qué quedó
+hecho en la fase 1 de la pestaña Mapa.
+
 ---
 
 ## 1. Qué es esta aplicación
@@ -449,9 +452,14 @@ y saldo en un dispositivo real.
    `flutter_foreground_task`, tipo `dataSync` (`shortService` está limitado a ~3 min), consulta cada 30 s;
    iOS: un recordatorio para la hora prevista, que se reprograma con cada actualización dentro de la aplicación.
    Hace falta la declaración del tipo y un video en Play Console (`docs/store-listing.md`).
-9. **Mapa del ómnibus.** Con `real:true` vienen `coordinates`: mostrar dónde está el ómnibus ahora.
-   Los arribos de `/v1` no llevan esa posición (se sacó `location` de las formas: el diseño no usa mapas); haría
-   falta agregarla al contrato como campo nuevo.
+9. 🟡 **Mapa del ómnibus.** Con `real:true` vienen `coordinates`: mostrar dónde está el ómnibus ahora.
+   Fase 1 hecha en la rama `feat/mapa`: la pestaña «Mapa» muestra las paradas guardadas y los ómnibus con GPS
+   que vienen a ellas. `location` volvió a los arribos de `/v1` como campo nuevo (`{lat, lng}` de `coordinates`,
+   solo con `real:true`; si no, `null`). El mapa base de OpenStreetMap viene dentro de la app (un recorte de
+   Protomaps con el estilo «Timbre Noche», `assets/map/`), sin servidor de teselas, y el mapa no usa la ubicación
+   del teléfono. La ubicación de las paradas guardadas sale del catálogo con proxy y del WFS, por número, sin él.
+   Fase 2, sin hacer: la flota de toda la ciudad (una ruta nueva como `/v1/buses`, con la flota que ya baja
+   `ImGateway`), después de desplegar el proxy.
 
 **Hecho en la rama `feat/open-data-features` (4, 5, 6 y horarios por tipo de día):**
 pestaña «Novedades» en «Mis paradas» (badge de no leídas, texto HTML sin WebView/JS, el enlace se abre

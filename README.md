@@ -1,10 +1,12 @@
 # MVD_Transporte
 
-Timbre MVD: app no oficial en Flutter para el transporte público de Montevideo. Tiene una
-pestaña nativa «Mis paradas» —paradas y rutas guardadas con los tiempos de arribo de los ómnibus,
-horarios, novedades, notificaciones y un widget de Android— y accesos rápidos a los sitios
-oficiales (Mi STM, recarga de la tarjeta, Cómo Ir, Avisos), que se abren en el navegador del
-sistema (Custom Tabs / SFSafariViewController) y no en un WebView integrado.
+Timbre MVD: app no oficial en Flutter para el transporte público de Montevideo. Tiene dos
+pestañas nativas: «Mis paradas» —paradas y rutas guardadas con los tiempos de arribo de los
+ómnibus, horarios, novedades, notificaciones y un widget de Android— y «Mapa», con tus paradas
+guardadas y los ómnibus con GPS que se acercan a ellas, sobre un mapa que viene dentro de la app.
+Además, accesos rápidos a los sitios oficiales (Mi STM, recarga de la tarjeta, Cómo Ir, Avisos),
+que se abren en el navegador del sistema (Custom Tabs / SFSafariViewController) y no en un
+WebView integrado.
 
 No está afiliada a la Intendencia de Montevideo.
 
@@ -28,6 +30,13 @@ ni destinos por línea, ni búsqueda por calles. «Paradas cercanas» le pide al
 GeoServer de la IM (`geoserver.montevideo.gub.uy/geoserver/ows`, capa `imm:v_uptu_paradas`, sin
 autenticación) un área aproximada alrededor de tu posición redondeada a 3 decimales, y filtra en el
 teléfono con la posición exacta. Este modo queda hasta que el proxy esté desplegado.
+
+El mapa de la pestaña «Mapa» viene dentro de la app (`assets/map/`): un recorte de Protomaps de
+Montevideo y alrededores, con datos de OpenStreetMap (licencia ODbL) y el estilo «Timbre Noche».
+No hay servidor de teselas: moverlo no le pide nada a nadie, y el mapa no usa tu ubicación. La
+posición de los ómnibus es `arrivals[].location` de `/v1`. La de una parada guardada que no la
+tiene sale del catálogo con el proxy y, sin proxy, del mismo WFS de geoserver, pedida por número
+de parada. Procedencia y licencias: [assets/map/README.md](assets/map/README.md).
 
 El botón «Ver en Cómo Ir» abre la parada con el deep link `m.montevideo.gub.uy/comoir/parada?numero={id}`.
 El contrato /v1 está en [docs/design/contrato-v1.md](docs/design/contrato-v1.md); el mapa de la API,
@@ -69,6 +78,9 @@ después la app.
   para la hora prevista
 - `lib/ui/stops_page.dart` — paradas y rutas
 - `lib/ui/home_page.dart` — pestañas
+- `lib/ui/map/`, `lib/services/map/`, `lib/services/stop_locations_service.dart` — la pestaña Mapa:
+  los ómnibus y sus hojas, el mapa base dentro de la app y la ubicación de las paradas guardadas
+- `assets/map/`, `tool/map/` — el mapa base, su estilo y el generador del estilo
 - `lib/ui/app_lock.dart`, `lib/ui/lock_screen.dart` — bloqueo biométrico, encima de toda la app
 - `lib/ui/services_page.dart`, `lib/services/official_sites.dart` — sitios oficiales en el navegador del sistema
 - `lib/ui/theme/` — el sistema de diseño Timbre: colores, medidas y opacidades (`timbre_tokens.dart`),

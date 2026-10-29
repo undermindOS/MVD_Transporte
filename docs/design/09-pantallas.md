@@ -14,7 +14,7 @@ Ver también:
   esperando».
 - [11-accesibilidad.md](11-accesibilidad.md): lo que escucha el lector de pantalla en cada una.
 
-## Mapa
+## Árbol de pantallas
 
 ```
 Bloqueo (AppLock, LockScreen) tapa toda la app mientras falta autenticar
@@ -23,20 +23,23 @@ HomePage                      barra buildTimbreAppBar + botón «Info»
 │   ├── Paradas               subpestaña; botón + → Agregar parada
 │   ├── Rutas                 subpestaña; botón + → Agregar ruta
 │   └── Novedades             subpestaña; el detalle se abre en una hoja
-└── Servicios (ServicesPage)  pestaña inferior 2
+├── Mapa (MapaPage)           pestaña inferior 2; se arma la primera vez que se elige
+└── Servicios (ServicesPage)  pestaña inferior 3
 
 Páginas que se abren encima:  Horarios (SchedulePage), Info (InfoPage) → Privacidad
                               (PrivacyPolicyPage)
 Diálogos:                     Agregar parada, Agregar ruta
-Hojas:                        Estoy esperando, Ajustes de aviso, detalle de novedad
+Hojas:                        Estoy esperando, Ajustes de aviso, detalle de novedad,
+                              un ómnibus y una parada del Mapa
 ```
 
-- `HomePage` (`lib/ui/home_page.dart`) tiene dos pestañas en la `NavigationBar`: «Mis paradas»
-  (ícono `bus`) y «Servicios» (ícono `grid`). La elegida lleva el ícono encendido (`glow`). Un
-  `IndexedStack` guarda el estado de las dos: cambiar de pestaña no borra los arribos cargados ni
-  la subpestaña elegida.
+- `HomePage` (`lib/ui/home_page.dart`) tiene tres pestañas en la `NavigationBar`: «Mis paradas»
+  (ícono `bus`), «Mapa» (ícono `streets`) y «Servicios» (ícono `grid`). La elegida lleva el ícono
+  encendido (`glow`). Un `IndexedStack` guarda el estado de las tres: cambiar de pestaña no borra
+  los arribos cargados, la subpestaña elegida ni la cámara del Mapa.
 - Mi STM, Recarga, Avisos y Cómo Ir no son pestañas: son sitios oficiales y se abren en el
-  navegador (`OfficialSite` en `lib/services/official_sites.dart`).
+  navegador (`OfficialSite` en `lib/services/official_sites.dart`). La pestaña Mapa es propia: no
+  abre Cómo Ir.
 - La barra de todas las pantallas, menos la de bloqueo, es `buildTimbreAppBar` (ver
   [08-componentes.md](08-componentes.md)).
   En `HomePage` lleva el botón «Info»; Horarios, Info y Privacidad llevan la flecha para volver.
@@ -48,22 +51,24 @@ Hojas:                        Estoy esperando, Ajustes de aviso, detalle de nove
 
 | Dato | Cuándo se pide | Dónde queda | En el código |
 |---|---|---|---|
-| Arribos de una parada (`GET /v1/stops/{id}/arrivals`) | al arrancar la app; cada 30 s mientras Mis paradas está a la vista; al volver a estar a la vista; al deslizar para actualizar; al agregar una parada o una ruta (solo esa parada) | memoria: el último tablero bueno, cuándo llegó según el reloj del teléfono y el último fallo de cada parada (`_BoardView`) | `StopsPage.autoRefreshInterval`, `_refresh` |
+| Arribos de una parada (`GET /v1/stops/{id}/arrivals`) | al arrancar la app; cada 30 s mientras Mis paradas está a la vista; al volver a estar a la vista; al deslizar para actualizar; al agregar una parada o una ruta (solo esa parada). Las paradas guardadas, también cada 30 s mientras el Mapa está a la vista y al abrirlo o volver a él, salvo que todas tengan un tablero de menos de 30 s | memoria: el último tablero bueno, cuándo llegó según el reloj del teléfono y el último fallo de cada parada (`_BoardView`); además, el tablero más nuevo de cada parada, venga de donde venga, que lee el Mapa (`MvdApiService.latestBoards`) | `StopsPage.autoRefreshInterval`, `_refresh`; `MapaPage._refresh` |
 | Estado del GPS (`GET /v1/status/gps`) | junto con los arribos: al arrancar la app, en cada vuelta de 30 s y al deslizar; como mucho una vez por minuto | memoria; después de un fallo queda el último estado bueno | `BusStatusService.minInterval` |
 | Novedades (`GET /v1/news`) | al arrancar la app, si pasaron 10 min desde la última vez; al deslizar en Novedades, si pasaron 30 s | Hive, hasta 30 novedades | `TransportNewsService.minInterval`, `forcedMinInterval` |
 | Horario (`GET /v1/stops/{id}/schedule/{day}/{H:MM}`) | al abrir Horarios y con cada cambio de día o de hora | memoria, 6 h por parada, día y hora | `MvdApiService._scheduleTtl` |
 | Datos de una parada (`GET /v1/stops/{id}`) | al agregar una parada por número; al buscar la parada en Agregar ruta; al arrancar la app, para las paradas guardadas como «Parada N» | Hive, dentro de la parada o la ruta guardada | `MvdApiService.getStopDetails`, `healPlaceholderStops` |
-| Catálogo de paradas (`GET /v1/catalog/stops`, solo con proxy) | en Agregar parada: con la primera letra en «Buscar por calles» o al tocar «Paradas cercanas» | Hive (caja `catalog`), 1 día; uno sin líneas, 15 min, y nunca reemplaza una copia con líneas; sin red se usa la copia vieja, tenga la edad que tenga | `MvdApiService._catalogTtl`, `getStopCatalog` |
+| Catálogo de paradas (`GET /v1/catalog/stops`, solo con proxy) | en Agregar parada: con la primera letra en «Buscar por calles» o al tocar «Paradas cercanas»; al abrir el Mapa con una parada guardada sin ubicación | Hive (caja `catalog`), 1 día; uno sin líneas, 15 min, y nunca reemplaza una copia con líneas; sin red se usa la copia vieja, tenga la edad que tenga | `MvdApiService._catalogTtl`, `getStopCatalog` |
+| Ubicación de una parada guardada que no la tiene (con proxy, del catálogo; sin proxy, un pedido a geoserver por parada, por su número) | al abrir el Mapa o volver a él; como mucho una vez cada 10 min por parada, la encuentre o no | Hive, dentro de la parada guardada (`BusStop.latitude`, `longitude`) | `StopLocationsService.fillMissing`, `retryInterval` |
 
 «Al arrancar la app» es cuando se arma `StopsPage`: al abrir la app o, con el bloqueo encendido,
 después del primer desbloqueo (ver «Bloqueo»). Los desbloqueos siguientes no la vuelven a armar. El
-`IndexedStack` la arma aunque la pestaña elegida sea otra.
+`IndexedStack` la arma aunque la pestaña elegida sea otra. El Mapa, en cambio, se arma recién la
+primera vez que elegís su pestaña, y después queda armado: antes no carga ni pide nada.
 
 Sin proxy las mismas llamadas van a los servicios de la Intendencia y el teléfono convierte la
-respuesta a /v1. No hay catálogo, y las paradas cercanas salen de geoserver. El detalle está en
-[contrato-v1.md](contrato-v1.md).
+respuesta a /v1. No hay catálogo, y las paradas cercanas y la ubicación de las paradas del Mapa
+salen de geoserver. El detalle está en [contrato-v1.md](contrato-v1.md).
 
-### Los 30 s: solo con Mis paradas a la vista
+### Los 30 s: solo con Mis paradas o el Mapa a la vista
 
 El temporizador de `StopsPage` corre solo si se cumplen las cuatro cosas:
 
@@ -74,21 +79,27 @@ El temporizador de `StopsPage` corre solo si se cumplen las cuatro cosas:
 - la app no está bloqueada: `HomePage` lee `AppLock.of(context).locked`;
 - la app está en primer plano.
 
-| Situación | Qué pasa con los 30 s |
-|---|---|
-| Pestaña Servicios | se pausan |
-| Horarios o Info abiertos | se pausan |
-| App en segundo plano (`hidden`, `paused`) | se pausan |
-| App bloqueada | se pausan; antes del primer desbloqueo `StopsPage` todavía no existe |
-| Diálogo u hoja abiertos (Agregar parada, Agregar ruta, Estoy esperando, Ajustes de aviso, detalle de novedad) | siguen: el tablero queda a la vista y solo cuentan las páginas enteras |
-| Un diálogo del sistema que deja la app `inactive` (por ejemplo, un pedido de permiso) | siguen |
-| Mis paradas vuelve a estar a la vista | un refresco enseguida y después cada 30 s (`_resumeAutoRefresh`) |
-| La vuelta anterior todavía no terminó (red lenta) | esa vuelta se saltea (`_autoRefreshing`) |
+El del Mapa (`MapaPage`) pide las mismas cuatro cosas, con la pestaña Mapa en lugar de Mis
+paradas, y además que haya alguna parada guardada. `HomePage` también lo envuelve en
+`TickerMode`: fuera de la vista no se anima nada, porque el `IndexedStack` deja andar las
+animaciones de una pestaña escondida.
+
+| Situación | Mis paradas | Mapa |
+|---|---|---|
+| Otra pestaña elegida | se pausan | se pausan; antes de elegirla por primera vez, `MapaPage` todavía no existe |
+| Horarios o Info abiertos | se pausan | se pausan |
+| App en segundo plano (`hidden`, `paused`) | se pausan | se pausan |
+| App bloqueada | se pausan; antes del primer desbloqueo `StopsPage` todavía no existe | se pausan |
+| Diálogo u hoja abiertos (en Mis paradas: Agregar parada, Agregar ruta, Estoy esperando, Ajustes de aviso, detalle de novedad; en el Mapa: un ómnibus o una parada) | siguen: el tablero queda a la vista y solo cuentan las páginas enteras | siguen, y la hoja abierta se actualiza con cada tablero |
+| Un diálogo del sistema que deja la app `inactive` (por ejemplo, un pedido de permiso) | siguen | siguen |
+| Vuelve a estar a la vista | un refresco enseguida y después cada 30 s (`_resumeAutoRefresh`) | lee de nuevo las paradas guardadas, busca la ubicación de las que no la tienen y pide los tableros enseguida, salvo que todas las paradas tengan uno de menos de 30 s (por ejemplo, recién actualizadas en Mis paradas); después, cada 30 s (`_resume`) |
+| La vuelta anterior todavía no terminó (red lenta) | esa vuelta se saltea (`_autoRefreshing`) | esa vuelta se saltea (`_refreshing`) |
+| Sin paradas guardadas | — | no hay temporizador ni mapa base |
 
 Al volver del segundo plano, además, `BusWaitService.sync()` revisa si «Estoy esperando»
 terminó mientras tanto. El refresco de esa vuelta espera al primer cuadro
-(`WidgetsBinding.endOfFrame`): si la app se bloquea al volver, ese cuadro ya deja a Mis paradas
-fuera de la vista y no se pide nada.
+(`WidgetsBinding.endOfFrame`), en Mis paradas y en el Mapa: si la app se bloquea al volver, ese
+cuadro ya deja la pantalla fuera de la vista y no se pide nada.
 
 ### Un pedido por parada
 
@@ -97,14 +108,16 @@ guardada es también el origen de una ruta, las dos tarjetas leen el mismo table
 parada ya se está pidiendo, el pedido nuevo espera ese mismo resultado. Una parada que falla no
 frena a las demás, tampoco sin proxy cuando su respuesta no se puede convertir. Deslizar para
 actualizar pide solo las paradas de su subpestaña: las paradas guardadas en Paradas, los orígenes
-en Rutas.
+en Rutas. Cada tablero que llega bien queda en `MvdApiService.latestBoards`, el más nuevo por
+parada: el Mapa dibuja también los que pidió Mis paradas.
 
 ### Demasiados pedidos: `Retry-After`
 
 - Ante un 429 del proxy, la capa de datos devuelve `ApiFailure.busy` con `retryAfter`, que sale
   del encabezado `Retry-After` (60 s si no viene).
 - `StopsPage` saltea las vueltas del temporizador hasta que pasa el `retryAfter` más largo de
-  esa tanda (`_skipTicksUntil`). No muestra ningún mensaje y la tarjeta queda como estaba.
+  esa tanda (`_skipTicksUntil`). No muestra ningún mensaje y la tarjeta queda como estaba. El
+  Mapa hace lo mismo, con su propio `_skipTicksUntil`.
 - `MvdApiService` además deja de mandar pedidos, en todas las rutas menos el catálogo, hasta que
   pasa ese tiempo (`_busyUntil`): contesta `busy` sin tocar la red. Deslizar para actualizar y
   volver a la pantalla no esperan el salto de vueltas, pero sí este freno.
@@ -130,16 +143,17 @@ viejo que el pedido. Los tiempos de caché de cada ruta están en [contrato-v1.m
 
 - **Cargando.** Un indicador de progreso ámbar, sin texto. El único texto de espera es «Buscando
   parada…».
-- **Error.** Dice qué falló y qué hacer ([07-textos.md](07-textos.md)). Dentro de una tarjeta o
-  debajo de un campo va en `rojoLed`; sobre una lista que se sigue viendo, en el panel
-  `avisoNoche`; después de una acción, en un snack bar.
+- **Error.** Dice qué falló y qué hacer ([07-textos.md](07-textos.md)). Dentro de una tarjeta,
+  de una hoja o debajo de un campo va en `rojoLed`; sobre una lista o un mapa que se siguen
+  viendo, en el panel `avisoNoche`; después de una acción, en un snack bar.
 - **Vacío.** Un cartel de `TimbreEmptyState` («SIN PARADAS», «SIN RUTAS», «SIN NOVEDADES»,
   «SIN PASADAS») con una frase que dice qué hacer.
-- **Datos viejos.** Solo Mis paradas los marca: después de un fallo deja hasta 5 min las últimas
-  filas como estimados «~H:MM», nunca en ámbar. Sin fallo, un tablero que llegó hace 1 min o más
-  también pasa a estimados, y desde los 5 min la tarjeta vuelve al indicador de carga. Novedades
-  muestra lo guardado debajo del panel de error. Horarios, el catálogo y el estado del GPS usan su
-  copia guardada sin decirlo.
+- **Datos viejos.** Los marcan Mis paradas y el Mapa. Mis paradas, después de un fallo, deja hasta
+  5 min las últimas filas como estimados «~H:MM», nunca en ámbar. Sin fallo, un tablero que llegó
+  hace 1 min o más también pasa a estimados, y desde los 5 min la tarjeta vuelve al indicador de
+  carga. El Mapa deja sus ómnibus sin encender con las mismas edades y los saca a los 5 min.
+  Novedades muestra lo guardado debajo del panel de error. Horarios, el catálogo y el estado del
+  GPS usan su copia guardada sin decirlo.
 
 ## Mis paradas: Paradas
 
@@ -331,8 +345,8 @@ app sigue así:
 | Ninguna a menos de 400 m | «No hay paradas a menos de 400 m» |
 | Con datos | las paradas a menos de 400 m, de la más cerca a la más lejos («#5109 · 48 m · 124, 125») |
 
-Elegir una parada de cualquiera de las dos listas la guarda en el acto con el nombre y las líneas
-de la lista, sin otro pedido, y después se pide su tablero.
+Elegir una parada de cualquiera de las dos listas la guarda en el acto con el nombre, las líneas
+y la ubicación de la lista, sin otro pedido, y después se pide su tablero.
 
 | Dato | Con proxy | Sin proxy |
 |---|---|---|
@@ -431,6 +445,87 @@ No pide nada a la red. Lee y guarda en Hive `etaAlertMinutes` y `schedule` de la
 `alertMinutes` y `schedule` de la ruta. Una ventana como 22:00–1:00 pasa la medianoche y cuenta
 para el día en que empezó (`AlertSchedule.allows`).
 
+## Mapa
+
+Código: `lib/ui/map/mapa_page.dart` (`MapaPage`), `lib/ui/map/bus_layer.dart` (`BusLayer`),
+`lib/ui/map/map_buses.dart` (`MapBuses`), `lib/ui/map/map_sheets.dart` (`BusSheet`,
+`StopSheet`) y el mapa base en `lib/services/map/` (`Basemap`).
+
+Un mapa nocturno de Montevideo y alrededores con tus paradas guardadas y los ómnibus con GPS que
+vienen a ellas. La barra dice «Mapa», sin subtítulo: el lugar queda para el mapa.
+
+- **Se arma la primera vez que elegís la pestaña** y después queda armada, con la cámara donde la
+  dejaste. Antes no carga ni pide nada. La primera vez que se abre en el teléfono, la app copia el
+  mapa base a su caché (`Basemap.load`); las siguientes lo abre de ahí.
+- **El mapa base viene dentro de la app** (`assets/map/`): moverlo o acercarlo no le pide nada a
+  ningún servidor. Va del zoom 10 al 18 del estilo y no gira; el centro de la cámara no sale del
+  recorte (`Basemap.bounds`). Apenas hay paradas ubicadas, la cámara las encuadra una vez (margen
+  de 48, como mucho el zoom 16); antes, muestra el centro (-34.9058, -56.1913) en el zoom 14.
+- **No usa la ubicación del teléfono.**
+- **Las paradas guardadas** que tienen ubicación son el glifo `stop` sobre una baldosa `tinta` de
+  26 px con borde `etiquetaCartel`, sin encender, en un área táctil de 44. Tocar una abre su hoja.
+- **Los ómnibus con GPS** salen de `arrivals[].location` de los tableros de las paradas guardadas.
+  Un ómnibus que viene a dos de tus paradas es uno solo (por su `tripId`,
+  `bus-{idEmpresa}-{idBus}`), en la posición de su tablero más nuevo; una fila con GPS sin número
+  de ómnibus queda una por parada. Una posición fuera del recorte no se dibuja. Desde el zoom 14
+  del estilo cada ómnibus es una píldora con el ómnibus de píxeles y el número de línea; más lejos,
+  un punto. Encendido, en `ambar` como `LineBadge(live: true)`; estimado, sin ámbar. Tocar uno
+  abre su hoja.
+- **Entre un tablero y el siguiente** cada ómnibus se desliza a su posición nueva en 1 s. Con
+  «reducir movimiento», o si el Mapa no está a la vista, salta. Un ómnibus nuevo aparece en su
+  lugar; uno que ya no está desaparece.
+- **«© OpenStreetMap»** abajo a la izquierda, dentro del área segura, siempre a la vista: la
+  licencia ODbL lo pide. Tocarlo abre `https://www.openstreetmap.org/copyright` en el navegador
+  (`SystemBrowser.open`); si no se puede, el snack bar «No se pudo abrir el navegador. Revisá que
+  tengas uno activado.».
+- **Con poca memoria** (`didHaveMemoryPressure`) suelta las teselas que tenía decodificadas
+  (`Basemap.clearMemoryCache`).
+
+Los datos:
+
+- **Arribos.** Los mismos tableros que Mis paradas (`MvdApiService.getBoards`), cada 30 s
+  mientras el Mapa está a la vista (ver «Los 30 s»). Al volver a estar a la vista dibuja enseguida
+  lo que ya hay en `MvdApiService.latestBoards` y pide de nuevo, salvo que todas las paradas
+  guardadas tengan un tablero de menos de 30 s. Una parada que ya no existe no cambia nada en el
+  mapa: lo dice su tarjeta en Mis paradas.
+- **Ubicación de las paradas.** Una parada elegida en «Buscar por calles» o en «Paradas cercanas»
+  se guardó con su ubicación. Una agregada por número, o guardada antes de que existiera el Mapa,
+  no la tiene: al abrir el Mapa o volver a él, `StopLocationsService.fillMissing` la busca, como
+  mucho una vez cada 10 min por parada, y la guarda en el teléfono. Con proxy sale del catálogo de
+  paradas (`getStopCatalog`, que lo descarga si no está guardado); sin proxy, de geoserver, un
+  pedido por parada, por su número (`NearbyStopsService.fetchStop`). Una parada que no se
+  encuentra no se dibuja.
+
+| Estado | Qué se ve |
+|---|---|
+| Sin paradas guardadas | el cartel «SIN PARADAS» de `TimbreEmptyState`, «Sin paradas guardadas» y «Agregá una parada en Mis paradas para ver acá los ómnibus con GPS que se acercan.». No abre el mapa base ni pide nada |
+| Abriendo el mapa base | el indicador de progreso de 18 px, sin texto |
+| No se pudo abrir el mapa base | ícono `warning` de 24 en `rojoLed`, «No se pudo abrir el mapa. Probá de nuevo.» y el botón «Reintentar»; nunca el texto del error |
+| Con datos | las paradas y los ómnibus encendidos |
+| Ningún ómnibus con GPS viene a tus paradas | la nota «Ahora ningún ómnibus con GPS viene a tus paradas.», solo con alguna parada ubicada y algún tablero de menos de 5 min |
+| No se pudo actualizar ninguna parada | el panel `avisoNoche` «No se pudo actualizar. Revisá la conexión.» con «Reintentar». Los ómnibus de la última vez quedan sin encender hasta 5 min después del `fetchedAt` de su tablero, y después desaparecen |
+| Falló solo alguna parada | sin panel: los ómnibus de esa parada, y sus minutos en las hojas, pasan a estimado |
+| Demasiados pedidos (`busy`) | nada: el Mapa saltea vueltas hasta que pasa `Retry-After` (60 s si no viene) |
+| Sin fallo, un tablero de 1 min o más | sus ómnibus quedan sin encender, sin nota; desde los 5 min desaparecen |
+| Paradas que no se pudieron ubicar | la nota «No se pudo ubicar en el mapa la parada 574.»; con dos o más, «No se pudieron ubicar en el mapa 2 paradas.» |
+
+El panel y las notas van juntos en una columna arriba del mapa, dentro del área segura, y la
+esquina de «© OpenStreetMap» queda libre. Las notas son un panel `tinta` con borde `lineaNoche`,
+ícono y texto en `tenue`.
+
+Las hojas se actualizan con cada tablero mientras están abiertas:
+
+- **Un ómnibus** (`BusSheet`): el `LineBadge`, encendido mientras su tablero está al día, y el
+  destino. Debajo, una fila por cada parada guardada a la que va, la más próxima primero: «a la
+  parada 574 · SAN JOSE y ANDES» y los minutos con `MinutosEnVivo` (26 px), o el reloj y «~19:56»
+  si es un estimado. Si el ómnibus deja de estar en los tableros con la hoja abierta, la hoja se
+  queda con lo último, como estimado.
+- **Una parada** (`StopSheet`): el nombre, «#574» y hasta 6 filas `ArrivalRow` de su tablero,
+  estimadas después de un fallo o con un tablero de 1 min o más. Las filas no se tocan: «Estoy
+  esperando» se abre desde Mis paradas. Mientras no hay tablero, el indicador de carga; si la
+  parada falló, «No se pudo actualizar. Revisá la conexión.» en `rojoLed`; sin ómnibus, «Sin
+  ómnibus próximos».
+
 ## Servicios
 
 Código: `lib/ui/services_page.dart`.
@@ -443,7 +538,7 @@ que la app no ve tu usuario ni tu saldo y que Timbre MVD no es oficial.
 - Cada mosaico abre su sitio en Custom Tabs (Android) o SFSafariViewController (iOS); si no hay
   dónde, en el navegador completo (`SystemBrowser.open`). Si no se pudo abrir: snack bar «No se
   pudo abrir el navegador. Revisá que tengas uno activado.»
-- Mientras Servicios está elegido, Mis paradas no se refresca.
+- Mientras Servicios está elegido, ni Mis paradas ni el Mapa se refrescan.
 
 ## Info
 
@@ -454,12 +549,13 @@ Se abre con el botón «Info» de la barra. Tarjetas de arriba a abajo:
 1. El ícono de la app, el nombre «Timbre MVD» y el aviso «NO OFICIAL» sobre el tablero, con «No
    está afiliada con la Intendencia de Montevideo, el STM ni ninguna empresa de transporte.».
 2. «Bloqueo biométrico», con su llave.
-3. «FUENTE DE DATOS»: de dónde salen los tiempos de arribo, los horarios, las novedades y el
-   estado del GPS, y que los tiempos con reloj son horarios teóricos. Solo con proxy
-   (`MvdApiService.usesProxy`) suma dos párrafos: de dónde salen los datos de confort («Aire
-   acondicionado y cero emisiones: API de transporte público de Montevideo.») y «Las consultas
-   pasan por el servidor del proyecto, que no guarda datos personales.». Sin proxy no hay ni
-   datos de confort ni servidor del proyecto.
+3. «FUENTE DE DATOS»: de dónde salen los tiempos de arribo, los horarios, las novedades, el
+   estado del GPS y la posición de los ómnibus; de dónde sale el mapa («Mapa: © colaboradores de
+   OpenStreetMap, con licencia ODbL. Viene dentro de la app.»), y que los tiempos con reloj son
+   horarios teóricos. Solo con proxy (`MvdApiService.usesProxy`) suma dos párrafos: de dónde
+   salen los datos de confort («Aire acondicionado y cero emisiones: API de transporte público de
+   Montevideo.») y «Las consultas pasan por el servidor del proyecto, que no guarda datos
+   personales.». Sin proxy no hay ni datos de confort ni servidor del proyecto.
 4. Enlaces: «Política de privacidad» (abre Privacidad, dentro de la app, con `chevronRight`),
    «Código fuente» (en el navegador) y «Contacto» (en la app de correo).
 5. Los créditos.
@@ -472,7 +568,7 @@ Se abre con el botón «Info» de la barra. Tarjetas de arriba a abajo:
   «Bloqueo biométrico desactivado».
 - Si un enlace no se abre: «No se pudo abrir el navegador. Revisá que tengas uno activado.» o «No
   se pudo abrir el correo. Revisá que tengas una app de correo configurada.».
-- Mientras Info está abierto, Mis paradas no se refresca.
+- Mientras Info está abierto, ni Mis paradas ni el Mapa se refrescan.
 
 ## Privacidad
 
@@ -492,7 +588,8 @@ del texto está escrito en el código.
 - En el cuerpo no hay Doto ni ámbar: el Doto queda en la barra (la placa y «PRIVACIDAD»).
 - Lee el archivo una vez cada vez que se abre, sin la caché del bundle; hasta que termina, la
   pantalla queda vacía, sin indicador.
-- No pide datos a la red. Mientras está abierta, Mis paradas no se refresca: Info sigue debajo.
+- No pide datos a la red. Mientras está abierta, ni Mis paradas ni el Mapa se refrescan: Info
+  sigue debajo.
 
 ## Bloqueo
 
@@ -507,8 +604,9 @@ el candado `LedLock`, «BLOQUEADA», «Tus paradas y rutas guardadas están prot
   `resumed`). Un estado `inactive` solo, como el de un pedido de permiso del sistema, no bloquea.
   Tampoco bloquea si la app volvió mientras el pedido del sistema estaba abierto o dentro de los 2 s
   de que se cerró, ni si la salida empezó menos de 3 s después de abrir otra app desde Timbre MVD
-  (`ExternalApps`): el navegador desde Servicios, «Ver en Cómo Ir» o «Código fuente», el correo de
-  «Contacto», «Ver más» de una novedad y los ajustes del sistema desde «Paradas cercanas».
+  (`ExternalApps`): el navegador desde Servicios, «Ver en Cómo Ir», «Código fuente» o
+  «© OpenStreetMap» del Mapa, el correo de «Contacto», «Ver más» de una novedad y los ajustes del
+  sistema desde «Paradas cercanas».
 - **El pedido del sistema** dice «Autenticate para acceder a Timbre MVD» y acepta huella, cara,
   PIN o patrón (`biometricOnly: false`).
 - **Si falla o lo cancelás,** queda la pantalla de bloqueo. «Desbloquear» lo vuelve a pedir;
@@ -521,8 +619,8 @@ el candado `LedLock`, «BLOQUEADA», «Tus paradas y rutas guardadas están prot
   si ya había avisos activados y registra o cancela la verificación en segundo plano
   (`_setupAfterAuth`, con `BackgroundWorker.sync`).
 - **Mientras está bloqueada,** la app queda armada debajo, fuera de la vista y del alcance: nada se
-  pinta, recibe toques o foco, se anima ni lo escucha el lector de pantalla, y Mis paradas no pide
-  nada. Los snack bars de la app no aparecen sobre el bloqueo, que tiene su propio
+  pinta, recibe toques o foco, se anima ni lo escucha el lector de pantalla, y ni Mis paradas ni el
+  Mapa piden nada. Los snack bars de la app no aparecen sobre el bloqueo, que tiene su propio
   `ScaffoldMessenger`.
 - **El botón atrás** no cierra ninguna página, hoja ni diálogo escondidos (`AppLock.routeGuard`).
   Con solo la pantalla principal debajo, sale de la app, como antes.
@@ -544,3 +642,8 @@ Lo anotamos para corregirlo en el código cuando se toque ese archivo:
 - **Agregar ruta:** «Guardar» sin número o sin destino no hace nada y no dice por qué.
 - **Estoy esperando** muestra los minutos del momento en que tocaste la fila y no se actualiza
   mientras la hoja está abierta.
+- **El Mapa cuenta la edad de un tablero desde `fetchedAt`**, la hora del servidor, y no desde que
+  llegó al teléfono, como Mis paradas (`_BoardView.receivedAt`). Con el reloj del teléfono
+  adelantado un minuto o más, sus ómnibus salen sin encender aunque el tablero acabe de llegar; con
+  el reloj atrasado, o adelantado más de 30 s, el Mapa vuelve a pedir los tableros que Mis paradas
+  acaba de traer.

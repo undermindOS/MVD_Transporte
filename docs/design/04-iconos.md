@@ -1,6 +1,6 @@
 # Íconos
 
-Un solo juego de íconos: `PixelGlyphs`, 33 glifos de 12 × 12 en
+Un solo juego de íconos: `PixelGlyphs`, 34 glifos de 12 × 12 en
 `lib/ui/widgets/pixel_glyphs.dart`, dibujados por `PixelIcon`
 (`lib/ui/widgets/pixel_icon.dart`). La app no usa los íconos de Material
 (`Icons.`), ni emoji, ni íconos de línea de otros juegos.
@@ -28,9 +28,15 @@ Un solo juego de íconos: `PixelGlyphs`, 33 glifos de 12 × 12 en
 | `rowLarge` | 24 | Botón +, candado de Info, error de Horarios. 24 es también el tamaño del `iconTheme` del tema, de la app bar y de la barra de navegación, y el de los botones de ícono (campana de aviso, reloj de Horarios en la tarjeta). |
 | `tile` | 48 | Íconos de los mosaicos de Servicios. |
 
-Hay un tamaño sin token: 22, en las subpestañas (Paradas, Rutas,
-Novedades), en las paradas de las listas de Agregar parada y en la nota
-del navegador de Servicios.
+Hay tamaños sin token:
+
+- 22, en las subpestañas (Paradas, Rutas, Novedades), en las paradas de las
+  listas de Agregar parada y en la nota del navegador de Servicios;
+- 16, la parada sobre el mapa del Mapa, en su baldosa de 26
+  (`_StopMarker` en `lib/ui/map/mapa_page.dart`);
+- 12, el ómnibus de las píldoras del Mapa. No es un `PixelIcon`: `BusLayer`
+  (`lib/ui/map/bus_layer.dart`) pinta los píxeles de `bus` con el mismo
+  espacio de 0.14 celdas.
 
 ## Color
 
@@ -40,12 +46,12 @@ El color sale del contexto: casi siempre `PixelIcon` lo toma del
 | Color | Para qué | Ejemplos |
 |---|---|---|
 | `ambar` | Lo encendido y lo que actúa | Pestaña y subpestaña elegidas, íconos de `OutlinedButton` y `TextButton`, campana de un aviso activado, campana del ómnibus que esperás, mosaicos de Servicios, ícono de los paneles de aviso. |
-| `tinta` | Sobre un relleno ámbar | Íconos del botón principal («Avisarme cuando llegue», «Ver más», «Desbloquear») y del botón +. |
-| `papel` | Botones de la app bar y botones de ícono | Info, la flecha de atrás, «Ver líneas» en Agregar ruta. |
-| `etiquetaCartel` | Marcas pasivas | Confort, origen de una ruta, íconos de los campos, paradas en las listas (`listTileTheme.iconColor`), candado de Info, reloj de Horarios en la tarjeta, flecha de la fila de aviso, nota del navegador. |
-| `tenue` | Lo apagado | Pestañas sin elegir, campana sin aviso, reloj de una fila sin GPS o estimada, «Sin ómnibus próximos». |
+| `tinta` | Sobre un relleno ámbar | Íconos del botón principal («Avisarme cuando llegue», «Ver más», «Desbloquear») y del botón +; el ómnibus de una píldora encendida del Mapa. |
+| `papel` | Botones de la app bar y botones de ícono | Info, la flecha de atrás, «Ver líneas» en Agregar ruta; la parada sobre el mapa, en su baldosa `tinta`. |
+| `etiquetaCartel` | Marcas pasivas | Confort, origen de una ruta, íconos de los campos, paradas en las listas (`listTileTheme.iconColor`), candado de Info, reloj de Horarios en la tarjeta, flecha de la fila de aviso, nota del navegador; el ómnibus de una píldora estimada del Mapa. |
+| `tenue` | Lo apagado | Pestañas sin elegir, campana sin aviso, reloj de una fila sin GPS o estimada, «Sin ómnibus próximos», notas sobre el mapa. |
 | `ambarTenue` | Luz atenuada | Enlace externo en el rincón de los mosaicos de Servicios. |
-| `rojoLed` | Errores | Notas de error de una tarjeta, snackbar de error, error de Horarios. |
+| `rojoLed` | Errores | Notas de error de una tarjeta y de la hoja de una parada del Mapa, snackbar de error, error de Horarios, error del mapa base. |
 | `noche` | Sobre `rojoLed` | Papelera de deslizar para borrar. |
 
 Pendiente: los íconos de los enlaces de Info (`_LinkRow` en
@@ -67,9 +73,9 @@ tiene lo que está «prendido»:
 El resto de la luz del sistema está en
 [06-luz-y-movimiento.md](06-luz-y-movimiento.md).
 
-## Los 33 glifos
+## Los 34 glifos
 
-14 se dibujaron para Timbre. Los otros 19 son de pixelarticons (Gerrit
+15 se dibujaron para Timbre. Los otros 19 son de pixelarticons (Gerrit
 Halfmann, licencia MIT), pasados a la grilla de 12 × 12; en el código
 llevan `(pixelarticons)` en su comentario. La licencia está en
 `assets/licenses/MIT-pixelarticons.txt` y se registra junto con las de las
@@ -80,15 +86,16 @@ Tamaño y color de cada uso, en ese orden.
 
 | Glifo | Origen | Qué es | Dónde se usa |
 |---|---|---|---|
-| `bus` | Timbre | Frente de un ómnibus | Pestaña Mis paradas de la navegación (24); campo «Número de parada» de Agregar parada (20, `etiquetaCartel`); nota «Sin ómnibus próximos» de la tarjeta (20, `tenue`). |
+| `bus` | Timbre | Frente de un ómnibus | Pestaña Mis paradas de la navegación (24); campo «Número de parada» de Agregar parada (20, `etiquetaCartel`); nota «Sin ómnibus próximos» de la tarjeta y de la hoja de una parada del Mapa (20, `tenue`); nota «Ahora ningún ómnibus con GPS viene a tus paradas.» sobre el mapa (20, `tenue`); ómnibus de las píldoras del Mapa (12, `tinta` encendida o `etiquetaCartel` estimada, pintado por `BusLayer`). |
+| `streets` | Timbre | Dos calles que se cruzan y un ómnibus | Pestaña Mapa de la navegación (24). |
 | `info` | Timbre | Info | Botón Info de la app bar (24, `papel`). |
-| `stop` | Timbre | Una parada: el cartel con un ómnibus arriba del poste | Subpestaña Paradas (22); origen en la tarjeta de una ruta (14, `etiquetaCartel`); paradas cercanas y resultados por calles en Agregar parada (22, `etiquetaCartel`); campo «Parada de origen» de Agregar ruta (20, `etiquetaCartel`). |
-| `clock` | Timbre | Horario | Botón Horarios de la tarjeta (24, `etiquetaCartel`); botón «Desde» de Horarios (20, `ambar`); hora de una fila sin GPS o estimada en `ArrivalRow` (14, `tenue`). |
+| `stop` | Timbre | Una parada: el cartel con un ómnibus arriba del poste | Subpestaña Paradas (22); origen en la tarjeta de una ruta (14, `etiquetaCartel`); paradas cercanas y resultados por calles en Agregar parada (22, `etiquetaCartel`); campo «Parada de origen» de Agregar ruta (20, `etiquetaCartel`); paradas guardadas sobre el mapa del Mapa (16, `papel`, en una baldosa `tinta`); nota «No se pudo ubicar en el mapa…» (20, `tenue`). |
+| `clock` | Timbre | Horario | Botón Horarios de la tarjeta (24, `etiquetaCartel`); botón «Desde» de Horarios (20, `ambar`); hora de una fila sin GPS o estimada en `ArrivalRow` (14, `tenue`); hora estimada en la hoja de un ómnibus del Mapa (14, `tenue`). |
 | `bell` | Timbre | Aviso apagado | Campana de una parada o ruta sin aviso (`_AlertButton`, 24, `tenue`); «Dejar de esperar» en la hoja Estoy esperando (20, `ambar`); mosaico Avisos de Servicios (48, `ambar`, brillo). |
 | `bellRing` | Timbre | Aviso encendido, Estoy esperando | Campana de un aviso activado (`_AlertButton`, 24, `ambar`, brillo); fila «Aviso N min antes» (14, `ambar`); «Avisarme cuando llegue» (20, `tinta`); marca del ómnibus que esperás en `ArrivalRow` (14, `ambar`, se lee «Esperando»). |
 | `plus` | Timbre | Agregar | Botón + de Paradas y Rutas (24, `tinta`). |
 | `trash` | Timbre | Borrar | Fondo de deslizar para borrar (24, `noche` sobre `rojoLed`, se lee «Eliminar»). |
-| `warning` | Timbre | Error o aviso | Snackbar de error y notas de error de la tarjeta (20, `rojoLed`); error de Horarios (24, `rojoLed`); panel «No se pudo actualizar» de Novedades (20, `ambar`). |
+| `warning` | Timbre | Error o aviso | Snackbar de error y notas de error de la tarjeta (20, `rojoLed`); error de Horarios (24, `rojoLed`); panel «No se pudo actualizar» de Novedades y del Mapa (20, `ambar`); error del mapa base (24, `rojoLed`); nota de error en la hoja de una parada del Mapa (20, `rojoLed`). |
 | `accessible` | Timbre | Ómnibus accesible | Marca de confort en `ArrivalRow` y en `CartelParada` (14, `etiquetaCartel`). |
 | `snow` | Timbre | Aire acondicionado | Marca de confort en `ArrivalRow` y en `CartelParada` (14, `etiquetaCartel`). |
 | `route` | Timbre | Rutas guardadas | Subpestaña Rutas (22); campo «Destino» de Agregar ruta (20, `etiquetaCartel`). |
@@ -121,8 +128,11 @@ brillo.
 ## La parada es un cartel, no un marcador de mapa
 
 Una parada siempre se dibuja con `stop`: el cartel con un ómnibus arriba
-del poste. Un marcador de mapa dice «un lugar en el mapa», y la app no
-muestra mapas. El porqué está en [12-decisiones.md](12-decisiones.md).
+del poste, también sobre el mapa de la pestaña Mapa, nunca con una gota ni
+un alfiler. Un marcador de mapa dice «un lugar cualquiera»; el cartel dice
+«acá esperás el ómnibus». La pestaña Mapa tiene su propio glifo, `streets`:
+`map` queda para lo que abre Cómo Ir. El porqué está en
+[12-decisiones.md](12-decisiones.md#la-parada-es-un-cartel-en-un-poste-no-un-marcador-de-mapa).
 
 ## Fuera de `PixelGlyphs`
 

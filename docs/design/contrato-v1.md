@@ -161,8 +161,9 @@ Qué cambia para la persona que usa una versión sin proxy:
 - Para ubicar las paradas guardadas en el Mapa, la app le pide a geoserver
   la capa `imm:v_uptu_paradas` filtrada por el número de la parada
   (`CQL_FILTER`), porque sin proxy no hay catálogo. Es un pedido por cada
-  parada que todavía no tiene ubicación, y la ubicación queda guardada en el
-  teléfono (sección 8).
+  parada que todavía no tiene ubicación, uno después del otro y como mucho
+  uno cada 10 min por parada (`StopLocationsService.retryInterval`), y la
+  ubicación queda guardada en el teléfono (sección 8).
 - Novedades pagina desde el último inicio guardado (`news_from_id`), con su
   propio pedido (`TransportNewsService._fetchPage`). `DirectSource.news()`
   empieza siempre en 0: es lo que comparan las pruebas del contrato con el
@@ -577,8 +578,8 @@ del proxy:
   mensajes usables.
 - **Catálogo**: solo existe en el proxy (`toStops` en `im_api.js`), así que no
   tiene gemela en Dart.
-- **WFS de «Paradas cercanas»**: solo existe en Dart
-  (`WfsAdapter.featuresToCatalogItems`).
+- **WFS de «Paradas cercanas» y de las paradas del Mapa**: solo existe en
+  Dart (`WfsAdapter.featuresToCatalogItems`).
 - **`compareDirections`**: solo existe en el proxy (`im_gateway.js`).
 
 ## 6. Caché y presupuesto de la API oficial
@@ -587,7 +588,7 @@ del proxy:
 
 | Ruta | Caché de borde (200) | En la app | Pedidos a fuentes cuando no hay caché | Unidades del presupuesto IM |
 |---|---|---|---|---|
-| arribos | 15 s | ninguna. Mis paradas pide cada 30 s solo mientras está a la vista (`StopsPage.autoRefreshInterval`); «Estoy esperando» en Android, cada 30 s (`BusWaitTaskHandler.pollInterval`); la tarea de fondo, cada 15 min o más | 1 a transporteRest, más `/vehicles` a `ImGateway` si hay ómnibus con GPS | 0 directas. `/vehicles` contesta de memoria o del almacenamiento y recarga la flota en segundo plano si tiene más de 15 s: como mucho 4 flotas por minuto en total |
+| arribos | 15 s | ninguna caché: el tablero más nuevo de cada parada queda en memoria (`MvdApiService.latestBoards`) solo para que el Mapa lo dibuje y no repita un pedido de menos de 30 s. Mis paradas pide cada 30 s solo mientras está a la vista (`StopsPage.autoRefreshInterval`), y el Mapa lo mismo para las paradas guardadas; «Estoy esperando» en Android, cada 30 s (`BusWaitTaskHandler.pollInterval`); la tarea de fondo, cada 15 min o más | 1 a transporteRest, más `/vehicles` a `ImGateway` si hay ómnibus con GPS | 0 directas. `/vehicles` contesta de memoria o del almacenamiento y recarga la flota en segundo plano si tiene más de 15 s: como mucho 4 flotas por minuto en total |
 | parada | 86 400 s; 300 s sin `directions` | la parada guardada en Hive (`BusStop`) | 1 a transporteRest, más `/stops/{id}/meta` a `ImGateway` (lee una de las 64 partes del índice) | 0 |
 | horario | 21 600 s | memoria, 6 h, por parada, día y hora | 1 a transporteRest | 0 |
 | catálogo | 86 400 s; 900 s con `linesAvailable: false` | caja perezosa de Hive `catalog`, 1 día; sin líneas, 15 min, y nunca encima de una copia con líneas; si el proxy no contesta, sirve la copia vieja | `ImGateway`: las paradas de la API oficial (de memoria o de la API) y las líneas del índice | como mucho 1 cada vez que `ImGateway` se despierta, por las paradas (la copia vive solo en memoria). Con 24 h de caché de borde, en la práctica una por día y por centro de datos de Cloudflare |
@@ -709,7 +710,8 @@ ningún pedido (`MvdApiService._call`).
 - El 503 `upstream_busy` del catálogo no frena las demás rutas: es solo del
   catálogo.
 - Mis paradas, ante `busy`, no cambia lo que muestra, no escribe nada y
-  saltea los ticks hasta el `retryAfter` más largo (60 s si no vino).
+  saltea los ticks hasta el `retryAfter` más largo (60 s si no vino). El Mapa
+  hace lo mismo.
 
 ### Qué ve la persona
 
@@ -720,6 +722,9 @@ ningún pedido (`MvdApiService._call`).
 | `failed`, `timeout`, `offline` | tarjeta, sin un tablero de menos de 5 min | «No se pudo actualizar. Deslizá para reintentar» |
 | `failed`, `timeout`, `offline` | tarjeta, con un tablero de menos de 5 min | «No se pudo actualizar. Datos de las H:MM. Deslizá para reintentar.» y debajo las filas viejas como estimado («~H:MM») |
 | `busy` | tarjetas | nada: siguen igual, pero el tablero sigue envejeciendo (fila siguiente) |
+| `failed`, `timeout`, `offline` en todas las paradas guardadas | Mapa | panel `avisoNoche`: «No se pudo actualizar. Revisá la conexión.» y «Reintentar»; los últimos ómnibus quedan sin encender hasta 5 min después de su `fetchedAt` |
+| `failed`, `timeout`, `offline` en alguna parada | Mapa | nada: los ómnibus de esa parada pasan a estimado; su hoja dice «No se pudo actualizar. Revisá la conexión.» si no le queda ninguna fila |
+| `busy`, `notFound` | Mapa | nada |
 | ningún fallo, pero el tablero llegó hace 1 min o más | tarjeta | ningún texto: las filas pasan a estimado («~H:MM»); desde los 5 min, o si no queda ninguna fila, el indicador de carga |
 | cualquier falla menos `notFound` | «Agregar parada» con un número escrito | se guarda igual como «Parada N»; al abrir la app, `healPlaceholderStops` le completa nombre y líneas |
 | cualquier falla menos `notFound` | «Agregar ruta» | «No se pudieron cargar las líneas. Revisá la conexión.» |

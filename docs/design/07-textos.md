@@ -136,12 +136,14 @@ hay…», y la segunda frase arranca con un verbo en voseo.
 Dónde se muestra (colores en [02-color.md](02-color.md)):
 
 - **Dentro de una tarjeta o debajo de un campo:** un LED rojo. Ícono `warning` y texto en
-  `rojoLed`: la nota de la tarjeta, las líneas de error de los diálogos, Horarios.
-- **Sobre una lista que se sigue viendo:** el panel `avisoNoche` con borde `ambarTenue` e ícono
-  en `ambar`. Lo usan el fallo de Novedades y el aviso de GPS parcial.
+  `rojoLed`: la nota de la tarjeta, las líneas de error de los diálogos, Horarios, el mapa base
+  que no se pudo abrir y la hoja de una parada del Mapa.
+- **Sobre una lista o un mapa que se siguen viendo:** el panel `avisoNoche` con borde
+  `ambarTenue` e ícono en `ambar`. Lo usan el fallo de Novedades, el aviso de GPS parcial y el
+  fallo del Mapa.
 - **Después de una acción:** un snack bar. En `lib/ui/stops_page.dart` (`_showError`) lleva el
-  ícono `warning` en `rojoLed`. En `home_page.dart`, `info_page.dart`, `app_lock.dart` y
-  `news_list.dart` es texto solo.
+  ícono `warning` en `rojoLed`. En `home_page.dart`, `info_page.dart`, `app_lock.dart`,
+  `news_list.dart` y `map/mapa_page.dart` es texto solo.
 
 ### Mis paradas: tarjetas de parada y de ruta
 
@@ -240,6 +242,24 @@ Código: `lib/ui/news_list.dart`.
 | Pie de la lista | «Publicadas por la Intendencia de Montevideo (Cómo Ir).» |
 | El enlace no se abrió | «No se pudo abrir el enlace. Probá de nuevo más tarde.» |
 
+### Mapa
+
+Código: `lib/ui/map/mapa_page.dart` y `lib/ui/map/map_sheets.dart`.
+
+| Situación | Texto | Cómo se ve |
+|---|---|---|
+| Sin paradas guardadas | cartel «SIN PARADAS», «Sin paradas guardadas» y «Agregá una parada en Mis paradas para ver acá los ómnibus con GPS que se acercan.» | `TimbreEmptyState` |
+| No se pudo abrir el mapa base | «No se pudo abrir el mapa. Probá de nuevo.» y el botón «Reintentar» | ícono rojo y texto `papel` |
+| Ninguna parada se pudo actualizar | «No se pudo actualizar. Revisá la conexión.» y el botón «Reintentar» | panel `avisoNoche` arriba del mapa; los últimos ómnibus quedan sin encender |
+| Ningún ómnibus con GPS viene a las paradas guardadas | «Ahora ningún ómnibus con GPS viene a tus paradas.» | nota en `tenue` con el ícono `bus` |
+| Una parada guardada no se pudo ubicar | «No se pudo ubicar en el mapa la parada 574.» | nota en `tenue` con el ícono `stop` |
+| Dos o más | «No se pudieron ubicar en el mapa 2 paradas.» | nota en `tenue` con el ícono `stop` |
+| Demasiados pedidos (`busy`) | ninguno: el Mapa saltea actualizaciones hasta que pasa `Retry-After` | — |
+| Atribución, siempre a la vista | «© OpenStreetMap» | rótulo abajo a la izquierda; abre `https://www.openstreetmap.org/copyright` |
+| Hoja de un ómnibus, una fila por parada | «a la parada 574 · SAN JOSE y ANDES» y los minutos, o «~19:56» | — |
+| Hoja de una parada que no se pudo actualizar | «No se pudo actualizar. Revisá la conexión.» | nota roja |
+| Hoja de una parada sin ómnibus | «Sin ómnibus próximos» | nota en `tenue` con el ícono `bus` |
+
 ### Servicios, Info, Privacidad y bloqueo
 
 Código: `lib/ui/home_page.dart`, `lib/ui/info_page.dart`, `lib/ui/privacy_policy_page.dart`,
@@ -247,6 +267,7 @@ Código: `lib/ui/home_page.dart`, `lib/ui/info_page.dart`, `lib/ui/privacy_polic
 
 | Situación | Texto |
 |---|---|
+| «FUENTE DE DATOS» de Info, siempre | «Tiempos de arribo, horarios por parada, novedades del transporte, estado del GPS y posición de los ómnibus: servicios en línea de la Intendencia de Montevideo, los mismos que usa Cómo Ir.», «Mapa: © colaboradores de OpenStreetMap, con licencia ODbL. Viene dentro de la app.» |
 | «FUENTE DE DATOS» de Info, solo con proxy | «Aire acondicionado y cero emisiones: API de transporte público de Montevideo.», «Las consultas pasan por el servidor del proyecto, que no guarda datos personales.» |
 | Enlace a la política, en Info | «Política de privacidad»; abre la pantalla «Privacidad» |
 | Pantalla Privacidad | el texto de `docs/privacy-policy.md` tal cual, sin las líneas `>`; cada `## ` en mayúsculas («RESUMEN») |
@@ -271,6 +292,10 @@ elige el texto; la tabla junta los casos. Los códigos HTTP que llevan a cada fa
 | `busy` | ninguno; se saltean actualizaciones hasta `Retry-After` | se guarda «Parada N», sin mensaje | «No se pudieron cargar las líneas. Revisá la conexión.» | «No se pudo cargar el horario. Revisá la conexión.» | panel «No se pudo actualizar…» | igual que `offline` |
 | `unavailable` | — | — | — | — | — | sin proxy, el campo «Buscar por calles» no aparece; con proxy sin configurar, igual que `offline` |
 
+En el Mapa, `offline`, `timeout` y `failed` en todas las paradas dan el panel «No se pudo
+actualizar. Revisá la conexión.»; si falla solo alguna, sus ómnibus pasan a estimado sin ningún
+texto. `busy` y `notFound` no dicen nada.
+
 El estado de GPS no muestra errores: si falla, queda el último estado bueno, y si nunca llegó
 no se muestra nada.
 
@@ -278,7 +303,8 @@ no se muestra nada.
 
 - **Cargando.** Indicadores de progreso sin texto. El único texto de espera es «Buscando
   parada…».
-- **Vacío.** Cuatro carteles de `TimbreEmptyState` (ver [08-componentes.md](08-componentes.md)):
+- **Vacío.** Cuatro carteles de `TimbreEmptyState` (ver [08-componentes.md](08-componentes.md)).
+  El Mapa repite «SIN PARADAS» con su propio detalle (ver «Mapa», arriba):
 
   | Cartel | Lo que escucha el lector | Detalle |
   |---|---|---|

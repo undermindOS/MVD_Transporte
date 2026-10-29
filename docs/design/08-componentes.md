@@ -2,7 +2,7 @@
 
 Las piezas con las que se arman las pantallas. Las públicas están en `lib/ui/widgets/`; las
 tarjetas, las notas y las filas de los diálogos son privadas de `lib/ui/stops_page.dart`,
-`lib/ui/schedule_page.dart` y `lib/ui/news_list.dart`. Para cada una: qué es, sus estados, qué
+`lib/ui/schedule_page.dart`, `lib/ui/news_list.dart` y `lib/ui/map/`. Para cada una: qué es, sus estados, qué
 dato muestra (campo del modelo ← campo de /v1) y dónde se usa.
 
 La cadena completa hasta la fuente de la ciudad (por ejemplo `clockTime` ← `horaDesc`) está en
@@ -71,14 +71,14 @@ El número se achica con `FittedBox` cuando no entra («124 SD»). La diferencia
 horario no depende solo del color: relleno contra contorno.
 
 Muestra `BusArrival.line` ← `arrivals[].line`, o `ScheduledPass.line` ← `passes[].line`. Se usa
-en `ArrivalRow` (`live: a.isRealTime && !stale`) y en la fila de horario (`live: false,
-compact: true`).
+en `ArrivalRow` (`live: a.isRealTime && !stale`), en la fila de horario (`live: false,
+compact: true`) y en la hoja de un ómnibus del Mapa (`live` mientras su tablero está al día).
 
 ## `MinutosEnVivo`: los minutos con GPS
 
 `lib/ui/widgets/cartel.dart`. `LiveDot`, los minutos en Doto (`TimbreText.liveMinutes`, 30 por
-defecto; `ArrivalRow` usa 26) y «min» en `TimbreText.minuteUnit` (Fira Sans Extra Condensed 14,
-`ambarTenue`). Con `minutes <= 0` muestra un `LlegandoChip`.
+defecto; `ArrivalRow` y la hoja de un ómnibus del Mapa usan 26) y «min» en `TimbreText.minuteUnit`
+(Fira Sans Extra Condensed 14, `ambarTenue`). Con `minutes <= 0` muestra un `LlegandoChip`.
 
 Frase propia: «en 12 minutos, con GPS». Dentro de `ArrivalRow` no se escucha, porque la fila
 lee su propia frase. Solo para GPS: un horario teórico usa `TimbreText.scheduleTime`.
@@ -149,9 +149,10 @@ abajo el `detail` en `TimbreText.subtitle`. El lector escucha `message`.
 | Rutas | «SIN RUTAS» | «Sin rutas guardadas» | «Tocá + para guardar una alerta de salida.» | no hay rutas guardadas (Hive) |
 | Novedades | «SIN NOVEDADES» | «Sin novedades» | «Los desvíos y cambios de recorrido aparecen acá.» | /v1 `news` vacío y nada guardado |
 | Horarios | «SIN PASADAS» | «Sin pasadas para este horario» | «Probá con otro día o con una hora más temprano.» | /v1 `passes` vacío |
+| Mapa | «SIN PARADAS» | «Sin paradas guardadas» | «Agregá una parada en Mis paradas para ver acá los ómnibus con GPS que se acercan.» | no hay paradas guardadas (Hive) |
 
 En Paradas y Rutas va dentro de `_EmptyTab`, que lo centra y lo deja desplazarse con la letra más
-grande.
+grande; en el Mapa, dentro de `_NoStops`, que hace lo mismo.
 
 ## `PageTitleBar` y `buildTimbreAppBar`: la barra de cada pantalla
 
@@ -174,6 +175,7 @@ desvanecen hacia el título (`LedMatrix` con `TimbreOpacity.ledUnlit`) y abajo e
 | Pantalla | Título | Subtítulo | Frase |
 |---|---|---|---|
 | Mis paradas | «Mis paradas» | — | «Mis paradas» |
+| Mapa | «Mapa» | — | «Mapa» |
 | Servicios | «Servicios» | «Sitios oficiales, en tu navegador» | título y subtítulo |
 | Horarios | «Horarios» | `BusStop.name` + « · » + `BusStop.id`, en Fira Sans Extra Condensed 17 `etiquetaCartel` | «Horarios de la parada 574, San Jose y Andes» |
 | Info | «Info» | — | «Info» |
@@ -341,7 +343,8 @@ Aparece cuando algún operador tiene datos parciales y nombra solo a esos: «Dat
 - **Cercana:** «#5109 · 48 m · 124, 125», hasta 2 líneas. Sin líneas termina en la distancia.
   Frase: «Parada 5109, Av Italia y Propios, a 48 metros, líneas 124, 125».
 - **Por calles:** «#574». Frase: «Parada 574, San Jose y Andes».
-- Elegir una la guarda en el acto como `BusStop(id, name, lines)`, sin otro pedido.
+- Elegir una la guarda en el acto como `BusStop(id, name, lines, latitude, longitude)`, sin otro
+  pedido: la ubicación es la que usa después el Mapa.
 
 | En pantalla | Modelo | Con proxy: /v1 (`GET /v1/catalog/stops`) | Sin proxy |
 |---|---|---|---|
@@ -361,3 +364,43 @@ Aparece cuando algún operador tiene datos parciales y nombra solo a esos: «Dat
   ómnibus (`destination` y `variantId` de `GET /v1/stops/{id}/arrivals`).
 - **DÍAS** (ajustes de aviso): «Lu», «Ma», «Mi», «Ju», «Vi», «Sá», «Do», sin la marca de elegido
   (`showCheckmark: false`); el lector dice «Lunes» a «Domingo».
+
+## El Mapa: paradas, ómnibus, notas y hojas
+
+Privadas de `lib/ui/map/`, salvo `BusLayer`, `BusSheet` y `StopSheet`. Los estados de la pantalla
+están en [09-pantallas.md](09-pantallas.md#mapa); las frases del lector, en
+[11-accesibilidad.md](11-accesibilidad.md).
+
+- **Parada (`_StopMarker`, `mapa_page.dart`).** Baldosa `tinta` de 26 × 26, radio
+  `TimbreRadii.chip` (6), borde `etiquetaCartel` de 1.5, con `stop` de 16 px en `papel`, en un
+  área táctil de 44 × 44. No se enciende nunca: el ámbar queda para los ómnibus. Muestra
+  `BusStop.latitude`, `longitude` ← `stops[].location`.
+- **Ómnibus (`BusLayer`, `bus_layer.dart`).** Todos en una sola capa pintada, sin un widget por
+  ómnibus: las píldoras salen de un atlas dibujado una vez por número de línea (`drawRawAtlas`), y
+  los puntos, de `drawRawPoints`. Muestra `BusArrival.location` ← `arrivals[].location` y `line`.
+  - Píldora, desde el zoom 14 del estilo: 22 de alto, el ómnibus de píxeles de 12 px y el número en
+    `TimbreText.lineBadge` a 15 px, con un borde `noche` de 1.5 que separa las que se pisan.
+    Encendida, placa `ambar` con ómnibus y número en `tinta`, como `LineBadge(live: true)`;
+    estimada, placa `tinta` con borde de 1.5, ómnibus y número en `etiquetaCartel`.
+  - Punto, más lejos: `ambar` de 5.5 px con halo `noche` de 8; estimado, un aro `etiquetaCartel`
+    con el centro `tinta`.
+  - Los encendidos van encima de los estimados, y los de más al sur encima de los de más al norte.
+- **Nota (`_MapNote`).** Panel `tinta`, borde `lineaNoche`, radio `TimbreRadii.control` (12),
+  ícono de 20 y texto `TimbreText.subtitle` en `tenue`.
+- **Panel de error (`_FailedBanner`).** Como el de Novedades: `avisoNoche`, borde `ambarTenue`,
+  radio 12, `warning` y texto en `ambar` (`TimbreText.subtitle`, 600), y «Reintentar». Desde 150 %
+  el botón pasa debajo del texto.
+- **Atribución (`_Attribution`).** «© OpenStreetMap» (`Basemap.attribution`) en
+  `TimbreText.caption` (`etiquetaCartel`) sobre un recuadro `noche` con la esquina de arriba a la
+  derecha redondeada (6), en un área táctil de 44 × 44.
+- **Hoja de un ómnibus (`BusSheet`, `map_sheets.dart`).** Arriba, el `LineBadge` y el destino en
+  `TimbreText.destination` («Línea N» si viene vacío). Debajo, una fila de 52 de alto como mínimo
+  por cada parada guardada a la que va (`MapBus.etas`, la más próxima primero): «a la parada 574 ·
+  SAN JOSE y ANDES» en `TimbreText.body` y, a la derecha, `MinutosEnVivo` de 26 o, si es un
+  estimado, el reloj y «~19:56» en `scheduleTime` de 20. Desde 150 % el tiempo pasa debajo.
+- **Hoja de una parada (`StopSheet`, `map_sheets.dart`).** El nombre en `TimbreText.stopName` y
+  «#574» en `TimbreText.caption` de 13; debajo, hasta 6 `ArrivalRow` sin acción de tocar, en
+  `stale` cuando el tablero no está al día. Sin filas, una nota: «Sin ómnibus próximos» en `tenue`
+  con `bus`, o «No se pudo actualizar. Revisá la conexión.» en `rojoLed` con `warning`.
+
+Las dos hojas se desplazan cuando sus filas no entran en la pantalla.

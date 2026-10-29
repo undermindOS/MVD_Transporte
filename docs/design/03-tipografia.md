@@ -24,6 +24,14 @@ Solo existen esos pesos. Si pedís otro (por ejemplo Doto a 700 o Fira Sans
 Extra Condensed a 400), Flutter usa el archivo de peso más cercano, que no
 es la letra que pediste.
 
+La excepción son las etiquetas del mapa base del Mapa (calles, barrios,
+ciudades): las dibuja `flutter_map_vector_tiles` con el motor de texto de
+Flutter y la fuente del sistema (Roboto en Android, SF en iOS), no con Fira.
+Del `text-font` del estilo solo toma el peso y la cursiva, y con la app no
+viaja ninguna fuente de mapa ([assets/map/README.md](../../assets/map/README.md)).
+Lo que la app escribe encima del mapa (la atribución, las notas, las
+píldoras de los ómnibus) sí va en Fira.
+
 ## Los estilos de `TimbreText`
 
 Tamaño en píxeles lógicos, peso e interlineado (`height`). «Sin color»
@@ -170,7 +178,8 @@ lo mejor es llevarlo a un estilo existente o agregar uno nuevo a
 | Tamaño | Dónde |
 |---|---|
 | 12 | «NUEVA» (700, espaciado 0.72, `ambar`) y mes de la fecha (700, espaciado 0.96) en `lib/ui/news_list.dart`; nota «Publicadas por la Intendencia de Montevideo (Cómo Ir).» (`tenue`). |
-| 13 | Número de parada en la tarjeta y origen de una ruta; texto del panel de GPS parcial (interlineado 1.4); fila «Aviso N min antes» (700); notas y errores de los diálogos; «Horarios teóricos, sin ubicación GPS» y «Después de medianoche» (600) en Horarios; textos chicos de Info y de los mosaicos de Servicios; fecha en el detalle de una novedad; rótulos de confort de `CartelParada`. Del tema: etiqueta de los chips (500), tooltip, subpestañas sin elegir (500). |
+| 13 | Número de parada en la tarjeta y origen de una ruta; texto del panel de GPS parcial (interlineado 1.4); fila «Aviso N min antes» (700); notas y errores de los diálogos; «Horarios teóricos, sin ubicación GPS» y «Después de medianoche» (600) en Horarios; textos chicos de Info y de los mosaicos de Servicios; fecha en el detalle de una novedad; rótulos de confort de `CartelParada`; «#574» en la hoja de una parada del Mapa. Del tema: etiqueta de los chips (500), tooltip, subpestañas sin elegir (500). |
+| 15 | Número de línea en las píldoras de los ómnibus del Mapa (`TimbreText.lineBadge` a 15, Fira Sans Extra Condensed 800), pintado en el atlas de `BusLayer`. |
 | 16 | «Bloqueo biométrico» (600) en Info; título de los mosaicos de Servicios (700); títulos dentro del texto de una novedad (`lib/ui/safe_html.dart`, 700). El tema define 16 / 700 para `ElevatedButton` y `SegmentedButton`, que la app no usa. |
 | 17 | Título de una novedad (600 leída, 700 sin leer, interlineado 1.25); subtítulo de Horarios con la parada (`_stopLine`: Fira Sans Extra Condensed 700, `etiquetaCartel`). |
 | 18 | Títulos de sección de Servicios (700); texto de «Desbloquear» (700). |

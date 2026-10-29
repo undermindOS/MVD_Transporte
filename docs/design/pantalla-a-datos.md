@@ -32,8 +32,9 @@ Ver también:
   leen los mismos campos de transporteRest, notificacion y pci, con las mismas
   reglas ([contrato-v1.md](contrato-v1.md), sección 5).
 - Donde el modo directo (sin `MVD_PROXY_URL`) es distinto, la fila lo dice.
-  Las diferencias son siempre las mismas cuatro: sin confort, sin
-  `directions`, sin catálogo, y «Paradas cercanas» con una caja de geoserver
+  Las diferencias son siempre las mismas cinco: sin confort, sin
+  `directions`, sin catálogo, «Paradas cercanas» con una caja de geoserver, y
+  la ubicación de las paradas del Mapa pedida a geoserver por número
   ([contrato-v1.md](contrato-v1.md), sección 2).
 - **IM** es la API oficial de la Intendencia
   (`api.montevideo.gub.uy/api/transportepublico`). Solo la llama `ImGateway`,
@@ -63,7 +64,7 @@ datos.
 ## Fila de ómnibus: `ArrivalRow`
 
 `lib/ui/widgets/arrival_row.dart`. La misma fila se usa en las tarjetas de
-parada y de ruta. Cada fila es un `BusArrival` (`lib/models/bus_arrival.dart`),
+parada y de ruta, y en la hoja de una parada del Mapa. Cada fila es un `BusArrival` (`lib/models/bus_arrival.dart`),
 que es un elemento de `arrivals`.
 
 | Qué se ve | Modelo | Campo /v1 | Fuente |
@@ -182,6 +183,25 @@ El último leído (`news_last_read_id`) se guarda solo en el teléfono. En modo
 directo la app pagina sola desde `news_from_id`; con el proxy recibe la última
 página de una vez.
 
+## Mapa
+
+`MapaPage` en `lib/ui/map/mapa_page.dart`. Los ómnibus salen de
+`MapBuses.from` (`lib/ui/map/map_buses.dart`), con los tableros de las
+paradas guardadas que quedaron en `MvdApiService.latestBoards`.
+
+| Qué se ve | Modelo | Campo /v1 | Fuente |
+|---|---|---|---|
+| Parada guardada (`stop` sobre el mapa) | `BusStop.latitude`, `longitude` (guardado); 0, 0 es «sin ubicación» y no se dibuja (`hasLocation`) | `stops[].location` del catálogo: al elegirla en «Buscar por calles» o «Paradas cercanas», o la que busca `StopLocationsService` con proxy | IM `busstops`: `location.coordinates`; modo directo: `geometry.coordinates` del WFS, de «Paradas cercanas» o de un pedido por `cod_ubic_parada` (`CQL_FILTER`) |
+| Ómnibus con GPS (píldora o punto) | `BusArrival.location`; un ómnibus por `tripId` `bus-…`, aunque esté en dos tableros | `arrivals[].location`, `tripId` | `coordinates` `[lng, lat]` de una fila con `real: true`; `idEmpresa`, `idBus` |
+| Número de línea de la píldora | `BusArrival.line` | `line` | `linea` |
+| Encendido o estimado | `MapBuses.liveness`: encendido si su tablero tiene menos de 1 min y su parada no falló; desde los 5 min no se dibuja | `fetchedAt` | cuando contestó transporteRest |
+| Hoja de un ómnibus: destino | `BusArrival.destination`; si está vacío, «Línea N» | `destination` | `destino` |
+| Hoja de un ómnibus: «a la parada 574 · SAN JOSE y ANDES» | `BusStop.id` y `name` (guardado) de cada parada guardada a la que va | – | – |
+| Hoja de un ómnibus: minutos o «~19:56» | `etaMinutes`, `clockTime` del tablero de esa parada | `etaMinutes`, `clockTime` | `minutos`, `horaDesc` |
+| Hoja de una parada | `ArrivalsBoard.arrivals`, hasta 6, como `ArrivalRow` | `arrivals` | transporteRest `siguientesParada/{id}` |
+| «© OpenStreetMap» | `Basemap.attribution` | – | `attribution` de la fuente del estilo (`assets/map/style_noche.json`) |
+| El mapa base | `Basemap` (`lib/services/map/basemap.dart`) | – | `assets/map/mvd-20261028.pmtiles`, dentro de la app ([assets/map/README.md](../../assets/map/README.md)) |
+
 ## Horarios
 
 `lib/ui/schedule_page.dart`. Se abre desde el reloj de una tarjeta de parada.
@@ -209,7 +229,7 @@ página de una vez.
 | «Paradas cercanas»: nombre | `NearbyStop.name`, que es `CatalogStop.name` | `stops[].name` | proxy: IM `street1` y `street2`; modo directo: `calle` y `esquina` del WFS |
 | «Paradas cercanas»: «· 230 m» | `NearbyStop.distanceMeters`, calculada en el teléfono | `stops[].location` | IM `location.coordinates`; modo directo: `geometry.coordinates` del WFS |
 | «Paradas cercanas»: «· 116, 117, …» | `NearbyStop.lines` | `stops[].lines` | `desc_linea` del WFS (del índice del proxy, o de la caja en modo directo) |
-| Una parada elegida de una lista, guardada | `BusStop(id, name, lines)`, sin otro pedido | – | – |
+| Una parada elegida de una lista, guardada | `BusStop(id, name, lines, latitude, longitude)`, sin otro pedido | – | – |
 
 - «Buscar por calles» busca en `CatalogStop.searchKey` (el nombre en
   minúsculas, sin tildes ni signos). Una parada sin calles tiene la clave
@@ -335,13 +355,13 @@ app.
 
 | Campo | Para qué lo usa la app |
 |---|---|
-| `arrivals[].tripId` | seguir el viaje de «Estoy esperando» y marcar la fila esperada |
+| `arrivals[].tripId` | seguir el viaje de «Estoy esperando» y marcar la fila esperada; en el Mapa, reconocer un ómnibus que va a dos paradas |
 | `arrivals[].variantId` | filtro de rutas (`preferredVariantIds`), seguimiento, chips HACIA de respaldo |
 | `arrivals[].expectedAt` | filas estimadas, seguimiento, recordatorio de iOS, caducidad del widget |
-| `fetchedAt` de los arribos | «Datos de las H:MM» y el límite de 5 min de las filas estimadas después de un fallo (sin fallo cuenta la hora en que el tablero llegó al teléfono) |
+| `fetchedAt` de los arribos | «Datos de las H:MM» y el límite de 5 min de las filas estimadas después de un fallo (sin fallo cuenta la hora en que el tablero llegó al teléfono); en el Mapa, si un ómnibus está encendido, hasta cuándo se dibuja y si un tablero es de menos de 30 s |
 | `id` de la parada y de los arribos | ninguno: `V1Parser` usa el número pedido |
 | `directions[].variantIds` | se guardan en `RouteAlert.preferredVariantIds` |
-| `stops[].location` | la distancia en «Paradas cercanas»; nunca se muestra un mapa |
+| `stops[].location` | la distancia en «Paradas cercanas»; se guarda en la parada elegida (`BusStop.latitude`, `longitude`) y, con proxy, completa la de una parada guardada sin ubicación: es su lugar en el Mapa |
 | `linesAvailable` | ninguna pantalla lo usa; `MvdApiService.getStopCatalog` no deja que un catálogo sin líneas reemplace una copia con líneas, y lo guarda solo 15 min |
 | `fetchedAt` del catálogo, de novedades y de GPS | ninguno: el catálogo se guarda con la hora del teléfono (corrida hacia atrás si vino sin líneas, para que venza a los 15 min) |
 | `passes[].hhmm` | encabezados de hora y «Después de medianoche» |
@@ -352,7 +372,7 @@ app.
 
 | Qué | Dónde | De dónde sale | Cuándo cambia |
 |---|---|---|---|
-| Nombre y líneas de una parada | `BusStop` (caja `stops`) | `/v1/stops/{id}` al escribir el número, o la fila del catálogo o de «Paradas cercanas» | Solo una parada guardada sin conexión como «Parada N», sin líneas: `healPlaceholderStops` la completa al abrir Mis paradas |
+| Nombre, líneas y ubicación de una parada | `BusStop` (caja `stops`) | `/v1/stops/{id}` al escribir el número (sin ubicación), o la fila del catálogo o de «Paradas cercanas» (con ubicación) | Una parada guardada sin conexión como «Parada N», sin líneas: `healPlaceholderStops` la completa al abrir Mis paradas. Una parada sin ubicación: `StopLocationsService` se la busca al abrir el Mapa, del catálogo con proxy o de geoserver sin proxy |
 | Origen, líneas y direcciones de una ruta | `RouteAlert` (caja `routes`) | `/v1/stops/{id}` y, de respaldo, `/v1/stops/{id}/arrivals` al guardar | Nunca. Una ruta guardada sin conexión queda con «Parada N» de origen |
 | El viaje esperado | `BusWait` | el elemento de `arrivals` elegido | En cada consulta adopta el `tripId` y el `expectedAt` del viaje encontrado |
 | Novedades | `news_cache` (caja `settings`) | `/v1/news` | En cada refresco (cada 10 min como mucho; 30 s al deslizar) |

@@ -114,7 +114,7 @@ void main() {
       expect(find.text('PRIVACIDAD'), findsOneWidget); // the page title
       expect(
           find.text('Política de privacidad — Timbre MVD'), findsOneWidget);
-      expect(find.text('Última actualización: 27 de octubre de 2026'),
+      expect(find.text('Última actualización: 28 de octubre de 2026'),
           findsOneWidget);
       expect(find.text('RESUMEN'), findsOneWidget);
       expect(find.textContaining('Borrador'), findsNothing);

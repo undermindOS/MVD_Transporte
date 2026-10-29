@@ -6,21 +6,34 @@ versiones: [SemVer](https://semver.org/lang/es/).
 ## [Unreleased]
 
 ### Agregado
+- Pestaña «Mapa», entre «Mis paradas» y «Servicios»: tus paradas guardadas y los ómnibus con GPS que vienen a
+  ellas, sobre un mapa nocturno de Montevideo y alrededores. El mapa viene dentro de la app (datos de
+  OpenStreetMap, estilo «Timbre Noche», unos 15 MB en `assets/map/`): moverlo o acercarlo no hace pedidos y la
+  pestaña no usa tu ubicación. Cada ómnibus aparece una sola vez aunque vaya a dos de tus paradas; al tocarlo
+  muestra cuánto le falta para cada una, y al tocar una parada se ven sus próximos ómnibus. Entre un refresco y
+  el siguiente los ómnibus se deslizan a su posición nueva, salvo con «reducir movimiento». La pestaña se arma la
+  primera vez que la abrís y pide los arribos cada 30 s solo mientras está a la vista, con los mismos tableros que
+  «Mis paradas»: si «Mis paradas» los trajo hace menos de 30 s, no los vuelve a pedir. Después de un fallo, los
+  últimos ómnibus quedan sin encender hasta 5 minutos. «© OpenStreetMap» se ve siempre en una esquina y abre la
+  página de derechos de OpenStreetMap. Las paradas elegidas en «Buscar por calles» o en «Paradas cercanas» se
+  guardan con su ubicación; a las demás se la busca la app al abrir el Mapa: con el proxy, en el catálogo de
+  paradas; sin proxy, en geoserver, por número de parada. Glifo nuevo para la pestaña: dos calles que se cruzan
+  y un ómnibus.
 - «Buscar por calles» en el diálogo «Agregar parada»: la parada se encuentra por los nombres de sus calles
   («18 de julio ejido» → «AV 18 DE JULIO y EJIDO», «san jose andes» → 574). Las palabras van en cualquier orden,
   sin distinguir mayúsculas, tildes, Ñ ni apóstrofos («ohiggins» = «O´HIGGINS»; «ordoñez» encuentra también
   «ORDOÐEZ», mal escrito en el catálogo); primero las coincidencias al principio de una palabra, hasta 50. La
-  parada elegida se guarda al instante con su nombre y sus líneas. El catálogo del proxy (`/v1/catalog/stops`,
-  4 972 paradas) se baja al escribir la primera letra y queda en el teléfono un día (unos 660 KB, que se leen del
-  disco solo cuando hacen falta); si el proxy no responde, se usa la copia anterior. Un catálogo que llega sin
-  líneas (el proxy todavía no armó su índice de paradas) nunca pisa una copia que sí las tiene y se vuelve a
-  pedir a los 15 minutos. Solo en la build con `MVD_PROXY_URL`; sin proxy el campo no aparece.
+  parada elegida se guarda al instante con su nombre, sus líneas y su ubicación. El catálogo del proxy
+  (`/v1/catalog/stops`, 4 972 paradas) se baja al escribir la primera letra y queda en el teléfono un día (unos
+  660 KB, que se leen del disco solo cuando hacen falta); si el proxy no responde, se usa la copia anterior. Un
+  catálogo que llega sin líneas (el proxy todavía no armó su índice de paradas) nunca pisa una copia que sí las
+  tiene y se vuelve a pedir a los 15 minutos. Solo en la build con `MVD_PROXY_URL`; sin proxy el campo no aparece.
 - «Paradas cercanas» en el diálogo «Agregar parada»: paradas en un radio de 400 m según tu ubicación, las más
   cercanas primero, con número, distancia y líneas; no hace falta ingresar el número. El permiso de ubicación se
-  pide al tocar el botón, y la parada elegida se guarda al instante con su nombre y sus líneas. Con el proxy se
-  calculan en el teléfono con el catálogo de paradas, así tu ubicación no sale del dispositivo. Sin proxy se le
-  pide al WFS abierto de `geoserver.montevideo.gub.uy` (capa `imm:v_uptu_paradas`, sin autenticación) un área
-  aproximada —tu posición redondeada a 3 decimales, unos 110 m— y después se filtra en el teléfono con la
+  pide al tocar el botón, y la parada elegida se guarda al instante con su nombre, sus líneas y su ubicación. Con
+  el proxy se calculan en el teléfono con el catálogo de paradas, así tu ubicación no sale del dispositivo. Sin
+  proxy se le pide al WFS abierto de `geoserver.montevideo.gub.uy` (capa `imm:v_uptu_paradas`, sin autenticación)
+  un área aproximada —tu posición redondeada a 3 decimales, unos 110 m— y después se filtra en el teléfono con la
   posición exacta.
 - Aire acondicionado y «cero emisiones» en las filas de «Mis paradas», con ícono y texto para TalkBack y
   VoiceOver, cuando la app usa el proxy. Solo se muestra un «sí» confirmado: «sin datos» no es «no».
@@ -101,8 +114,10 @@ versiones: [SemVer](https://semver.org/lang/es/).
     destino y los `variantIds`, según las variantes de geoserver y de la API oficial). Se guarda 24 h; si las
     direcciones fallan o tardan más de 2 s, responde `directions: []` y se guarda 5 minutos.
   - `/v1/stops/{id}/arrivals`: cada arribo trae `tripId`, `variantId`, `state` (`arriving`, `live` o `scheduled`),
-    `expectedAt`, `clockTime`, `airConditioning` y `zeroEmission`. Una fila con una hora imposible se descarta,
-    en lugar de un error para toda la parada. Se guarda 15 s.
+    `expectedAt`, `clockTime`, `airConditioning`, `zeroEmission` y `location`: la posición del ómnibus con GPS
+    (`{lat, lng}`, de `coordinates`, solo con `real: true`) o `null`. Una fila con una hora imposible se descarta,
+    en lugar de un error para toda la parada; una posición imposible deja solo `location` en `null`. Se guarda
+    15 s.
   - `/v1/stops/{id}/schedule/{weekday|saturday|sunday}/{H:MM}`: solo con la hora canónica (`8:05` anda, `08:05` y
     `8:5` dan 404). Se guarda 6 h.
   - `/v1/catalog/stops`: las 4 972 paradas con sus líneas y `linesAvailable`. Se guarda un día; si todavía no hay
@@ -142,10 +157,12 @@ versiones: [SemVer](https://semver.org/lang/es/).
   convertir hace fallar solo ese pedido: las otras paradas y sus avisos siguen andando.
 - `proxy/scripts/smoke.js <url>`, para probar un proxy andando: pide cada ruta de los casos 200 del contrato y
   verifica status, `Cache-Control`, `Content-Type` y las claves del cuerpo.
-- Dependencias: `url_launcher` (enlaces de las novedades), `html` (parseo del HTML de las novedades; ya era transitiva).
+- Dependencias: `url_launcher` (enlaces de las novedades), `html` (parseo del HTML de las novedades; ya era
+  transitiva), `flutter_map` 8.3.2 y `flutter_map_vector_tiles` 2.10.1 (el Mapa, con versiones fijas),
+  `latlong2` (coordenadas del mapa) y `path_provider` (la copia del mapa base en la caché de la app).
 - `docs/store-listing.md`: texto para Google Play / App Store con fuentes y aviso legal,
   borrador de Data safety y la URL de la política para Play Console; `docs/privacy-policy.md`: política de
-  privacidad (Ley 18.331), con fecha del 27 de octubre de 2026;
+  privacidad (Ley 18.331), con fecha del 28 de octubre de 2026;
   `docs/carta-imm.md`: borrador de carta a pci@imm.gub.uy (no enviada).
 - `docs/REVIEW.md`: revisión, mapa de la API de la Intendencia de Montevideo, marco legal, propuestas.
 
@@ -178,8 +195,8 @@ versiones: [SemVer](https://semver.org/lang/es/).
 - Mi STM, Recarga, Cómo Ir y Avisos se abren en el navegador del sistema (Chrome Custom Tabs en Android,
   SFSafariViewController en iOS) en lugar de un WebView integrado. Google Play (Spam policy) prohíbe
   «webview of a website without permission», y el inicio de sesión con ID Uruguay tiene que hacerse en un
-  navegador externo (RFC 8252), no en un WebView con JS inyectado. La navegación inferior tiene dos pestañas
-  nativas: «Mis paradas» (principal) y «Servicios», con tarjetas de los sitios oficiales.
+  navegador externo (RFC 8252), no en un WebView con JS inyectado. La navegación inferior tiene tres pestañas
+  nativas: «Mis paradas» (principal), «Mapa» y «Servicios», con tarjetas de los sitios oficiales.
 - Botones del widget de Android: «Mi STM» y «Recarga»; abren el sitio en el navegador.
 - El bloqueo biométrico protege las paradas y rutas guardadas (se corrigió el texto en Info). Volver de una app
   que abriste desde Timbre MVD —el navegador, también desde un enlace de Info; el correo de «Contacto»; «Ver más»

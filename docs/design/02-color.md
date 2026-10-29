@@ -2,14 +2,15 @@
 
 Un solo tema, «Noche». Los colores son los 12 tokens de `TimbreColors`
 (`lib/ui/theme/timbre_tokens.dart`); en los widgets no se escriben
-literales `Color(0x…)`.
+literales `Color(0x…)`. El mapa base del Mapa tiene seis tonos más, que
+viven en su estilo y no en los widgets ([el mapa base](#el-mapa-base)).
 
 ## Los tokens
 
 | Token | Valor | Para qué se usa |
 |---|---|---|
-| `noche` | `#070F22` | Fondo de pantalla (el tablero), app bar, relleno de los campos de texto, filas de novedades ya leídas. Ícono sobre el fondo `rojoLed` de deslizar para borrar. |
-| `tinta` | `#0A1A3A` | Paneles: tarjetas, hojas, diálogos, barra de navegación, cartel TIMBRE MVD, pantalla de bloqueo, filas de novedades sin leer, encabezados de hora en Horarios. Único color de texto sobre `ambar`. Acento de las notificaciones. |
+| `noche` | `#070F22` | Fondo de pantalla (el tablero), app bar, relleno de los campos de texto, filas de novedades ya leídas. Ícono sobre el fondo `rojoLed` de deslizar para borrar. En el Mapa: el fondo del mapa base, el recuadro de «© OpenStreetMap» y el borde que separa las píldoras de los ómnibus. |
+| `tinta` | `#0A1A3A` | Paneles: tarjetas, hojas, diálogos, barra de navegación, cartel TIMBRE MVD, pantalla de bloqueo, filas de novedades sin leer, encabezados de hora en Horarios, notas y baldosas de las paradas del Mapa. Único color de texto sobre `ambar`. Acento de las notificaciones. |
 | `tintaAlta` | `#13284F` | Lo que se levanta del panel: la fila del ómnibus que esperás, el indicador de la pestaña elegida, snackbar, tooltip, chip sin elegir, pista del switch apagado, botón principal desactivado. |
 | `lineaNoche` | `#22396A` | Bordes y divisores. Decoración, nunca texto. |
 | `papel` | `#F1ECE2` | Texto principal. Íconos de la app bar (`iconTheme` del tema). |
@@ -127,7 +128,7 @@ Se enciende:
 
 | Qué | Dónde en el código |
 |---|---|
-| Datos en vivo | `MinutosEnVivo` (punto y cifras), `LlegandoChip`, `LineBadge(live: true)`, `CartelTira`, la campana de `ArrivalRow` cuando esperás ese ómnibus |
+| Datos en vivo | `MinutosEnVivo` (punto y cifras), `LlegandoChip`, `LineBadge(live: true)`, `CartelTira`, la campana de `ArrivalRow` cuando esperás ese ómnibus, los ómnibus con GPS del Mapa (píldora o punto de `BusLayer`) |
 | Los carteles de la marca | `CartelCompacto` («TIMBRE»; «MVD» en `ambarTenue`), `TimbreText.pageTitle`, «BLOQUEADA» y `LedLock`, «NO OFICIAL» en Info, el cartel de `TimbreEmptyState`, `TimbreBus` |
 | La acción principal | `FilledButton`, `ElevatedButton`, `FloatingActionButton` y «Desbloquear»: relleno `ambar`, texto `tinta` |
 | Las demás acciones | Texto de `OutlinedButton` y `TextButton` (el borde del primero es `ambarTenue`), acción del snackbar |
@@ -154,6 +155,10 @@ No se enciende:
   navegador en Servicios.
 - La estimación del widget de Android («~14:32»,
   [10-superficies.md](10-superficies.md)).
+- En el Mapa: las paradas guardadas (`stop` en `papel` sobre `tinta`, con
+  borde `etiquetaCartel`), un ómnibus estimado (píldora `tinta` con borde y
+  número `etiquetaCartel`, o un aro `etiquetaCartel`), las notas (`tenue`) y
+  todo el mapa base.
 
 ### Excepciones documentadas
 
@@ -193,6 +198,9 @@ rojo. Un aviso sobre una lista es el panel `avisoNoche`.
 | Deslizar para borrar | Fondo `rojoLed` con radio 16, papelera `noche` | `_deleteBackground` en `lib/ui/stops_page.dart` |
 | GPS parcial de una empresa (menos del 70 % de sus ómnibus) | Panel `avisoNoche`, borde `ambarTenue` de 1 px, radio 12, ícono `signal` en `ambar`, texto `papel` 13 px | `_buildGpsWarning` en `lib/ui/stops_page.dart` |
 | Novedades no se pudo actualizar | Panel `avisoNoche`, borde `ambarTenue`, radio 12, ícono `warning` en `ambar`, texto `ambar` (`TimbreText.subtitle`, 600) | `_FailedBanner` en `lib/ui/news_list.dart` |
+| El Mapa no se pudo actualizar | Lo mismo que Novedades, con «Reintentar», sobre el mapa | `_FailedBanner` en `lib/ui/map/mapa_page.dart` |
+| No se pudo abrir el mapa base | Ícono `warning` de 24 en `rojoLed`; texto `papel` (`TimbreText.body`, 600) | `_BasemapFailed` en `lib/ui/map/mapa_page.dart` |
+| La hoja de una parada del Mapa no se pudo actualizar | Ícono `warning` y texto `TimbreText.subtitle` en `rojoLed` | `_SheetNote` en `lib/ui/map/map_sheets.dart` |
 
 Los textos de cada caso están en [07-textos.md](07-textos.md).
 
@@ -215,3 +223,29 @@ junto al widget que las usa:
 El único literal de color completo es `Color(0xFF000000)` en
 `lib/ui/widgets/led_matrix.dart`: debajo de un shader, el alfa de la
 pintura se multiplica con el del degradé, así que tiene que ser opaca.
+
+El Mapa no agrega transparencias: sus paradas, ómnibus, notas y la
+atribución usan los tokens opacos.
+
+### El mapa base
+
+El mapa base se pinta con el estilo «Timbre Noche»
+(`assets/map/style_noche.json`, generado desde `tool/map/flavor_noche.json`),
+no con widgets, así que la regla de los literales no cambia. Usa los valores
+de seis tokens (`noche`, `tinta`, `tintaAlta`, `lineaNoche`,
+`etiquetaCartel`, `tenue`) y seis tonos que existen solo en el mapa:
+
+| Nombre | Valor | Para qué |
+|---|---|---|
+| agua | `#0C1F47` | El agua: un poco más clara y más azul que `noche`, para que se lea la costa |
+| autopista | `#2C4880` | Autopistas y rutas, un escalón más claro que `lineaNoche` |
+| verde | `#091726` | Parques, bosques y matorrales: `noche` apenas corrido hacia el verde |
+| zona | `#09132A` | Hospitales, industrias, escuelas, zonas peatonales, aeródromos: `noche` apenas más claro |
+| arena | `#10172A` | Arena y playas, sin amarillo |
+| edificio | `#030814` | Los edificios (al 50 % en el estilo), más oscuros que `noche` |
+
+El mapa base no usa `ambar`, `ambarTenue`, `ambarClaro`, `avisoNoche`,
+`rojoLed` ni `papel`: el ámbar queda para los ómnibus con GPS que van encima.
+`test/map/basemap_assets_test.dart` comprueba que el estilo no tenga otros
+colores. La tabla completa, con qué capa usa cada valor y los contrastes,
+está en [assets/map/README.md](../../assets/map/README.md).

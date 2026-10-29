@@ -28,6 +28,8 @@ Timbre MVD te muestra cuándo llega tu ómnibus a las paradas que usás todos
 los días y te avisa cuando se está acercando.
 
 • Mis paradas: guardá tus paradas y mirá los próximos ómnibus de un vistazo.
+• Mapa: mirá en un mapa tus paradas guardadas y los ómnibus con GPS que se
+  acercan a ellas. El mapa viene dentro de la app y no usa tu ubicación.
 • Paradas cercanas: encontrá las paradas a tu alrededor sin saber el número.
   Se buscan en tu teléfono: tu ubicación no sale de él.
 • Buscar por calles: encontrá una parada por los nombres de sus calles.
@@ -52,12 +54,14 @@ afiliada al Sistema de Transporte Metropolitano (STM) ni a las empresas de
 transporte.
 
 **Fuentes de la información:**
-• Tiempos de arribo, horarios, paradas y sus líneas, novedades y estado del
-  GPS: servicios en línea de la Intendencia de Montevideo, los mismos que usa
-  Cómo Ir — https://m.montevideo.gub.uy/comoir/
+• Tiempos de arribo, posición de los ómnibus con GPS, horarios, paradas y sus
+  líneas, novedades y estado del GPS: servicios en línea de la Intendencia de
+  Montevideo, los mismos que usa Cómo Ir — https://m.montevideo.gub.uy/comoir/
 • Datos de los ómnibus (aire acondicionado, cero emisiones), lista de
   paradas y destinos de las líneas: API de transporte público de Montevideo
   API — https://api.montevideo.gub.uy
+• Mapa: © colaboradores de OpenStreetMap, datos con licencia ODbL —
+  https://www.openstreetmap.org/copyright
 • Mi STM y recarga de tarjeta: sitio oficial — https://stm.gub.uy
 • Información del transporte: https://montevideo.gub.uy
 
@@ -81,8 +85,9 @@ Live Montevideo bus arrivals and alerts for your stops. Unofficial app.
 - Ícono: `assets/app_icon.png` (el ómnibus encendido en ámbar sobre el
   tablero oscuro, sin escudo ni símbolos oficiales). Para Play (512 px):
   el mismo archivo reducido.
-- Capturas: solo pantallas propias de la app (Mis paradas, Rutas, alertas).
-  No usar capturas de stm.gub.uy ni logos del STM o la Intendencia.
+- Capturas: solo pantallas propias de la app (Mis paradas, Mapa, Rutas,
+  alertas). En las del Mapa se ve «© OpenStreetMap», que la app muestra
+  siempre. No usar capturas de stm.gub.uy ni logos del STM o la Intendencia.
 - El ícono, el splash, el widget y las notificaciones están descritos en
   [docs/design/10-superficies.md](design/10-superficies.md).
 
@@ -106,7 +111,7 @@ con `MVD_PROXY_URL` (ver la nota de arriba).
 | Pregunta | Respuesta propuesta | Por qué |
 |---|---|---|
 | ¿Recopila o comparte datos? | No | Lo único que sale del teléfono son las consultas al servidor intermediario, que se procesan de forma efímera (fila de abajo) |
-| Ubicación | No recopilada | «Paradas cercanas» elige las paradas en el teléfono, con el catálogo `/v1/catalog/stops`, que se descarga sin coordenadas (`NearbyStopsService.fetchNearby` en `lib/services/nearby_stops_service.dart`). `test/proxy_privacy_test.dart` verifica que ningún pedido lleva la posición. Una build sin `MVD_PROXY_URL` sí manda un área aproximada al WFS de la Intendencia: con esa build la respuesta pasa a ser «Ubicación aproximada, funcionalidad de la app» |
+| Ubicación | No recopilada | «Paradas cercanas» elige las paradas en el teléfono, con el catálogo `/v1/catalog/stops`, que se descarga sin coordenadas (`NearbyStopsService.fetchNearby` en `lib/services/nearby_stops_service.dart`). `test/proxy_privacy_test.dart` verifica que ningún pedido lleva la posición. La pestaña Mapa no pide la ubicación: dibuja las paradas guardadas y los ómnibus que vienen a ellas, y su mapa base viene dentro de la app (`assets/map/`), sin pedidos a servidores de mapas. Una build sin `MVD_PROXY_URL` sí manda un área aproximada al WFS de la Intendencia: con esa build la respuesta pasa a ser «Ubicación aproximada, funcionalidad de la app» |
 | Paradas y rutas guardadas | No recopilado | Quedan en el dispositivo (Hive) |
 | Consultas al servidor intermediario (número de parada, IP) | No recopilado: procesamiento efímero | El proxy en Cloudflare (`proxy/`) reenvía las consultas de arribos, paradas, horarios, catálogo de paradas, novedades y estado del GPS, y no guarda la IP ni el número de parada. La IP solo es la clave del límite de pedidos por minuto (`IP_LIMITER` en `proxy/wrangler.jsonc`). Los logs de Workers están apagados (`wrangler.jsonc` no tiene bloque `observability`) y los únicos mensajes de error son textos fijos `<fuente>: <tipo>`, sin URL ni IP (`respond()` en `proxy/src/index.js`). Confirmar con Google antes de enviar: la [ayuda de Play](https://support.google.com/googleplay/android-developer/answer/10787469) dice que lo procesado de forma efímera no aparece en la sección pública, pero en un lugar pide declararlo igual en el formulario y en las preguntas frecuentes dice que no hace falta |
 | Credenciales de Mi STM | No recopilado | Se ingresan en el sitio oficial, en el navegador del sistema |
@@ -129,6 +134,6 @@ Video: tocar un ómnibus en «Mis paradas» → «Avisarme cuando llegue» → a
 la pantalla → notificación fija que se actualiza → aviso de llegada.
 
 Apple App Privacy: «Data Not Collected». En una build con `MVD_PROXY_URL` la
-ubicación no sale del teléfono. Una build sin él manda un área aproximada a la
+ubicación no sale del teléfono, y el Mapa no la usa. Una build sin él manda un área aproximada a la
 Intendencia: con esa build habría que declarar la ubicación aproximada (App
 Functionality, no vinculada al usuario, sin tracking).

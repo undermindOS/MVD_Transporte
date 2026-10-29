@@ -7,8 +7,8 @@ incómodo).
 
 Las doce primeras vienen del diseño original de Timbre y están corregidas
 según el código. Las siguientes salieron de la reconstrucción del proxy como
-Backend-for-Frontend (`/v1`) y de la revisión de diseño de la misma rama. El
-contrato completo está en [contrato-v1.md](contrato-v1.md).
+Backend-for-Frontend (`/v1`), de la revisión de diseño de la misma rama y de
+la pestaña Mapa. El contrato completo está en [contrato-v1.md](contrato-v1.md).
 
 Índice:
 
@@ -29,7 +29,8 @@ contrato completo está en [contrato-v1.md](contrato-v1.md).
   [El brillo de `LiveDot`](#el-brillo-de-livedot) ·
   [El widget muestra el destino del ómnibus](#el-widget-muestra-el-destino-del-ómnibus) ·
   [El bloqueo va encima del `Navigator`](#el-bloqueo-va-encima-del-navigator) ·
-  [El bloqueo vuelve solo después del segundo plano](#el-bloqueo-vuelve-solo-después-del-segundo-plano)
+  [El bloqueo vuelve solo después del segundo plano](#el-bloqueo-vuelve-solo-después-del-segundo-plano) ·
+  [El mapa viene dentro de la app](#el-mapa-viene-dentro-de-la-app)
 - Backend: [Sin ruta por lotes](#sin-ruta-por-lotes) ·
   [Cercanas en el teléfono](#las-paradas-cercanas-se-calculan-en-el-teléfono) ·
   [Sin cambio automático al modo directo](#sin-cambio-automático-al-modo-directo) ·
@@ -78,7 +79,7 @@ pide una acción:
 
 - los datos en vivo: los minutos con GPS (`MinutosEnVivo`), «LLEGANDO»
   (`LlegandoChip`), el número de línea relleno (`LineBadge(live: true)`),
-  el ómnibus que estás esperando;
+  el ómnibus que estás esperando, los ómnibus con GPS sobre el Mapa;
 - los carteles de la marca: «TIMBRE», el título de página, el candado de
   bloqueo, el cartel de una lista vacía;
 - las acciones: el relleno del botón principal y el texto de los botones de
@@ -130,7 +131,7 @@ letra del sistema más chica no los achique.
 plantilla.
 
 **Decisión.** Íconos y letras comparten la misma grilla de puntos:
-`PixelGlyphs` (33 glifos de 12 × 12 en `lib/ui/widgets/pixel_glyphs.dart`),
+`PixelGlyphs` (34 glifos de 12 × 12 en `lib/ui/widgets/pixel_glyphs.dart`),
 dibujados por `PixelIcon`. En `lib/` no queda ningún `Icons.`.
 
 **Consecuencia.** Un ícono nuevo se dibuja en la grilla
@@ -140,16 +141,25 @@ copias vectoriales de glifos y hay que rehacerlas a mano si el glifo cambia
 
 ### La parada es un cartel en un poste, no un marcador de mapa
 
-**Contexto.** Un marcador de mapa dice «un lugar en el mapa», y la app no
-muestra mapas: muestra paradas.
+**Contexto.** Un marcador de mapa dice «un lugar en el mapa», y una parada es
+otra cosa: el cartel donde esperás el ómnibus. La regla original decía que la
+app no muestra mapas, que muestra paradas. Con la pestaña Mapa la app dibuja
+un mapa propio, y ahí lo fácil era la gota de siempre.
 
 **Decisión.** La parada es `PixelGlyphs.stop`, un cartel con un ómnibus
-arriba de un poste, en la pestaña Paradas, las listas y el origen de una
-ruta. El glifo `map` aparece solo en «Ver en Cómo Ir» y en la baldosa Cómo
-Ir de Servicios, que sí abren un mapa (el sitio oficial).
+arriba de un poste, en la pestaña Paradas, las listas, el origen de una ruta
+y sobre el mapa de la pestaña Mapa. La pestaña Mapa tiene su propio glifo,
+`streets` (dos calles que se cruzan y un ómnibus). El glifo `map` sigue solo
+en «Ver en Cómo Ir» y en la baldosa Cómo Ir de Servicios, que abren el mapa
+del sitio oficial.
 
-**Consecuencia.** La app no dibuja mapas ni ubicaciones; tampoco el contrato
-`/v1` devuelve la ubicación de una parada en `StopResponse`.
+**Consecuencia.** En el mapa no hay gotas ni alfileres: cada parada guardada
+es `stop` sobre una baldosa `tinta`, sin encender, y cada ómnibus con GPS es
+una píldora con el ómnibus de píxeles y su número de línea (de lejos, un
+punto). `StopResponse`
+sigue sin la ubicación de la parada: el Mapa la toma del catálogo con proxy,
+o de geoserver por número sin proxy, y la guarda en la parada
+([El mapa viene dentro de la app](#el-mapa-viene-dentro-de-la-app)).
 
 ### El acento de las notificaciones es el azul del tablero
 
@@ -250,7 +260,11 @@ teléfono (`_BoardView.receivedAt`, con `StopsPage.clock`), no desde
 **Consecuencia.** Una fila vieja no se puede tocar ni muestra la campanita de
 «Estoy esperando». El lector de pantalla dice «alrededor de las 20:01,
 estimado». El mismo formato «~H:MM» es el del widget
-([08-componentes.md](08-componentes.md), [07-textos.md](07-textos.md)).
+([08-componentes.md](08-componentes.md), [07-textos.md](07-textos.md)). El
+Mapa sigue la misma regla con sus ómnibus: sin encender después de un fallo o
+con un tablero de 1 min o más, y fuera del mapa desde los 5 min. Ahí la edad
+se cuenta desde el `fetchedAt` del tablero
+([09-pantallas.md](09-pantallas.md#mapa)).
 
 ### «NUEVA» y la fecha de lo no leído van en ámbar
 
@@ -318,7 +332,8 @@ los snack bars de la app se quedan con la app.
 
 **Consecuencia.** Al desbloquear volvés a la misma página, hoja o diálogo, y
 Mis paradas no se carga de cero. Como sigue armada, tiene que saber que está
-tapada: `HomePage` le pasa `active: false` mientras `AppLock.of(context).locked`,
+tapada: `HomePage` le pasa `active: false`, a Mis paradas y al Mapa, mientras
+`AppLock.of(context).locked`,
 y el refresco al volver del segundo plano espera al primer cuadro
 (`WidgetsBinding.endOfFrame`) para no pedir nada justo cuando aparece el
 bloqueo. Con solo la pantalla principal debajo, el atrás de Android sigue
@@ -351,6 +366,40 @@ enlace de una novedad y ajustes del sistema. Lo que cuenta es cuándo empezó
 la salida, no cuánto duró: si desde la app que abriste vas a la pantalla de
 inicio y volvés a Timbre MVD horas después, tampoco bloquea.
 
+### El mapa viene dentro de la app
+
+**Contexto.** La app no dibujaba mapas, y los arribos de `/v1` no traían la
+posición de los ómnibus. La pestaña Mapa necesita un mapa base. Pedirle
+teselas a un servidor de mapas (el de OpenStreetMap, uno pago o la
+cartografía de la Intendencia) le diría a ese servidor qué zona mirás cada vez
+que movés el mapa, y la app dependería de un servicio más.
+
+**Decisión.** El mapa base viene con la app: un recorte de Protomaps de
+Montevideo y alrededores (`assets/map/mvd-20261028.pmtiles`, 14,86 MB, zoom 0
+a 15) con el estilo «Timbre Noche» (`assets/map/style_noche.json`), dibujado
+por `flutter_map` y `flutter_map_vector_tiles`. No hay servidor de teselas:
+`Basemap` (`lib/services/map/basemap.dart`) copia el archivo una vez a la
+caché de la app y lee las teselas de esa copia. Encima van solo las paradas
+guardadas y los ómnibus con GPS que vienen a ellas, con la posición de
+`arrivals[].location`. Un ómnibus es uno solo aunque vaya a dos paradas: se
+reconoce por su `tripId` (`bus-{idEmpresa}-{idBus}`). El Mapa no usa la
+ubicación del teléfono.
+
+**Consecuencia.** Mover o acercar el mapa no hace pedidos, tampoco sin
+conexión. Los únicos pedidos del Mapa son los arribos de las paradas
+guardadas, cada 30 s mientras está a la vista, y la ubicación de una parada
+guardada que todavía no la tiene. La app pesa unos 15 MB más, y en el
+teléfono el archivo está dos veces: en la app y en su copia de la caché, que
+la app vuelve a copiar si el sistema la borra. El recorte envejece: se rehace
+con los pasos de `assets/map/README.md`. «© OpenStreetMap» se ve siempre en
+una esquina del mapa (licencia ODbL). El estilo está modificado y por eso no
+se llama Protomaps. El mapa base no usa ámbar: queda para los ómnibus con
+GPS. Las etiquetas del mapa salen con la fuente del sistema, no con Fira
+([03-tipografia.md](03-tipografia.md)). Tema abierto: mostrar la flota de
+toda la ciudad, y no solo los ómnibus que vienen a tus paradas, pide una ruta
+nueva del contrato (por ejemplo `/v1/buses`, con la flota que ya baja
+`ImGateway`), y espera a que el proxy esté desplegado.
+
 ---
 
 ## Backend
@@ -364,7 +413,8 @@ propia combinación, y la caché compartida del borde dejaría de servir.
 **Decisión.** Una URL por parada (`GET /v1/stops/{id}/arrivals`, 15 s en la
 caché del borde). La app pide cada parada una sola vez y todas en paralelo:
 `MvdApiService.getBoards` quita los ids repetidos y comparte un pedido en
-curso para la misma parada. Lo usan Mis paradas y la consulta de fondo.
+curso para la misma parada. Lo usan Mis paradas, el Mapa y la consulta de
+fondo.
 
 **Consecuencia.** Una parada popular se sirve a todos desde la misma copia
 del borde. Con N paradas la app hace N pedidos; el límite por IP del proxy

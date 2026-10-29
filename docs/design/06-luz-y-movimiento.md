@@ -65,10 +65,14 @@ está en [02-color.md](02-color.md#lo-que-no-es-token).
 
 ## Movimiento
 
-### La única animación propia: `LedLock`
+### Animaciones propias
 
-El candado de la pantalla de bloqueo (`lib/ui/widgets/led_lock.dart`) es la
-única animación que escribió el proyecto:
+El proyecto escribió dos animaciones: el candado de la pantalla de bloqueo y
+el movimiento de los ómnibus del Mapa.
+
+#### `LedLock`: el candado
+
+El candado de la pantalla de bloqueo (`lib/ui/widgets/led_lock.dart`):
 
 - **El candado.** 13 × 18 puntos cuadrados con un paso de 8 (104 × 144
   px); cada punto mide 0.8 del paso. El ojo de la cerradura queda en LEDs
@@ -93,12 +97,41 @@ El candado de la pantalla de bloqueo (`lib/ui/widgets/led_lock.dart`) es la
 El candado es decoración: el lector de pantalla oye «Aplicación
 bloqueada» del cartel «BLOQUEADA».
 
+#### Los ómnibus del Mapa
+
+`BusLayer` (`lib/ui/map/bus_layer.dart`) mueve los ómnibus de un tablero al
+siguiente:
+
+- **El movimiento.** Cuando llega un tablero con posiciones nuevas, cada
+  ómnibus se desliza desde donde está dibujado hasta su posición nueva en
+  1000 ms (`BusLayer.moveDuration`), con `Curves.easeInOut`. Un solo
+  `AnimationController` mueve a todos, y cada cuadro repinta solo la capa de
+  los ómnibus (su propio `RepaintBoundary`). Un tablero con las mismas
+  posiciones no reinicia un movimiento en curso.
+- **Lo que no se mueve.** Un ómnibus nuevo aparece en su lugar y uno que ya no
+  está desaparece en el acto, sin fundido. El mapa no gira, así que las
+  píldoras siempre quedan derechas. Nada parpadea.
+- **Fuera de la vista.** Con el Mapa tapado, en otra pestaña o con la app
+  bloqueada, `TickerMode` lo deja sin animar y cada ómnibus salta a su
+  posición. Los primeros tableros al volver también saltan: se movieron
+  mientras no estaba.
+- **Reducir movimiento.** Si `MediaQuery.maybeDisableAnimationsOf(context)`
+  es verdadero, cada ómnibus salta a su posición nueva y queda quieto; un
+  movimiento en curso termina donde iba.
+
+Los ómnibus son pintura: el lector de pantalla los escucha en la frase de
+cada parada ([11-accesibilidad.md](11-accesibilidad.md)).
+
 ### Lo que se mueve por Flutter
 
 La app no cambia las animaciones de Material: la onda del toque, la
 entrada de las pantallas apiladas, las hojas y los diálogos, el indicador
 de las subpestañas, el switch, los indicadores de carga y deslizar para
-actualizar se mueven como en cualquier app de Flutter.
+actualizar se mueven como en cualquier app de Flutter. El mapa del Mapa se
+arrastra, se acerca y sigue de largo al soltarlo como lo hace `flutter_map`
+(todos sus gestos menos girar); el encuadre de las paradas al abrirlo es un
+salto, sin animación.
 
 Si algún día se agrega otra animación propia, que haga lo mismo que
-`LedLock` con reducir movimiento: quedarse en su estado final, quieta.
+`LedLock` y los ómnibus del Mapa con reducir movimiento: quedarse en su
+estado final, quieta.

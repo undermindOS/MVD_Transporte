@@ -39,16 +39,16 @@ Lenguaje visual:
   luz, siempre oscuro, píxel, legible para todos) y lo que no se hace.
 - [02-color.md](02-color.md): los 12 colores y para qué sirve cada uno, la
   tabla de contrastes, la regla del ámbar con sus excepciones, errores
-  frente a avisos.
+  frente a avisos y los tonos del mapa base.
 - [03-tipografia.md](03-tipografia.md): Doto, Fira Sans Extra Condensed y
   Fira Sans; todos los estilos de `TimbreText`; el mínimo de 19 px y la
   letra grande.
-- [04-iconos.md](04-iconos.md): los 33 íconos de `PixelGlyphs` y dónde se
+- [04-iconos.md](04-iconos.md): los 34 íconos de `PixelGlyphs` y dónde se
   usa cada uno, tamaños, colores y brillo.
 - [05-formas-y-espacio.md](05-formas-y-espacio.md): radios, espacios,
   tamaño táctil, bordes y la tarjeta de parada.
 - [06-luz-y-movimiento.md](06-luz-y-movimiento.md): el tablero de LEDs,
-  los brillos, las opacidades y la única animación.
+  los brillos, las opacidades y las dos animaciones propias.
 
 Contenido e interfaz:
 

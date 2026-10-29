@@ -11,7 +11,7 @@
 > servidor intermediario» y la sección de seguridad de los datos de
 > `docs/store-listing.md`.
 
-**Última actualización:** 27 de octubre de 2026
+**Última actualización:** 28 de octubre de 2026
 
 Timbre MVD es una aplicación no oficial, desarrollada por Liberon Tech,
 de Khrestenkov & Co. No es una aplicación de la Intendencia de Montevideo ni de
@@ -26,6 +26,8 @@ ningún organismo de gobierno.
   Intendencia y no guarda datos personales.
 - Tu ubicación no sale del teléfono: las paradas cercanas se buscan en el
   dispositivo.
+- El mapa viene dentro de la app: mirarlo no le pide nada a ningún servidor
+  de mapas, y no usa tu ubicación.
 
 ## Qué datos usa la app
 
@@ -76,6 +78,17 @@ envía al servicio público de mapas de la Intendencia
 tu posición redondeada a tres decimales (unos 110 m), nunca la posición
 exacta, y elige las paradas cercanas en el teléfono. No guardamos tu
 ubicación. Podés negar el permiso; el resto de la app sigue funcionando.
+
+**Mapa.** El mapa de la pestaña Mapa viene dentro de la app, con datos de
+OpenStreetMap: moverlo o acercarlo no hace ninguna consulta. Muestra tus
+paradas guardadas y los ómnibus con GPS que se acercan a ellas, con la
+posición que la Intendencia publica para cada ómnibus y que la app recibe
+junto con los tiempos de arribo, en la misma consulta por número de parada.
+El mapa no usa tu ubicación. Para poner en el mapa una parada guardada que
+todavía no tiene su lugar, la app la busca en la misma lista de todas las
+paradas de Montevideo, y el lugar queda guardado en el teléfono. Sin el
+servidor intermediario, le pide esa parada por su número al servicio público
+de mapas de la Intendencia (`geoserver.montevideo.gub.uy`).
 
 **Mi STM, Recarga y Cómo Ir.** Se abren en el navegador de tu teléfono,
 en los sitios oficiales. Tu usuario, contraseña, ID Uruguay o datos de pago

@@ -352,7 +352,8 @@ Lo que dice la app alrededor de «Estoy esperando» (`_showWaitSheet` en
   referencia a la segunda, por eso queda).
 - **Ícono de Google Play** (512 px): el mismo `assets/app_icon.png`, reducido.
 - **Capturas:** solo pantallas de la app. Nada de capturas de stm.gub.uy ni
-  logos del STM o de la Intendencia.
+  logos del STM o de la Intendencia. Una captura del Mapa lleva «© OpenStreetMap»
+  a la vista, como en la app, que lo muestra siempre.
 - **Servicio en primer plano:** Google Play pide declarar el tipo `dataSync`
   de «Estoy esperando» con un video; el texto propuesto está en
   [docs/store-listing.md](../store-listing.md).

@@ -130,11 +130,15 @@ TalkBack y VoiceOver escuchan una frase completa por cada cosa, no pedazos suelt
 - `excludeSemantics` también se lleva la acción de tocar del `InkWell` de adentro. Por eso, si la
   cosa se puede tocar, el `Semantics` lleva su propio `onTap`; si no, deja de funcionar con el
   lector. Lo cumplen `ArrivalRow`, las filas de Agregar parada, `_NewsRow`, los mosaicos de
-  Servicios, `_LinkRow` de Info y cada segmento de `TimbreSegmented`.
+  Servicios, `_LinkRow` de Info, cada segmento de `TimbreSegmented`, las paradas del Mapa y su
+  «© OpenStreetMap».
 - Una fila que no se puede tocar no se anuncia como botón: `ArrivalRow` pone `button: onTap !=
   null`, así que una fila estimada no es botón.
 - Lo decorativo no se escucha: `PixelIcon` sin `semanticLabel`, `LedMatrix`, `TimbreBus` y
   `LedLock` van envueltos en `ExcludeSemantics`.
+- Los ómnibus del Mapa son pintura (`BusLayer`, un `CustomPaint`): el lector no los recorre uno
+  por uno. Lo que dicen está en la frase de cada parada, que cuenta cuántos vienen, y en las hojas.
+  El mapa base tampoco se escucha.
 - Los carteles en mayúsculas se escuchan como frase normal: «MIS PARADAS» se lee «Mis paradas»,
   «SIN PARADAS» se lee «Sin paradas guardadas», «BLOQUEADA» se lee «Aplicación bloqueada». Las
   secciones de Privacidad se leen como están en el archivo: «RESUMEN» se lee «Resumen».
@@ -181,13 +185,17 @@ diálogos y snack bars abiertos. La pantalla de bloqueo es una pantalla aparte p
 | Pantalla de bloqueo | «Aplicación bloqueada», como encabezado | `LockScreen` |
 | Privacidad | el título del archivo y cada sección («Resumen»), como encabezados; la viñeta de una lista no se escucha | `PrivacyPolicyPage` |
 | Widget de Android | «Línea 116 a POCITOS, alrededor de las 14:32, estimado» | `MVDTransporteWidgetProvider.kt` |
+| Parada del Mapa | «Parada 574, San Jose y Andes, 2 ómnibus con GPS en camino», como botón; con uno, «1 ómnibus con GPS en camino»; sin ninguno, «sin ómnibus con GPS en camino»; con un tablero viejo, «2 ómnibus en camino, estimado»; sin tablero de menos de 5 min, o con uno viejo y ningún ómnibus, solo «Parada 574, San Jose y Andes» | `_StopMarker._phrase` |
+| Atribución del Mapa | «© OpenStreetMap», como enlace | `_Attribution` |
+| Hoja de un ómnibus del Mapa | «Línea 117 a Punta Carretas», como encabezado; cada parada, «A la parada 574, San Jose y Andes, llega en 4 minutos, con GPS», «…, llegando, con GPS» o «…, alrededor de las 19:56, estimado» | `BusSheet`, `_EtaRow._sentence` |
+| Hoja de una parada del Mapa | «Parada 574, San Jose y Andes», como encabezado; las filas, como `ArrivalRow` | `StopSheet` |
 
 Las marcas de confort se escuchan solo cuando el dato es `true`. Con proxy pueden ser
 «accesible», «aire acondicionado» y «cero emisiones»; sin proxy, solo «accesible».
 
 Son encabezados: el título de página, la barra de Horarios, los encabezados de hora, el título de
 Ajustes de aviso, «Tu tarjeta STM» y «Para moverte» en Servicios, el título y las secciones de
-Privacidad, y «BLOQUEADA».
+Privacidad, el título de las hojas del Mapa y «BLOQUEADA».
 
 ### Borrar sin deslizar
 
@@ -228,15 +236,23 @@ Todo lo que se toca mide al menos 44 × 44 (`TimbreSpace.touch`). Una fila de ó
 | «Desbloquear» | 220 × 56 | `lock_screen.dart` |
 | Chips y switches | 48 de alto: el tema no cambia `materialTapTargetSize`, así que en el teléfono vale el área táctil de Material | valor por defecto de Flutter |
 | Botones «Mi STM» y «Recarga» del widget | 44 dp de alto | `res/layout/mvd_transporte_widget.xml` |
+| Parada del Mapa | 44 × 44, con la baldosa de 26 en el medio | `_StopMarker` en `mapa_page.dart` |
+| «© OpenStreetMap» | 44 × 44 | `_Attribution` en `mapa_page.dart` |
+| Fila de la hoja de un ómnibus del Mapa | 52 de alto | `_EtaRow` en `map_sheets.dart` |
 
 La fila de Horarios también mide 44 de alto, aunque no se toca. El ícono de un campo ocupa una caja
 de 44 × 44 (`_FieldIcon`), pero no es un botón.
 
+Un ómnibus del Mapa no llega a 44: se toca dentro de su píldora más 4 px de cada lado (unos 33 de
+alto) o a 14 px de su punto (`BusLayer`). La misma información está en la parada, que sí mide
+44 × 44.
+
 ## Movimiento
 
-La única animación es el candado de la pantalla de bloqueo. Con «reducir movimiento» del sistema
-(`MediaQuery.disableAnimations`), `LedLock` se queda quieto y cerrado. Lo prueba
-`test/lock_screen_test.dart`.
+Hay dos animaciones propias: el candado de la pantalla de bloqueo y el movimiento de los ómnibus
+del Mapa. Con «reducir movimiento» del sistema (`MediaQuery.disableAnimations`), `LedLock` se queda
+quieto y cerrado, y cada ómnibus salta a su posición nueva. Lo prueban
+`test/lock_screen_test.dart` y `test/map/bus_layer_test.dart`.
 
 ## Pruebas
 
@@ -254,12 +270,13 @@ texto cortado hace fallar la prueba.
 | `test/stop_search_layout_test.dart` | Agregar parada con la búsqueda por calles | 2× |
 | `test/lock_screen_test.dart` | la pantalla de bloqueo sin desborde; el candado quieto con movimiento reducido | 2× |
 | `test/privacy_policy_test.dart` | Privacidad sin desborde hasta la última sección; «geoserver.montevideo.gub.uy» en una sola línea | 2× |
+| `test/map/mapa_layout_test.dart` | el Mapa: el cartel vacío, las notas, el panel de error, el error del mapa base, la atribución y las dos hojas, con todas sus palabras | 1×, 1.3×, 2× |
 | `test/cartel_test.dart` | Doto nunca por debajo de 19 px | 0.85× |
 
 Las frases del lector se prueban con `find.bySemanticsLabel` en `cartel_test`, `stops_page_test`,
 `stops_board_test`, `screens_test`, `stop_search_test`, `news_tab_test`, `proxy_bff_test`,
-`lock_screen_test` y `privacy_policy_test`. Si cambiás una frase, cambiá también la prueba que la
-busca.
+`lock_screen_test`, `privacy_policy_test` y `map/mapa_page_test`. Si cambiás una frase, cambiá
+también la prueba que la busca.
 
 ### Antes de dar por terminada una pantalla o un componente
 
