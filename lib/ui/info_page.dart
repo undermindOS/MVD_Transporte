@@ -228,8 +228,16 @@ class _InfoPageState extends State<InfoPage> {
                 const SizedBox(height: 8),
                 Text(
                   'Tiempos de arribo, horarios por parada, novedades del '
-                  'transporte y estado del GPS: servicios en línea de la '
-                  'Intendencia de Montevideo, los mismos que usa Cómo Ir.',
+                  'transporte, estado del GPS y posición de los ómnibus: '
+                  'servicios en línea de la Intendencia de Montevideo, los '
+                  'mismos que usa Cómo Ir.',
+                  style: _reading,
+                ),
+                // The Mapa's basemap is OSM data (ODbL), in every build
+                const SizedBox(height: 8),
+                Text(
+                  'Mapa: © colaboradores de OpenStreetMap, con licencia ODbL. '
+                  'Viene dentro de la app.',
                   style: _reading,
                 ),
                 // Only proxy builds get comfort data, and only they have a

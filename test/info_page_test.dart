@@ -38,6 +38,9 @@ void main() {
     expect(switchValue(tester), isFalse);
   });
 
+  const map = 'Mapa: © colaboradores de OpenStreetMap, con licencia ODbL. '
+      'Viene dentro de la app.';
+
   testWidgets('shows data source attribution', (tester) async {
     await pumpInfo(tester, (value) async => value);
     expect(find.text('FUENTE DE DATOS'), findsOneWidget);
@@ -45,6 +48,9 @@ void main() {
     // Covers every IM service the native screens read
     expect(find.textContaining('novedades del transporte'), findsOneWidget);
     expect(find.textContaining('estado del GPS'), findsOneWidget);
+    expect(find.textContaining('posición de los ómnibus'), findsOneWidget);
+    // The Mapa's basemap (ODbL), with or without the proxy
+    expect(find.text(map), findsOneWidget);
   });
 
   // Comfort data and a server in between exist only in proxy builds
@@ -67,5 +73,6 @@ void main() {
     expect(find.text('FUENTE DE DATOS'), findsOneWidget);
     expect(find.text(comfort), findsNothing);
     expect(find.text(server), findsNothing);
+    expect(find.text(map), findsOneWidget);
   });
 }

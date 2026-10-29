@@ -110,10 +110,14 @@ void main() {
   }
 
   /// Scrolls Info down to a link row.
-  Future<void> scrollInfoTo(WidgetTester tester, String title) =>
-      tester.scrollUntilVisible(find.text(title), 200,
-          scrollable: find.descendant(
-              of: find.byType(InfoPage), matching: find.byType(Scrollable)));
+  Future<void> scrollInfoTo(WidgetTester tester, String title) async {
+    await tester.scrollUntilVisible(find.text(title), 200,
+        scrollable: find.descendant(
+            of: find.byType(InfoPage), matching: find.byType(Scrollable)));
+    // A 200 px step can stop with the row built but still under the screen
+    await tester.ensureVisible(find.text(title));
+    await tester.pump();
+  }
 
   bool polling(WidgetTester tester) => tester
       .widget<StopsPage>(find.byType(StopsPage, skipOffstage: false))
