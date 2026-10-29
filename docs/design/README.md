@@ -15,7 +15,7 @@ El sistema vive en el código Flutter de este repositorio:
 | `lib/ui/theme/timbre_tokens.dart` | Colores, radios, espacios, opacidades, tamaños de ícono y la sombra: `TimbreColors`, `TimbreRadii`, `TimbreSpace`, `TimbreOpacity`, `TimbreIconSize`, `TimbreShadow`. |
 | `lib/ui/theme/timbre_text.dart` | Las familias (`TimbreFonts`) y los estilos de texto (`TimbreText`, con `isLarge` y `largeFrom`). |
 | `lib/ui/theme/timbre_theme.dart` | `buildTimbreTheme()`: el tema Material 3 oscuro que reparte esos valores a botones, campos, hojas, diálogos y navegación. |
-| `lib/ui/widgets/` | Los componentes propios: carteles, fila de ómnibus, insignia de línea, íconos de píxeles, tablero de LEDs, candado. |
+| `lib/ui/widgets/` | Los componentes propios: carteles, fila de ómnibus, insignia de línea, íconos de píxeles, tablero de LEDs, candado, teclado del código. |
 
 Estas páginas describen el código. Si una página y el código no
 coinciden, vale el código y hay que corregir la página. Cada valor de
@@ -43,12 +43,12 @@ Lenguaje visual:
 - [03-tipografia.md](03-tipografia.md): Doto, Fira Sans Extra Condensed y
   Fira Sans; todos los estilos de `TimbreText`; el mínimo de 19 px y la
   letra grande.
-- [04-iconos.md](04-iconos.md): los 34 íconos de `PixelGlyphs` y dónde se
+- [04-iconos.md](04-iconos.md): los 37 íconos de `PixelGlyphs` y dónde se
   usa cada uno, tamaños, colores y brillo.
 - [05-formas-y-espacio.md](05-formas-y-espacio.md): radios, espacios,
   tamaño táctil, bordes y la tarjeta de parada.
 - [06-luz-y-movimiento.md](06-luz-y-movimiento.md): el tablero de LEDs,
-  los brillos, las opacidades y las dos animaciones propias.
+  los brillos, las opacidades y las tres animaciones propias.
 
 Contenido e interfaz:
 

@@ -11,7 +11,7 @@
 > servidor intermediario» y la sección de seguridad de los datos de
 > `docs/store-listing.md`.
 
-**Última actualización:** 28 de octubre de 2026
+**Última actualización:** 29 de octubre de 2026
 
 Timbre MVD es una aplicación no oficial, desarrollada por Liberon Tech,
 de Khrestenkov & Co. No es una aplicación de la Intendencia de Montevideo ni de
@@ -37,8 +37,13 @@ prueba compiladas sin ese servidor consultan directamente a la Intendencia;
 donde eso cambia algo, se aclara en el párrafo correspondiente.
 
 **Paradas, rutas y preferencias.** Los números de parada, rutas y líneas
-que guardás, y la configuración del bloqueo biométrico, se almacenan solo en
-tu dispositivo. Se borran al eliminar los datos de la app o desinstalarla.
+que guardás, y la configuración del bloqueo, se guardan en tu teléfono, no en
+servidores nuestros. Si elegís un código para abrir la app, se guarda en el
+teléfono solo como un hash con sal: la app no guarda las cifras. Si tenés
+activada la copia de seguridad del teléfono (la de Google en Android, iCloud
+en iPhone), el sistema puede incluir estos datos en esa copia, que es tuya y
+nosotros no vemos, y devolverlos si la restaurás. Al eliminar los datos de la
+app o desinstalarla, se borran del teléfono.
 
 **Tiempos de arribo, horarios y paradas.** La app los pide a un servidor
 intermediario de Timbre MVD, alojado en Cloudflare, que a su vez consulta
@@ -97,8 +102,12 @@ los ingresás directamente en esos sitios: la app no tiene acceso a ellos.
 **Notificaciones.** Las alertas de ómnibus se generan en tu teléfono. No
 usamos servicios de notificaciones remotas.
 
-**Biometría.** La huella o Face ID las valida el sistema operativo; la app
-solo recibe si la verificación fue correcta o no.
+**Biometría.** Si activás el desbloqueo con huella, Face ID o Touch ID, el
+sistema operativo valida tu huella o tu cara; la app solo recibe si la
+verificación fue correcta o no. Si olvidás el código de la app, el bloqueo de
+pantalla de tu teléfono (PIN, patrón, contraseña, huella o cara) te deja
+elegir uno nuevo: también lo valida el sistema, y la app solo recibe sí o no.
+La app nunca ve tu huella, tu cara ni el PIN del teléfono.
 
 ## Tus derechos
 

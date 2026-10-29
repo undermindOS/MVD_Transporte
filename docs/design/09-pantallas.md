@@ -17,7 +17,9 @@ Ver también:
 ## Árbol de pantallas
 
 ```
-Bloqueo (AppLock, LockScreen) tapa toda la app mientras falta autenticar
+Bloqueo (AppLock)             tapa toda la app hasta que la desbloqueás: con el código
+                              (CodeLockScreen) o con el bloqueo anterior (LockScreen)
+Bienvenida (WelcomeGate)      la primera vez, antes de HomePage, hasta «Empezar»
 HomePage                      barra buildTimbreAppBar + botón «Info»
 ├── Mis paradas (StopsPage)   pestaña inferior 1
 │   ├── Paradas               subpestaña; botón + → Agregar parada
@@ -27,7 +29,8 @@ HomePage                      barra buildTimbreAppBar + botón «Info»
 └── Servicios (ServicesPage)  pestaña inferior 3
 
 Páginas que se abren encima:  Horarios (SchedulePage), Info (InfoPage) → Privacidad
-                              (PrivacyPolicyPage)
+                              (PrivacyPolicyPage) y Código; desde la bienvenida,
+                              Privacidad
 Diálogos:                     Agregar parada, Agregar ruta
 Hojas:                        Estoy esperando, Ajustes de aviso, detalle de novedad,
                               un ómnibus y una parada del Mapa
@@ -40,9 +43,10 @@ Hojas:                        Estoy esperando, Ajustes de aviso, detalle de nove
 - Mi STM, Recarga, Avisos y Cómo Ir no son pestañas: son sitios oficiales y se abren en el
   navegador (`OfficialSite` en `lib/services/official_sites.dart`). La pestaña Mapa es propia: no
   abre Cómo Ir.
-- La barra de todas las pantallas, menos la de bloqueo, es `buildTimbreAppBar` (ver
-  [08-componentes.md](08-componentes.md)).
-  En `HomePage` lleva el botón «Info»; Horarios, Info y Privacidad llevan la flecha para volver.
+- La barra de todas las pantallas, menos las de bloqueo y la bienvenida (`LedBoard`), es
+  `buildTimbreAppBar` (ver [08-componentes.md](08-componentes.md)).
+  En `HomePage` lleva el botón «Info»; Horarios, Info, Privacidad y las páginas del código llevan
+  la flecha para volver.
 - Mis paradas tiene tres subpestañas en un `TabBar` (íconos `stop`, `route` y `news`, de 22 px).
   La de Novedades lleva un contador de novedades sin leer. El botón + dice «Agregar parada» en
   Paradas y «Agregar ruta» en Rutas; en Novedades no aparece.
@@ -59,10 +63,11 @@ Hojas:                        Estoy esperando, Ajustes de aviso, detalle de nove
 | Catálogo de paradas (`GET /v1/catalog/stops`, solo con proxy) | en Agregar parada: con la primera letra en «Buscar por calles» o al tocar «Paradas cercanas»; al abrir el Mapa con una parada guardada sin ubicación | Hive (caja `catalog`), 1 día; uno sin líneas, 15 min, y nunca reemplaza una copia con líneas; sin red se usa la copia vieja, tenga la edad que tenga | `MvdApiService._catalogTtl`, `getStopCatalog` |
 | Ubicación de una parada guardada que no la tiene (con proxy, del catálogo; sin proxy, un pedido a geoserver por parada, por su número) | al abrir el Mapa o volver a él; como mucho una vez cada 10 min por parada, la encuentre o no | Hive, dentro de la parada guardada (`BusStop.latitude`, `longitude`) | `StopLocationsService.fillMissing`, `retryInterval` |
 
-«Al arrancar la app» es cuando se arma `StopsPage`: al abrir la app o, con el bloqueo encendido,
-después del primer desbloqueo (ver «Bloqueo»). Los desbloqueos siguientes no la vuelven a armar. El
-`IndexedStack` la arma aunque la pestaña elegida sea otra. El Mapa, en cambio, se arma recién la
-primera vez que elegís su pestaña, y después queda armado: antes no carga ni pide nada.
+«Al arrancar la app» es cuando se arma `StopsPage`: al abrir la app o, con un bloqueo, después del
+primer desbloqueo (ver «Bloqueo»). La primera vez, recién cuando termina la bienvenida (ver
+«Bienvenida»). Los desbloqueos siguientes no la vuelven a armar. El `IndexedStack` la arma aunque
+la pestaña elegida sea otra. El Mapa, en cambio, se arma recién la primera vez que elegís su
+pestaña, y después queda armado: antes no carga ni pide nada.
 
 Sin proxy las mismas llamadas van a los servicios de la Intendencia y el teléfono convierte la
 respuesta a /v1. No hay catálogo, y las paradas cercanas y la ubicación de las paradas del Mapa
@@ -90,6 +95,7 @@ animaciones de una pestaña escondida.
 | Horarios o Info abiertos | se pausan | se pausan |
 | App en segundo plano (`hidden`, `paused`) | se pausan | se pausan |
 | App bloqueada | se pausan; antes del primer desbloqueo `StopsPage` todavía no existe | se pausan |
+| Bienvenida sin terminar | `StopsPage` todavía no existe | `MapaPage` todavía no existe |
 | Diálogo u hoja abiertos (en Mis paradas: Agregar parada, Agregar ruta, Estoy esperando, Ajustes de aviso, detalle de novedad; en el Mapa: un ómnibus o una parada) | siguen: el tablero queda a la vista y solo cuentan las páginas enteras | siguen, y la hoja abierta se actualiza con cada tablero |
 | Un diálogo del sistema que deja la app `inactive` (por ejemplo, un pedido de permiso) | siguen | siguen |
 | Vuelve a estar a la vista | un refresco enseguida y después cada 30 s (`_resumeAutoRefresh`) | lee de nuevo las paradas guardadas, busca la ubicación de las que no la tienen y pide los tableros enseguida, salvo que todas las paradas tengan uno de menos de 30 s (por ejemplo, recién actualizadas en Mis paradas); después, cada 30 s (`_resume`) |
@@ -552,7 +558,8 @@ Se abre con el botón «Info» de la barra. Tarjetas de arriba a abajo:
 
 1. El ícono de la app, el nombre «Timbre MVD» y el aviso «NO OFICIAL» sobre el tablero, con «No
    está afiliada con la Intendencia de Montevideo, el STM ni ninguna empresa de transporte.».
-2. «Bloqueo biométrico», con su llave.
+2. El bloqueo: «Código de acceso» con su llave y, con un código, «Cambiar código» y «Desbloquear
+   con huella» con su llave (ver abajo).
 3. «FUENTE DE DATOS»: de dónde salen los tiempos de arribo, los horarios, las novedades, el
    estado del GPS y la posición de los ómnibus; de dónde sale el mapa («Mapa: © colaboradores de
    OpenStreetMap, con licencia ODbL. Viene dentro de la app.»), y que los tiempos con reloj son
@@ -565,14 +572,41 @@ Se abre con el botón «Info» de la barra. Tarjetas de arriba a abajo:
 5. Los créditos.
 
 - No pide datos a la red.
-- **Llave del bloqueo.** Para encenderla, la app pide confirmar con el sistema («Confirmá para
-  activar el bloqueo biométrico»). Si el teléfono no tiene bloqueo de pantalla: «Tu dispositivo
-  no tiene bloqueo de pantalla. Configuralo en Ajustes.». Si cancelás, la llave queda como
-  estaba. Para apagarla no pide confirmación. Al terminar: «Bloqueo biométrico activado» o
-  «Bloqueo biométrico desactivado».
+- **El bloqueo.** Info lee el bloqueo con `AppLock.of(context)`, que está encima del `Navigator`:
+  la tarjeta cambia apenas cambia el bloqueo, también con una página abierta encima. Al abrirse,
+  vuelve a preguntar qué tiene el teléfono para el desbloqueo rápido
+  (`AppLockState.refreshBiometrics`). Cada fila es una frase (`MergeSemantics`; «Cambiar código»
+  es un solo botón), con su glifo en `etiquetaCartel`: `lock` en «Código de acceso» y
+  `fingerprint` o `face` en «Desbloquear con huella»; «Cambiar código» no lleva glifo y queda
+  alineada con las otras. Cada mensaje nuevo reemplaza al que está en pantalla.
+
+  | Fila | Cuándo | Qué hace |
+  |---|---|---|
+  | «Código de acceso», con llave | siempre; encendida con un código o con el bloqueo anterior (`lock.enabled`) | debajo dice «La app lo pide al abrirse» si está encendida y «Protegé tus paradas y rutas guardadas» si no. Encenderla abre «CÓDIGO NUEVO»; al guardarlo, vuelve a Info con «Código activado». Apagarla abre «TU CÓDIGO»; con el código correcto apaga todo el bloqueo, también el desbloqueo rápido, con «Bloqueo desactivado». Con solo el bloqueo anterior, lo apaga en el acto, también con «Bloqueo desactivado» |
+  | «Cambiar código», con `chevronRight` | con un código | abre «TU CÓDIGO» y, con el código correcto, «CÓDIGO NUEVO» en la misma página; al guardarlo, «Código cambiado» |
+  | «Desbloquear con huella», con llave | con un código y una huella o un rostro configurados en el teléfono | debajo dice «El código queda de respaldo». Encenderla abre el pedido del sistema «Confirmá para abrir Timbre MVD con tu huella», solo con huella o cara; con un «sí», «Desbloqueo con huella activado». Apagarla no pide nada: «Desbloqueo con huella desactivado». Si cancelás, queda como estaba, sin mensaje. Si el teléfono ya no tiene ninguna configurada, «Tu teléfono no tiene una huella ni un rostro configurados.» |
+
+- **Las páginas del código** se abren encima de Info, con `buildTimbreAppBar` y el título «CÓDIGO»,
+  como Privacidad, y con el teclado del bloqueo ([08-componentes.md](08-componentes.md)):
+  - «CÓDIGO NUEVO» (`PasscodeCreate`): «Elegí 4 cifras para abrir la app.» y después «REPETILO»,
+    como en la bienvenida.
+  - «TU CÓDIGO» (`PasscodeEntry`): «Ingresá tu código actual.» y «¿Olvidaste el código?». Un
+    código equivocado («Código incorrecto») y la espera cuentan igual que en el bloqueo: es el
+    mismo `AppPasscode.check`.
+  - «¿Olvidaste el código?» abre el pedido del sistema con el bloqueo del teléfono
+    (`lock.confirmWithPhoneLock`): «Usá el bloqueo de tu teléfono para cambiar el código» o «Usá
+    el bloqueo de tu teléfono para desactivar el código». Con un «sí», sigue como con el código
+    correcto; si cancelás, o el pedido termina con un error y el teléfono sí tiene bloqueo, queda
+    en «TU CÓDIGO». Si el teléfono no tiene bloqueo de pantalla (antes del pedido, o después de un
+    error), debajo aparece, como región en vivo, «Tu teléfono no tiene bloqueo de pantalla, así que
+    no puede confirmar que sos vos. Sin el código no se puede cambiar ni desactivar.»
+  - Atrás, en cualquiera de las dos, vuelve a Info sin cambiar nada.
+- Con Face ID o Touch ID, «huella» y «tu huella» pasan a «Face ID» o «Touch ID» en la fila, en el
+  pedido y en los mensajes («Desbloquear con Face ID»).
 - Si un enlace no se abre: «No se pudo abrir el navegador. Revisá que tengas uno activado.» o «No
   se pudo abrir el correo. Revisá que tengas una app de correo configurada.».
-- Mientras Info está abierto, ni Mis paradas ni el Mapa se refrescan.
+- Mientras Info está abierto, también con una página del código encima, ni Mis paradas ni el Mapa
+  se refrescan.
 
 ## Privacidad
 
@@ -598,11 +632,18 @@ del texto está escrito en el código.
 ## Bloqueo
 
 Código: `lib/ui/app_lock.dart` (`AppLock`, encima del `Navigator`, en `MaterialApp.builder` de
-`lib/main.dart`) y `lib/ui/lock_screen.dart` (`LockScreen`).
+`lib/main.dart`), `lib/ui/lock_screen.dart` (`CodeLockScreen`, `NewCodeScreen` y `LockScreen`),
+`lib/ui/passcode_entry.dart` (`PasscodeEntry`, `PasscodeCreate`), `lib/services/app_passcode.dart`
+(`AppPasscode`) y `lib/services/device_auth.dart` (`DeviceAuth`, el pedido del sistema).
 
-Con el bloqueo biométrico encendido, la pantalla de bloqueo tapa toda la app: el tablero de LEDs,
-el candado `LedLock`, «BLOQUEADA», «Tus paradas y rutas guardadas están protegidas», el botón
-«Desbloquear» y la placa TIMBRE MVD al pie.
+El bloqueo tapa toda la app hasta que la desbloqueás. Qué pantalla aparece depende de lo que esté
+encendido (`AppLockState.hasCode` y `enabled`):
+
+| Caso | Qué se ve |
+|---|---|
+| Hay un código (`AppPasscode.isSet`) | la pantalla del código (`CodeLockScreen`): el tablero de LEDs (`LedBoard`), el candado `LedLock` con un paso más chico (6 en vez de 8, para que entre el teclado), «BLOQUEADA», «Ingresá tu código», los cuatro puntos, el teclado, «¿Olvidaste el código?» y la placa TIMBRE MVD al pie |
+| No hay código, pero sí el bloqueo anterior (`keyBiometricEnabled`) | la pantalla de antes (`LockScreen`): el candado, «BLOQUEADA», «Tus paradas y rutas guardadas están protegidas», el botón «Desbloquear» y la placa. Queda solo hasta la bienvenida, que lo cambia por un código o lo apaga |
+| Ninguno de los dos | nada: la app se abre |
 
 - **Cuándo aparece:** al abrir la app y al volver del segundo plano (`hidden` o `paused` y después
   `resumed`). Un estado `inactive` solo, como el de un pedido de permiso del sistema, no bloquea.
@@ -610,14 +651,8 @@ el candado `LedLock`, «BLOQUEADA», «Tus paradas y rutas guardadas están prot
   de que se cerró, ni si la salida empezó menos de 3 s después de abrir otra app desde Timbre MVD
   (`ExternalApps`): el navegador desde Servicios, «Ver en Cómo Ir», «Código fuente» o
   «© OpenStreetMap» del Mapa, el correo de «Contacto», «Ver más» de una novedad y los ajustes del
-  sistema desde «Paradas cercanas».
-- **El pedido del sistema** dice «Autenticate para acceder a Timbre MVD» y acepta huella, cara,
-  PIN o patrón (`biometricOnly: false`).
-- **Si falla o lo cancelás,** queda la pantalla de bloqueo. «Desbloquear» lo vuelve a pedir;
-  mientras el pedido está abierto, el botón se desactiva y el candado hace el barrido.
-- **Sin método de bloqueo** en el teléfono (`notAvailable`, `notEnrolled`, `passcodeNotSet`), la
-  app se abre: si no, quedarías encerrado. Un bloqueo temporal por intentos fallidos la deja
-  cerrada.
+  sistema desde «Paradas cercanas». Un código recién elegido no bloquea en ese momento: lo pide la
+  próxima vez que la app vuelve del segundo plano o se abre.
 - **Antes del primer desbloqueo** la app no se arma: ni `HomePage` ni Mis paradas existen y no hay
   pedidos. Después del primer desbloqueo, y una sola vez, la app pide el permiso de notificaciones
   si ya había avisos activados y registra o cancela la verificación en segundo plano
@@ -632,7 +667,144 @@ el candado `LedLock`, «BLOQUEADA», «Tus paradas y rutas guardadas están prot
   con los tableros que tenía: apenas vuelve a estar a la vista los actualiza, sin indicadores, y
   sigue cada 30 s.
 
-No hay datos de red en esta pantalla.
+### El código
+
+Son 4 cifras de la app, no el PIN del teléfono. Se eligen en la bienvenida o en Info y quedan en el
+teléfono como un hash PBKDF2-HMAC-SHA256 con sal (`AppPasscode`), nunca como las cifras.
+
+- **Al escribir la cuarta cifra,** la app compara el código (`AppPasscode.check`). Mientras tanto
+  los puntos quedan encendidos y el teclado, apagado. Con el código correcto, la app se abre.
+- **Del primer al cuarto código equivocado seguidos,** los puntos se ponen en `rojoLed` un momento,
+  se vacían y aparece «Código incorrecto» en `rojoLed`.
+- **El quinto, y cada uno de los que siguen,** empiezan una espera de 30 s
+  (`AppPasscode.freeTries`, `wait`): el teclado se apaga y la pantalla cuenta «Demasiados intentos.
+  Probá de nuevo en 30 s», en segundos enteros. Al terminar vuelve «Ingresá tu código». Durante la
+  espera la app no compara ningún código. El código correcto, uno nuevo o el bloqueo del teléfono (en «¿Olvidaste el código?») vuelven la cuenta a cero.
+- **Cada bloqueo empieza con el teclado vacío.** Las cifras escritas antes de irse no quedan.
+- **Cerrar la app no saltea nada.** El código equivocado se cuenta antes de calcular el hash, y la
+  espera se guarda con su hora de inicio (`keyLockFailures`, `keyLockWaitFrom`): si la app se abre
+  durante una espera, la pantalla sigue contando. La espera confía en el reloj del teléfono:
+  adelantarlo la termina, y atrasarlo nunca la hace durar más de 60 s.
+
+### El desbloqueo rápido
+
+Con un código, la huella o la cara pueden abrir la app en su lugar (`keyLockBiometric`). Se
+enciende en la bienvenida o en Info.
+
+- **Al abrir la app y al volver del segundo plano,** si está encendido y el teléfono tiene una huella
+  o un rostro configurados (`DeviceAuth.biometrics()`), el pedido del sistema se abre enseguida:
+  «Desbloqueá Timbre MVD», solo con huella o cara (`biometricOnly: true`), con el botón «Usar
+  código».
+- **Solo un «sí» abre.** Cualquier otra respuesta (cancelar, «Usar código», atrás, el tiempo que se
+  agota, un bloqueo por muchos intentos) deja el teclado, sin mensaje.
+- **La tecla de abajo a la izquierda** del teclado, con el glifo `fingerprint` o `face`, vuelve a
+  abrir el pedido. Está solo con el desbloqueo rápido encendido y una huella o un rostro
+  configurados; si no, ese lugar queda vacío. El lector la llama «Desbloquear con huella»,
+  «Desbloquear con Face ID» o «Desbloquear con Touch ID».
+- **Mientras un pedido del sistema está abierto,** el candado hace el barrido y el teclado se apaga.
+- **Un pedido que se abre con la app abierta** (encender la huella en Info o en la bienvenida,
+  «¿Olvidaste el código?» en la página del código de Info) no sobrevive al segundo plano: salir lo
+  cierra con un «no» y la vuelta bloquea. Si al volver sigue abierto, la app se bloquea cuando se
+  cierra sin un «sí» ([12-decisiones.md](12-decisiones.md#un-pedido-abierto-desde-la-app-no-la-deja-abierta)).
+- **En Android siempre dice «huella»,** también si el teléfono se desbloquea con la cara: Android no
+  le dice a la app cuál es ([12-decisiones.md](12-decisiones.md#android-dice-huella)).
+
+### «¿Olvidaste el código?»
+
+El bloqueo de pantalla del teléfono abre la app y la app pide un código nuevo. Las paradas y las
+rutas guardadas no se borran.
+
+| Situación | Qué pasa |
+|---|---|
+| El teléfono tiene bloqueo de pantalla (`DeviceAuth.isAvailable()`) | el pedido del sistema «Usá el bloqueo de tu teléfono para entrar a Timbre MVD», que acepta el PIN, el patrón o la contraseña del teléfono, y también su huella o su cara |
+| El pedido responde que sí | el cartel «CÓDIGO NUEVO» con «Elegí 4 cifras nuevas para abrir la app.» (`PasscodeCreate`) y después «REPETILO». Al guardarlo, la app se abre con el código nuevo; con «Ahora no», se abre y queda el código de antes. El bloqueo del teléfono ya borró los códigos equivocados y la espera |
+| Cancelás, o el pedido termina con un error y el teléfono sí tiene bloqueo | queda el teclado |
+| El teléfono no tiene bloqueo de pantalla (antes del pedido, o después de un error) | no se abre nada. Debajo del teclado, en Android: «Tu teléfono no tiene bloqueo de pantalla, así que no puede confirmar que sos vos. Para entrar sin el código, borrá los datos de Timbre MVD en los ajustes del teléfono: se borran tus paradas y rutas.»; en iOS: «Tu teléfono no tiene bloqueo de pantalla, así que no puede confirmar que sos vos. Para entrar sin el código, borrá Timbre MVD y volvé a instalarla: se borran tus paradas y rutas.» |
+| La app pasa al segundo plano mientras elegís el código nuevo | vuelve bloqueada, al teclado |
+
+La nota va en la misma pantalla, debajo de «¿Olvidaste el código?», en `etiquetaCartel` (no es un
+error) y como región en vivo: el bloqueo está encima del `Navigator` y no abre diálogos.
+
+### El bloqueo anterior
+
+El de antes del código: solo el pedido del sistema, encendido desde Info en una versión anterior.
+Queda hasta que termina la bienvenida.
+
+- **El pedido del sistema** dice «Autenticate para acceder a Timbre MVD» y acepta huella, cara,
+  PIN o patrón (`biometricOnly: false`).
+- **Si falla o lo cancelás,** queda la pantalla de bloqueo. «Desbloquear» lo vuelve a pedir;
+  mientras el pedido está abierto, el botón se desactiva y el candado hace el barrido.
+- **Un error abre la app solo si el teléfono no tiene método de bloqueo:** la app lo vuelve a
+  preguntar (`isAvailable()`), porque si no quedarías encerrado. Con cualquier otro error queda
+  cerrada: un bloqueo temporal por intentos fallidos, o el `NotAvailable` que iOS devuelve también
+  después de un intento fallido.
+
+No hay datos de red en estas pantallas.
+
+## Bienvenida
+
+Código: `lib/ui/welcome/` (`WelcomeGate`, `WelcomePage` y sus pasos) y `lib/main.dart`
+(`home: WelcomeGate(child: HomePage())`).
+
+Se ve una sola vez, la primera vez que se abre la app: cuatro pasos dicen qué hace Timbre MVD y que
+no hay cuentas ni registros, y ofrecen un código para abrirla.
+
+- **Después del bloqueo y antes que todo lo demás.** `WelcomeGate` está en `home` de
+  `MaterialApp`, debajo de `AppLock`: si hay un código o el bloqueo anterior, primero se
+  desbloquea. Hasta que la bienvenida termina, `HomePage` no se arma: ni Mis paradas ni el Mapa
+  existen, y la app no pide arribos, novedades ni el estado del GPS.
+- **Termina con «Empezar»:** la app guarda `keyWelcomeDone` y muestra `HomePage`. Desde ahí arranca
+  como siempre ([Cuándo se pide cada dato](#cuándo-se-pide-cada-dato)).
+- **Si la app se cierra antes,** la bienvenida vuelve a empezar la próxima vez. Si ya había un
+  código guardado, saltea «Tu código»; si además el desbloqueo rápido ya estaba encendido, saltea
+  también «Huella».
+- **Cada paso es un `LedBoard`** con los puntos de los pasos arriba (cuatro LED cuadrados de 10 px,
+  de 2 × 2 píxeles: el actual encendido en `ambar`, con su luz, y los otros como marcas tenues,
+  en `tenue`; el lector oye «Paso 2 de 4»; «Huella» es parte del paso 3), un cartel, el texto y el botón
+  principal (`FilledButton` ámbar, de 220 × 56 o más, como «Desbloquear» del bloqueo), con los
+  botones de texto siempre debajo. El contenido mide 420 px de ancho como mucho, también en una
+  tableta.
+- **Entre un paso y otro,** un fundido de 200 ms; con «reducir movimiento», ninguno.
+- **Atrás** (`PopScope`): en «Sin cuentas ni registros» vuelve a «Hola»; en «Tu código», mientras
+  no se guardó, a «Sin cuentas ni registros», también desde «REPETILO». Mientras el paso siguiente
+  se prepara (la app pregunta qué tiene el teléfono para el desbloqueo rápido o guarda el código),
+  no hace nada. En «Huella» y en «Listo» tampoco. En «Hola», y en cualquier paso mientras el
+  bloqueo está encima, sale de la app.
+- **A 1× cada paso entra** en una pantalla de 390 × 844 sin desplazarse; con la letra más grande,
+  se desplaza.
+
+| Paso | Cartel | Qué se ve | Botones |
+|---|---|---|---|
+| 1. Hola | «HOLA» | el ícono de la app (`TimbreAppIcon` de 96 px); «Timbre MVD te muestra los ómnibus de Montevideo como el cartel de la parada.»; tres filas, cada una con un glifo pasivo (24 px, `etiquetaCartel`, como en Info, sin brillo), el nombre en negrita y una frase: `bus` «Mis paradas», «Los minutos en vivo de tus paradas, con el GPS de cada ómnibus.»; `streets` «Mapa», «Los ómnibus que vienen a tus paradas.»; `bellRing` «Estoy esperando», «Te avisamos cuando tu ómnibus está cerca.»; al pie, «App no oficial: no está afiliada con la Intendencia de Montevideo, el STM ni ninguna empresa de transporte.» | «Continuar» |
+| 2. Sin cuentas ni registros | «SIN CUENTAS» / «NI REGISTROS» | tres frases, cada una con el glifo `check` atenuado: «No tenés que crear una cuenta: la app no te pide nombre, mail ni teléfono.», «No registramos lo que hacés ni lo que buscás. Sin publicidad, analíticas ni rastreo.» y «Lo que guardás queda en tu teléfono, no en servidores nuestros.» | «Continuar» y, debajo, «Leer la política de privacidad», que abre Privacidad encima |
+| 3. Tu código | «TU CÓDIGO» | `PasscodeCreate` con «Elegí 4 cifras para abrir la app.»; después «REPETILO» con «Ingresá el mismo código otra vez.» y «Volver». Si no coinciden, vuelve al primero con «No coinciden. Elegí el código de nuevo.» | «Ahora no» |
+| 3b. Huella | «HUELLA», «FACE ID» o «TOUCH ID» | el glifo `fingerprint` o `face`, de 96 px, encendido en `ambar` con brillo; «Abrí Timbre MVD con tu huella. Si no funciona, usás el código.» | «Usar huella», «Ahora no» |
+| 4. Listo | «LISTO» | con un código, el candado `LedLock` (paso 8), que al encenderse baja el arco y queda cerrado; sin código, el glifo `unlock`, de 96 px, encendido en `ambar` con brillo; las filas de abajo, cada una con su glifo atenuado | «Empezar» |
+
+**Tu código** aparece solo si todavía no hay un código (`lock.hasCode` es falso). Al elegirlo, la
+app lo guarda (`lock.setCode`) y apaga el bloqueo anterior, pero no se bloquea en ese momento: lo
+pide la próxima vez que vuelve del segundo plano o se abre. «Ahora no» apaga todo bloqueo, también
+el anterior (`lock.removeLock()`), y pasa a «Listo».
+
+**Huella** aparece después de elegir el código, si el teléfono tiene una huella o un rostro
+configurados (`lock.biometricKind`, que se vuelve a leer al entrar a «Tu código») y el desbloqueo
+rápido todavía está apagado. Con Face ID o
+Touch ID, «tu huella» y «huella» pasan a «Face ID» o «Touch ID»: «Abrí Timbre MVD con Face ID. Si
+no funciona, usás el código.», «Usar Face ID». «Usar huella» abre el pedido del sistema «Confirmá
+para abrir Timbre MVD con tu huella», solo con huella o cara (`lock.setBiometric(true)`): con un
+«sí» pasa a «Listo»; si no, se queda, sin error. «Ahora no» pasa a «Listo» con el desbloqueo
+rápido apagado.
+
+**Listo** dice cómo se va a abrir la app:
+
+| Estado | Filas |
+|---|---|
+| Con código y desbloqueo rápido | `lock` «La app pide tu código al abrirse.», `fingerprint` o `face` «También se abre con tu huella.» y `info` «Podés cambiarlo cuando quieras en Info.» |
+| Con código | `lock` «La app pide tu código al abrirse.» y `info` «Podés cambiarlo cuando quieras en Info.» |
+| Sin código | `unlock` «La app se abre sin código.» y `info` «Podés cambiarlo cuando quieras en Info.» |
+
+No hay datos de red en la bienvenida. «Leer la política de privacidad» abre el archivo que viene
+con la app, también sin conexión.
 
 ## Lo que hoy no está resuelto
 

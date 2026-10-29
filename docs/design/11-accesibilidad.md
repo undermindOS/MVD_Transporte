@@ -11,8 +11,8 @@ Ver también:
 - [07-textos.md](07-textos.md): cómo se escriben las frases que escucha el lector de pantalla.
 - [08-componentes.md](08-componentes.md) y [09-pantallas.md](09-pantallas.md): cada pieza y cada
   pantalla.
-- [06-luz-y-movimiento.md](06-luz-y-movimiento.md): las dos animaciones propias (el candado y
-  los ómnibus del Mapa).
+- [06-luz-y-movimiento.md](06-luz-y-movimiento.md): las animaciones propias (el candado, los
+  ómnibus del Mapa y el fundido de la bienvenida).
 
 ## Contraste
 
@@ -39,11 +39,17 @@ Qué par se usa dónde está en [02-color.md](02-color.md). Lo que hay que saber
 - **`tenue` sobre `tintaAlta` da 4.49:1**, apenas por debajo de 4.5. Solo se usa en lo
   desactivado (el texto de un `FilledButton` desactivado) y en el pulgar del switch apagado, que no
   es texto. No pongas texto activo `tenue` sobre `tintaAlta`.
+- **El teclado del código** está sobre el tablero `tinta`: las cifras en `papel` (14.60:1), la
+  tecla presionada en `ambar` (8.06:1 o más sobre cualquiera de los cuatro fondos) y el error en
+  `rojoLed` (6.13:1).
 - **Los bordes `lineaNoche` quedan por debajo de 3:1** (1.29 a 1.69:1). Son decoración. Un campo
   se reconoce por su rótulo, su ícono y, con foco, por el borde ámbar de 2 px (9.53:1 contra el
   diálogo `tinta`, 10.58:1 contra el relleno `noche` del campo). Una tarjeta se reconoce por su
   contenido. Si algún día hace falta un campo que se reconozca sin rótulo, el borde tiene que
   subir a 3:1.
+- **Los lugares vacíos del código y los pasos de la bienvenida que no son el actual** van en
+  `tenue` (5.31:1 sobre `tinta`): dicen cuántas cifras faltan y dónde estás. Un LED apagado del
+  tablero (`ambar` al 16 %, 1.35:1) no se vería.
 - **El sol.** La pantalla oscura refleja en la calle. Por eso lo importante va con mucho contraste
   (`papel` 16:1, `ambar` 10.6:1) y los minutos en vivo van grandes. Si las opiniones de la tienda
   dicen «no se ve con sol», la respuesta barata es un modo de día con el mismo tema (ver
@@ -60,6 +66,9 @@ Qué par se usa dónde está en [02-color.md](02-color.md). Lo que hay que saber
 | Error | el ícono `warning` y una frase que dice qué pasó y qué hacer |
 | Segmento elegido | el lector lo anuncia como elegido (`selected`) |
 | Novedad sin leer | el rótulo «NUEVA», el fondo `tinta` y la fecha sobre LEDs; el lector empieza con «Nueva» |
+| Cifras escritas del código | puntos encendidos contra apagados; el lector dice «2 de 4 cifras» |
+| Código equivocado | además de los puntos en `rojoLed`, el texto «Código incorrecto», que el lector anuncia solo |
+| Paso de la bienvenida | el lector dice «Paso 2 de 4» |
 
 ## Letra grande
 
@@ -94,9 +103,11 @@ disposición:
 - **Cosas de tamaño fijo que se achican adentro:** el número de línea en `LineBadge`, la hora de
   Horarios (columna de 56), la fecha de una novedad (recuadro de 52 × 56), las etiquetas de
   `TimbreSegmented` y el nombre «Timbre MVD» de Info.
+- **Teclas del código:** tienen tamaño fijo, así que la cifra puede limitar su escala de texto. A
+  2× no se desborda nada.
 - **Lo que se puede desplazar:** las subpestañas vacías (`_EmptyTab`), las hojas
-  (`isScrollControlled` y `SingleChildScrollView`), el diálogo de Agregar ruta y la pantalla de
-  bloqueo.
+  (`isScrollControlled` y `SingleChildScrollView`), el diálogo de Agregar ruta, las pantallas de
+  bloqueo y los pasos de la bienvenida (`LedBoard`; a 1× la bienvenida entra sin desplazarse).
 
 Lo que sí puede terminar en «…»: un destino de más de 2 líneas, la línea «#5109 · 48 m · …» de una
 parada cercana después de 2 líneas, el subtítulo de la barra después de 4 líneas o si la pantalla
@@ -111,11 +122,15 @@ Tres mecanismos lo sostienen:
    `CartelCompacto` sube su propio tamaño a 19 si le piden menos.
 2. Con la letra del sistema más chica que 1×, `MediaQuery.withClampedTextScaling(minScaleFactor:
    1)` evita que el texto Doto se achique por debajo de su tamaño en: `LlegandoChip`,
-   `CartelTira` (todo el cartel), el cartel de `TimbreEmptyState`, «NO OFICIAL» de Info y
-   `CartelCompacto`. Este último además no crece más de 1.3× (`maxScaleFactor: 1.3`).
+   `CartelTira` (todo el cartel), el cartel de `TimbreEmptyState`, «NO OFICIAL» de Info, el
+   cartel de `PasscodeEntry` («BLOQUEADA» del código, «TU CÓDIGO», «CÓDIGO NUEVO», «REPETILO»),
+   los carteles de la bienvenida («HOLA», «SIN CUENTAS» / «NI REGISTROS», «HUELLA», «LISTO») y
+   `CartelCompacto`. Este último además no crece más de 1.3× (`maxScaleFactor: 1.3`). Los de la
+   bienvenida, con la letra más grande, se achican para entrar en el ancho (`FittedBox`), sin bajar
+   de 19 px (`test/welcome_layout_test.dart`).
 3. El resto del texto Doto no tiene ese límite, pero es tan grande que a 0.85× (la escala más
    chica de Android) sigue arriba de 19 px: el título de página (28 → 23.8), los minutos de
-   `ArrivalRow` (26 → 22.1), el día de una novedad sin leer (24 → 20.4) y «BLOQUEADA» (30 → 25.5).
+   `ArrivalRow` (26 → 22.1), el día de una novedad sin leer (24 → 20.4) y «BLOQUEADA» de `LockScreen` (30 → 25.5).
 
 `test/cartel_test.dart` lo prueba a 0.85×.
 
@@ -136,20 +151,35 @@ TalkBack y VoiceOver escuchan una frase completa por cada cosa, no pedazos suelt
 - Una fila que no se puede tocar no se anuncia como botón: `ArrivalRow` pone `button: onTap !=
   null`, así que una fila estimada no es botón.
 - Lo decorativo no se escucha: `PixelIcon` sin `semanticLabel`, `LedMatrix`, `TimbreBus` y
-  `LedLock` van envueltos en `ExcludeSemantics`.
+  `LedLock` van envueltos en `ExcludeSemantics`. Los puntos del código (`CodeDots`) tampoco se
+  escuchan: `PasscodeEntry` dice cuántas cifras van.
 - Los ómnibus del Mapa son pintura (`BusLayer`, un `CustomPaint`): el lector no los recorre uno
   por uno. Lo que dicen está en la frase de cada parada, que cuenta cuántos vienen, y en las hojas.
   El mapa base tampoco se escucha.
 - Los carteles en mayúsculas se escuchan como frase normal: «MIS PARADAS» se lee «Mis paradas»,
-  «SIN PARADAS» se lee «Sin paradas guardadas», «BLOQUEADA» se lee «Aplicación bloqueada». Las
-  secciones de Privacidad se leen como están en el archivo: «RESUMEN» se lee «Resumen».
+  «SIN PARADAS» se lee «Sin paradas guardadas», «BLOQUEADA» se lee «Aplicación bloqueada»,
+  «REPETILO» se lee «Repetí el código», «SIN CUENTAS» / «NI REGISTROS» se lee «Sin cuentas ni
+  registros». Las secciones de Privacidad se leen como están en el archivo: «RESUMEN» se lee
+  «Resumen».
 
 ### Con la app bloqueada, solo el bloqueo
 
 Mientras está la pantalla de bloqueo, el lector no llega a nada de la app: `AppLock` la deja
 debajo dentro de un `Offstage`, que la saca del árbol de semántica, junto con las páginas, hojas,
-diálogos y snack bars abiertos. La pantalla de bloqueo es una pantalla aparte para el lector
-(`Semantics(scopesRoute: true)`), como una página.
+diálogos y snack bars abiertos. Las dos pantallas de bloqueo, la del código y la anterior, son una
+pantalla aparte para el lector (`Semantics(scopesRoute: true)`), como una página.
+
+### El teclado del código
+
+- Cada tecla es un botón: las cifras, «Borrar» y, si está, «Desbloquear con huella»
+  («Desbloquear con Face ID», «Desbloquear con Touch ID»).
+- Los puntos no se escuchan solos: `PasscodeEntry` dice cuántas cifras van, de «0 de 4 cifras» a
+  «4 de 4 cifras».
+- «Código incorrecto», la cuenta de «Demasiados intentos. Probá de nuevo en 30 s» y la nota de un
+  teléfono sin bloqueo de pantalla son regiones en vivo: el lector las dice sin que haya que ir a
+  buscarlas. El error no depende del color: lo dice el texto.
+- El cartel es un encabezado con su frase (`signLabel`): «Aplicación bloqueada», «Tu código»,
+  «Código nuevo», «Repetí el código».
 
 ### Las frases
 
@@ -182,8 +212,12 @@ diálogos y snack bars abiertos. La pantalla de bloqueo es una pantalla aparte p
 | Mosaico de Servicios | «Mi STM. Saldo y movimientos de tu tarjeta. Abre el sitio oficial en el navegador», como botón | `_SiteTile` |
 | Aviso de Info | «Aplicación no oficial. No está afiliada con la Intendencia de Montevideo, el STM ni ninguna empresa de transporte.» | `InfoPage` |
 | Enlaces de Info | «Código fuente, github.com/undermindOS/MVD_Transporte, se abre en el navegador»; «Contacto, daniil@khrestenkov.com, se abre en tu app de correo»; «Política de privacidad», sin «se abre en», porque abre una pantalla de la app | `_LinkRow` |
-| Bloqueo biométrico | la fila entera junto con la llave (`MergeSemantics`) | `InfoPage` |
-| Pantalla de bloqueo | «Aplicación bloqueada», como encabezado | `LockScreen` |
+| Filas del bloqueo en Info | «Código de acceso» y «Desbloquear con huella»: cada fila entera, una frase, junto con su llave (`MergeSemantics`); «Cambiar código», un solo botón | `InfoPage` |
+| Pantallas de bloqueo | «Aplicación bloqueada», como encabezado | `LockScreen`, `PasscodeEntry` |
+| Puntos del código | «0 de 4 cifras» a «4 de 4 cifras» | `PasscodeEntry` |
+| Teclas del código | cada cifra; «Borrar»; «Desbloquear con huella», «Desbloquear con Face ID» o «Desbloquear con Touch ID»; como botones | `LedKeypad` |
+| Error y espera del código | «Código incorrecto»; «Demasiados intentos. Probá de nuevo en 30 s»; como regiones en vivo | `PasscodeEntry` |
+| Bienvenida | «Paso 1 de 4» a «Paso 4 de 4»; los carteles como encabezados: «Hola», «Sin cuentas ni registros», «Tu código», «Repetí el código», «Huella» (o «Face ID», «Touch ID»), «Listo» | `lib/ui/welcome/` |
 | Privacidad | el título del archivo y cada sección («Resumen»), como encabezados; la viñeta de una lista no se escucha | `PrivacyPolicyPage` |
 | Widget de Android | «Línea 116 a POCITOS, alrededor de las 14:32, estimado» | `MVDTransporteWidgetProvider.kt` |
 | Parada del Mapa | «Parada 574, San Jose y Andes, 2 ómnibus con GPS en camino», como botón; con uno, «1 ómnibus con GPS en camino»; sin ninguno, «sin ómnibus con GPS en camino»; con un tablero viejo, «2 ómnibus en camino, estimado»; sin tablero de menos de 5 min, o con uno viejo y ningún ómnibus, solo «Parada 574, San Jose y Andes» | `_StopMarker._phrase` |
@@ -196,7 +230,8 @@ Las marcas de confort se escuchan solo cuando el dato es `true`. Con proxy puede
 
 Son encabezados: el título de página, la barra de Horarios, los encabezados de hora, el título de
 Ajustes de aviso, «Tu tarjeta STM» y «Para moverte» en Servicios, el título y las secciones de
-Privacidad, el título de las hojas del Mapa y «BLOQUEADA».
+Privacidad, el título de las hojas del Mapa, «BLOQUEADA» y los carteles del código y de la
+bienvenida.
 
 ### Borrar sin deslizar
 
@@ -226,7 +261,7 @@ Todo lo que se toca mide al menos 44 × 44 (`TimbreSpace.touch`). Una fila de ó
 | Elemento | Mínimo | Dónde se fija |
 |---|---|---|
 | `IconButton` (campana, reloj, Info, volver) | 44 × 44 | `iconButtonTheme` en `timbre_theme.dart` |
-| `TextButton` («Ver en Cómo Ir», «Ver las N», «Reintentar») | 44 × 44 | `textButtonTheme` |
+| `TextButton` («Ver en Cómo Ir», «Ver las N», «Reintentar», «¿Olvidaste el código?», «Ahora no») | 44 × 44 | `textButtonTheme` |
 | `OutlinedButton` y `ElevatedButton` | 48 de alto | `outlinedButtonTheme`, `elevatedButtonTheme` |
 | `FilledButton` (botón principal) | 52 de alto | `filledButtonTheme` |
 | Segmento de `TimbreSegmented` | 44 de alto | `segmented.dart` |
@@ -235,6 +270,8 @@ Todo lo que se toca mide al menos 44 × 44 (`TimbreSpace.touch`). Una fila de ó
 | `ArrivalRow` | 52 de alto | `arrival_row.dart` |
 | Enlaces de Info | 52 de alto | `_LinkRow` |
 | «Desbloquear» | 220 × 56 | `lock_screen.dart` |
+| Teclas del código | 84 × 64 | `led_keypad.dart` |
+| Botón principal de la bienvenida («Continuar», «Usar huella», «Empezar») | 220 × 56 | `lib/ui/welcome/` |
 | Chips y switches | 48 de alto: el tema no cambia `materialTapTargetSize`, así que en el teléfono vale el área táctil de Material | valor por defecto de Flutter |
 | Botones «Mi STM» y «Recarga» del widget | 44 dp de alto | `res/layout/mvd_transporte_widget.xml` |
 | Parada del Mapa | 44 × 44, con la baldosa de 26 en el medio | `_StopMarker` en `mapa_page.dart` |
@@ -250,10 +287,13 @@ alto) o a 14 px de su punto (`BusLayer`). La misma información está en la para
 
 ## Movimiento
 
-Hay dos animaciones propias: el candado de la pantalla de bloqueo y el movimiento de los ómnibus
-del Mapa. Con «reducir movimiento» del sistema (`MediaQuery.disableAnimations`), `LedLock` se queda
-quieto y cerrado, y cada ómnibus salta a su posición nueva. Lo prueban
-`test/lock_screen_test.dart` y `test/map/bus_layer_test.dart`.
+Hay tres animaciones propias: el candado (`LedLock`, en las pantallas de bloqueo y en «Listo» de
+la bienvenida), el movimiento de los ómnibus del Mapa y el fundido entre los pasos de la
+bienvenida. Con «reducir movimiento» del sistema (`MediaQuery.disableAnimations`), `LedLock` se
+queda quieto y cerrado, cada ómnibus salta a su posición nueva y los pasos cambian sin fundido. La
+tecla presionada se apaga sin transición, y los puntos de un código equivocado nunca la tienen. Lo
+prueban `test/lock_screen_test.dart` (también la pantalla del código), `test/passcode_entry_test.dart`
+(la tecla), `test/welcome_test.dart` (los pasos) y `test/map/bus_layer_test.dart`.
 
 ## Pruebas
 
@@ -269,14 +309,17 @@ texto cortado hace fallar la prueba.
 | `test/screens_test.dart` | Horarios: un nombre de parada de tres líneas, entero y dentro de la barra | 2× |
 | `test/screens_test.dart` | Servicios, Novedades, Horarios e Info sin desborde; la barra con subtítulo; el título más largo | 2× |
 | `test/stop_search_layout_test.dart` | Agregar parada con la búsqueda por calles | 2× |
-| `test/lock_screen_test.dart` | la pantalla de bloqueo sin desborde; el candado quieto con movimiento reducido | 2× |
+| `test/lock_screen_test.dart` | la pantalla del código, también con la nota de un teléfono sin bloqueo, y la del código nuevo, con todas sus palabras y, a 1×, sin desplazarse; la del bloqueo anterior sin desborde; el candado quieto con movimiento reducido | 1×, 1.3×, 2× (la anterior, 2×) |
+| `test/passcode_layout_test.dart` | `PasscodeEntry` y `PasscodeCreate` sobre `LedBoard`: el bloqueo con el candado, la tecla del desbloqueo rápido y «¿Olvidaste el código?», el error y la espera, y los dos pasos de un código nuevo con los puntos de la bienvenida; las teclas no cambian de tamaño y el cartel no baja de 19 px; a 1×, sin desplazarse. En un teléfono de 320 × 568, el teclado se achica dentro del tablero y sus teclas siguen por encima de 44 px | 1×, 1.3×, 2× (320 × 568: 1×, 2×) |
+| `test/welcome_layout_test.dart` | cada paso de la bienvenida, también «Listo» en sus tres estados | 1×, 1.3×, 2× |
 | `test/privacy_policy_test.dart` | Privacidad sin desborde hasta la última sección; «geoserver.montevideo.gub.uy» en una sola línea | 2× |
 | `test/map/mapa_layout_test.dart` | el Mapa: el cartel vacío, las notas, el panel de error, el error del mapa base, la atribución y las dos hojas, con todas sus palabras | 1×, 1.3×, 2× |
 | `test/cartel_test.dart` | Doto nunca por debajo de 19 px | 0.85× |
 
 Las frases del lector se prueban con `find.bySemanticsLabel` en `cartel_test`, `stops_page_test`,
 `stops_board_test`, `screens_test`, `stop_search_test`, `news_tab_test`, `proxy_bff_test`,
-`lock_screen_test`, `privacy_policy_test` y `map/mapa_page_test`. Si cambiás una frase, cambiá
+`lock_screen_test`, `passcode_entry_test`, `app_lock_test`, `info_page_test`, `welcome_test`,
+`privacy_policy_test` y `map/mapa_page_test`. Si cambiás una frase, cambiá
 también la prueba que la busca.
 
 ### Antes de dar por terminada una pantalla o un componente

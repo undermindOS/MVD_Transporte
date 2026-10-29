@@ -327,6 +327,12 @@ Lo que dice la app alrededor de «Estoy esperando» (`_showWaitSheet` en
   tarea, así que en iOS la tarea periódica no corre. `BackgroundWorker.sync`
   atrapa el error. Los avisos de parada y de ruta salen solo en Android; en
   iOS solo existe el recordatorio de «Estoy esperando».
+- **iOS en español:** `Info.plist` declara `CFBundleLocalizations` = `es`,
+  así que los botones del sistema dentro de la app, como el de cancelar en la
+  hoja de Face ID, salen en español. Los textos propios del pedido del
+  sistema, en Android y en iOS, están en `lib/services/device_auth.dart`
+  (`AndroidAuthMessages`, `IOSAuthMessages`) y en
+  [07-textos.md](07-textos.md#bloqueo).
 - **Verificación:** los recursos de Android y el widget se comprueban con
   `flutter build apk --debug` y con `test/brand_assets_test.dart`; no hay
   pruebas en emulador. Los cambios de iOS (`Info.plist`, storyboard) no se
@@ -350,6 +356,8 @@ Lo que dice la app alrededor de «Estoy esperando» (`_showWaitSheet` en
   mostrarte las paradas cercanas.», en `NSLocationWhenInUseUsageDescription`
   y en `NSLocationAlwaysAndWhenInUseUsageDescription` (geolocator hace
   referencia a la segunda, por eso queda).
+- **Face ID en iOS:** «Timbre MVD usa Face ID para proteger tu información
+  de transporte.», en `NSFaceIDUsageDescription`.
 - **Ícono de Google Play** (512 px): el mismo `assets/app_icon.png`, reducido.
 - **Capturas:** solo pantallas de la app. Nada de capturas de stm.gub.uy ni
   logos del STM o de la Intendencia. Una captura del Mapa lleva «© OpenStreetMap»

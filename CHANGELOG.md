@@ -6,6 +6,21 @@ versiones: [SemVer](https://semver.org/lang/es/).
 ## [Unreleased]
 
 ### Agregado
+- Bienvenida la primera vez que abrís la app, en el mismo tablero de LED: cuatro pasos cuentan qué hace (Mis
+  paradas, Mapa, «Estoy esperando»), que no hay cuentas ni registros («Lo que guardás queda en tu teléfono, no en
+  servidores nuestros.», con un enlace a la política de privacidad), ofrecen un código y la huella, y dicen cómo
+  queda la app. Se ve una sola vez, también al actualizar. Hasta que termina, «Mis paradas» y el Mapa no se arman
+  y no piden nada.
+- Código propio de la app: 4 cifras que se escriben en un teclado de LED y quedan en el teléfono solo como un hash
+  con sal (PBKDF2-HMAC-SHA256), nunca como las cifras. Es opcional: se elige en la bienvenida o en Info, donde
+  también se cambia o se apaga. La huella, Face ID o Touch ID abren la app más rápido, y el código queda de
+  respaldo. Desde el quinto código equivocado seguido, cada código equivocado hace esperar 30 s. Si lo olvidás,
+  «¿Olvidaste el código?» usa el bloqueo de pantalla del teléfono y te deja elegir uno nuevo, sin borrar tus
+  paradas ni tus rutas; en un teléfono sin bloqueo de pantalla, la app explica que la única salida es borrar sus
+  datos (Android) o reinstalarla (iOS). Cada bloqueo empieza con el teclado vacío, y un pedido del sistema abierto
+  desde Info o la bienvenida se cierra si salís de la app, que vuelve bloqueada. Glifos nuevos: huella, cara y
+  borrar. `crypto` pasa a ser dependencia de
+  la app (antes, solo de las pruebas), y `local_auth_android` y `local_auth_darwin`, dependencias directas.
 - Pestaña «Mapa», entre «Mis paradas» y «Servicios»: tus paradas guardadas y los ómnibus con GPS que vienen a
   ellas, sobre un mapa nocturno de Montevideo y alrededores. El mapa viene dentro de la app (datos de
   OpenStreetMap, estilo «Timbre Noche», unos 15 MB en `assets/map/`): moverlo o acercarlo no hace pedidos y la
@@ -168,6 +183,18 @@ versiones: [SemVer](https://semver.org/lang/es/).
 - `docs/REVIEW.md`: revisión, mapa de la API de la Intendencia de Montevideo, marco legal, propuestas.
 
 ### Cambiado
+- Info: la llave del bloqueo biométrico pasa a ser «Código de acceso», con «Cambiar código» y «Desbloquear con
+  huella» (o Face ID, Touch ID) cuando hay un código; apagarlo pide el código actual. El bloqueo de antes, que era solo el
+  pedido del sistema, sigue para quien lo tenía hasta que termina la bienvenida, que lo cambia por un código o lo
+  apaga.
+- Los pedidos del sistema hablan en español y dicen para qué son: «Desbloqueá Timbre MVD», «Usá el bloqueo de tu
+  teléfono para entrar a Timbre MVD», «Confirmá que sos vos» y el botón «Usar código», que vuelve al teclado; en
+  iOS, también el aviso de Face ID bloqueado por muchos intentos.
+- iOS en español: `CFBundleLocalizations` = `es` en `Info.plist`, así que los botones del sistema dentro de la
+  app, como el de cancelar en la hoja de Face ID, salen en español.
+- La política de privacidad ya no dice que lo que guardás está «solo en tu dispositivo»: queda en el teléfono, no
+  en servidores nuestros, y la copia de seguridad del teléfono (Google en Android, iCloud en iPhone), si la tenés
+  activada, puede incluirlo y devolverlo al restaurarla.
 - Info dice que la app la desarrolla Liberon Tech, de Khrestenkov & Co, y el contacto pasa a ser
   daniil@khrestenkov.com, también en la política de privacidad.
 - Diseño nuevo: la app se llama Timbre MVD (en la pantalla de inicio del teléfono, en el widget y, en iOS, también
@@ -209,12 +236,14 @@ versiones: [SemVer](https://semver.org/lang/es/).
   sin consultar a nadie, con proxy y sin proxy.
 - Los errores dentro de una tarjeta y en Horarios se muestran en rojo y dicen qué hacer, por ejemplo «No existe la
   parada N. Revisá el número.» o «No se pudo cargar el horario. Revisá la conexión.».
-- Los mensajes usan voseo y dicen cuál es el paso siguiente: bloqueo biométrico («Autenticate para acceder a Timbre
-  MVD», «Tu dispositivo no tiene bloqueo de pantalla. Configuralo en Ajustes.»), navegador, correo, enlaces de
-  Novedades, permiso de ubicación («Timbre MVD usa tu ubicación para mostrarte las paradas cercanas.») y avisos que
-  no se pudieron activar.
+- Los mensajes usan voseo y dicen cuál es el paso siguiente: bloqueo («Autenticate para acceder a Timbre MVD»),
+  navegador, correo, enlaces de Novedades, permiso de ubicación («Timbre MVD usa tu ubicación para mostrarte las
+  paradas cercanas.») y avisos que no se pudieron activar.
 
 ### Corregido
+- En iPhone, el bloqueo de antes ya no se abre si el sistema responde con un error que puede ser un intento
+  fallido: iOS devuelve `NotAvailable` también después de un intento fallido de Face ID. Un error abre la app solo
+  si el teléfono confirma que no tiene bloqueo de pantalla.
 - Los tiempos de arribo (ETA) vuelven a funcionar: el viejo `m.montevideo.gub.uy/stmonlineRest/nextETA` respondía
   `400 Argumentos invalidos`; ahora se usa `api.montevideo.gub.uy/transporteRest/siguientesParada/{id}`,
   el mismo servicio que usa la app web oficial Cómo Ir.

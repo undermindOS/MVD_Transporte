@@ -14,6 +14,10 @@ del 17/10. El contrato completo está en [design/contrato-v1.md](design/contrato
 **Actualización 2026-10-28** (rama `feat/mapa`): la propuesta 9 de §6 (el mapa del ómnibus) dice qué quedó
 hecho en la fase 1 de la pestaña Mapa.
 
+**Actualización 2026-10-29** (rama `feat/onboarding`): la decisión del bloqueo de §5.1 está tomada. La app
+tiene su propio código de 4 cifras, con la huella o Face ID como atajo y el bloqueo del teléfono si se
+olvida, y una bienvenida la primera vez que se abre.
+
 ---
 
 ## 1. Qué es esta aplicación
@@ -389,7 +393,7 @@ para que esa verificación funcione en Android 11+ se agregó al manifiesto `<qu
 **Bloqueo biométrico — se necesita una decisión.** Antes protegía el WebView con la sesión activa de Mi STM.
 Ahora la sesión vive en el navegador (Chrome/Safari) y el bloqueo no la protege, así que solo protege
 las paradas y rutas guardadas (a partir de ellas se puede deducir dónde vive y trabaja la persona).
-Hecho: el texto en Info se corrigió a «Protege tus paradas y rutas guardadas»; volver del
+Hecho: el texto en Info se corrigió para decir que protege las paradas y rutas guardadas; volver del
 navegador ya no vuelve a bloquear la aplicación (la Custom Tab es una activity aparte, y en iOS mostrar
 SFSafariViewController también produce `inactive → hidden → paused`; solo se ignora la pausa
 que empieza en los primeros 3 s después de abrir el navegador, y un test lo verifica). Más tarde el bloqueo
@@ -398,6 +402,11 @@ pasó a tapar toda la aplicación, también Horarios, Info, hojas y diálogos, y
 ([docs/design/09-pantallas.md](design/09-pantallas.md), «Bloqueo»). Opciones: (a) mantenerlo como protección de la privacidad de los datos guardados (estado actual);
 (b) quitar el bloqueo, `local_auth` y `USE_BIOMETRIC`/`NSFaceIDUsageDescription`: más simple, menos
 preguntas en la revisión de las tiendas. Recomendación: (a); viene desactivado por defecto y no cuesta nada.
+**Decidido (2026-10-29):** (a), con un código propio de la app: 4 cifras guardadas en el teléfono como hash,
+la huella o Face ID como atajo y el bloqueo de pantalla del teléfono si se olvida el código. Se ofrece en la
+bienvenida y es opcional («Ahora no»). Quedan `local_auth` y `USE_BIOMETRIC`/`NSFaceIDUsageDescription`.
+Detalle: [design/09-pantallas.md](design/09-pantallas.md) («Bloqueo», «Bienvenida») y
+[design/12-decisiones.md](design/12-decisiones.md#bloqueo-y-bienvenida).
 
 **Verificado.** `flutter analyze`: limpio; `flutter test`: 20/20 (tests nuevos: dos pestañas nativas,
 mosaicos, Mi STM → `inAppBrowserView`, sin Custom Tabs → `externalApplication`, error al abrir →

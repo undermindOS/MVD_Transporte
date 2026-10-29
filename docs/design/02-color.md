@@ -212,7 +212,7 @@ junto al widget que las usa:
 | Valor | Dónde |
 |---|---|
 | `ambar` al 11 % | `LedMatrix` de los recuadros: mosaicos de Servicios, lista vacía, fecha sin leer, «NO OFICIAL» en Info |
-| `ambar` al 9 % | `LedMatrix` de la pantalla de bloqueo |
+| `ambar` al 9 % | `LedMatrix` de `LedBoard`: las pantallas de bloqueo y la bienvenida |
 | `ambar` al 32 % | Selección de texto (`textSelectionTheme`) |
 | `noche` al 70 % | `scrim` del tema |
 | `ambar` al 16 %, 45 %, 50 % | Puntos apagados, halo y haz del candado `LedLock` |
