@@ -10,4 +10,7 @@
     <color name="etiqueta">#9FB0D0</color>
     <color name="ambar">#FFB21E</color>
     <color name="ambar_tenue">#C68B1E</color>
+    <!-- Stop widgets: footer text, and errors -->
+    <color name="tenue">#7F8FB3</color>
+    <color name="rojo_led">#FF6B57</color>
 </resources>

@@ -20,6 +20,7 @@ import 'package:stm_app/services/cache_service.dart';
 import 'package:stm_app/services/home_widget_feed.dart';
 import 'package:stm_app/services/mvd_api_service.dart';
 import 'package:stm_app/services/notification_service.dart';
+import 'package:stm_app/services/stop_widgets_feed.dart';
 
 /// Stop 574: 116 in 4 min and 121 in 8 min with GPS, 117 in 2 min only
 /// by the timetable.
@@ -82,6 +83,8 @@ void main() {
   // What the widget would read, and how often it was told to redraw
   final widget = <String, Object?>{};
   var redraws = 0;
+  // Stop widgets told to redraw
+  final stopRedraws = <String>[];
 
   var client = MockClient((request) async {
     requests.add(request.url.path);
@@ -120,8 +123,12 @@ void main() {
         case 'getWidgetData':
           return widget[args!['id'] as String];
         case 'updateWidget':
-          expect(args!['name'], 'MVDTransporteWidgetProvider');
-          redraws++;
+          if (args!['android'] case final String stopWidget) {
+            stopRedraws.add(stopWidget);
+          } else {
+            expect(args['name'], 'MVDTransporteWidgetProvider');
+            redraws++;
+          }
       }
       return true;
     });
@@ -314,6 +321,7 @@ void main() {
       MvdApiService.proxyUrl = 'https://proxy.test';
       widget.clear();
       redraws = 0;
+      stopRedraws.clear();
       proxyUp = true;
       destination = 'POCITOS';
     });
@@ -462,6 +470,34 @@ void main() {
       await pumpEventQueue(); // the widget is not awaited
       expect(widget[WidgetFeed.keyLine], isNull);
       expect(widget[WidgetFeed.keyStatus], 'off');
+    });
+
+    test('the stop widgets get their stops at any hour, without alerts',
+        () async {
+      await CacheService.saveStop(BusStop(id: 574, name: 'SAN JOSE y ANDES'));
+      // What TimbreStopWidget writes for a placed Parada widget
+      widget
+        ..[StopWidgetsFeed.keyShownStops] = '574'
+        ..[StopWidgetsFeed.keyPlacedWidgets] = '1';
+
+      expect(await checkAt(_t0), isEmpty);
+      expect(requests, ['/v1/stops/574/arrivals']);
+      expect(jsonDecode(widget[StopWidgetsFeed.keySavedStops] as String), [
+        {'id': 574, 'name': 'SAN JOSE y ANDES'},
+      ]);
+      final board = jsonDecode(
+          widget[StopWidgetsFeed.keyBoard(574)] as String) as Map;
+      expect(board['checkedAtMs'], _t0.millisecondsSinceEpoch);
+      expect((board['arrivals'] as List).first, {
+        'line': '116',
+        'dest': 'POCITOS',
+        'clock': '19:56',
+        'dueMs': _t0.add(const Duration(minutes: 4)).millisecondsSinceEpoch,
+        'acc': true,
+      });
+      expect(stopRedraws, StopWidgetsFeed.providers);
+      // No route: the route widget only says so
+      expect(redraws, 1);
     });
   });
 }

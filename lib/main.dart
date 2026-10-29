@@ -9,6 +9,7 @@ import 'services/bus_wait_service.dart';
 import 'services/cache_service.dart';
 import 'services/device_auth.dart';
 import 'services/notification_service.dart';
+import 'services/stop_widgets_feed.dart';
 import 'ui/app_lock.dart';
 import 'ui/home_page.dart';
 import 'ui/theme/timbre_theme.dart';
@@ -21,6 +22,8 @@ void main() async {
   await CacheService.init();
   await NotificationService.init();
   await BackgroundWorker.init();
+  // The refresh button of the stop widgets runs Dart in the background
+  await initStopWidgets();
   // "Estoy esperando": messages from the Android service isolate
   FlutterForegroundTask.initCommunicationPort();
   await BusWaitService.init();

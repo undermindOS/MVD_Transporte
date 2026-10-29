@@ -52,6 +52,56 @@
                 android:resource="@xml/mvd_transporte_widget_info"/>
         </receiver>
 
+        <!-- Stop widgets: Próximo, Parada and Mis paradas (TimbreStopWidget.kt) -->
+        <receiver
+            android:name=".TimbreProximoWidget"
+            android:label="@string/widget_proximo_label"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE"/>
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_stop_small_info"/>
+        </receiver>
+        <receiver
+            android:name=".TimbreParadaWidget"
+            android:label="@string/widget_parada_label"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE"/>
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_stop_medium_info"/>
+        </receiver>
+        <receiver
+            android:name=".TimbreMisParadasWidget"
+            android:label="@string/widget_mis_paradas_label"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE"/>
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_stop_large_info"/>
+        </receiver>
+
+        <!-- The refresh button of the stop widgets runs the app's Dart code in
+             the background (home_widget's interactivity callback). Only the
+             widgets send it: not exported -->
+        <receiver
+            android:name="es.antonborri.home_widget.HomeWidgetBackgroundReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="es.antonborri.home_widget.action.BACKGROUND"/>
+            </intent-filter>
+        </receiver>
+        <service
+            android:name="es.antonborri.home_widget.HomeWidgetBackgroundService"
+            android:permission="android.permission.BIND_JOB_SERVICE"
+            android:exported="false"/>
+
         <!-- "Estoy esperando" (flutter_foreground_task; the name is fixed).
              Started only by a tap, stops when the bus is close, after the
              trip passes or after 60 min. -->

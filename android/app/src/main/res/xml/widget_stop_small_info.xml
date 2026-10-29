@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Stop widget (docs/design/10-superficies.md). Data comes from the app;
+     updatePeriodMillis only redraws, so buses that passed drop out -->
+<appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
+    android:minWidth="140dp"
+    android:minHeight="140dp"
+    android:minResizeWidth="140dp"
+    android:minResizeHeight="140dp"
+    android:targetCellWidth="2"
+    android:targetCellHeight="2"
+    android:updatePeriodMillis="1800000"
+    android:initialLayout="@layout/widget_stop_small"
+    android:previewLayout="@layout/widget_stop_small_preview"
+    android:resizeMode="horizontal|vertical"
+    android:widgetCategory="home_screen"
+    android:description="@string/widget_proximo_description" />

@@ -552,4 +552,22 @@ abstract final class PixelGlyphs {
     '............',
     '............',
   ]);
+
+  /// Refresh: the button of the Android stop widgets, copied by hand to
+  /// `res/drawable/widget_ic_refresh.xml`. A clockwise arc, its head on the
+  /// right.
+  static const refresh = PixelGlyph([
+    '....####....',
+    '..##....##..',
+    '.#.......#..',
+    '.#.....#####',
+    '#.......###.',
+    '#........#..',
+    '#...........',
+    '#..........#',
+    '.#........#.',
+    '.#........#.',
+    '..##....##..',
+    '....####....',
+  ]);
 }

@@ -24,6 +24,7 @@ import '../services/home_widget_feed.dart';
 import '../services/mvd_api_service.dart';
 import '../services/nearby_stops_service.dart';
 import '../services/notification_service.dart';
+import '../services/stop_widgets_feed.dart';
 import '../services/transport_news_service.dart';
 import 'news_list.dart';
 import 'schedule_page.dart';
@@ -263,6 +264,12 @@ class _StopsPageState extends State<StopsPage>
       unawaited(WidgetFeed.update(
           enabledRoutes: enabledRoutes, boards: results, now: DateTime.now()));
     }
+    // The stop widgets show saved stops only
+    final savedIds = {for (final stop in _stops) stop.id};
+    unawaited(StopWidgetsFeed.updateBoards({
+      for (final MapEntry(:key, :value) in results.entries)
+        if (savedIds.contains(key)) key: value,
+    }, now: DateTime.now()));
 
     if (!mounted) return;
     setState(() {
@@ -327,7 +334,12 @@ class _StopsPageState extends State<StopsPage>
 
   // ---------------------------------------------------------------- Stops ---
 
-  void _loadStops() => setState(() => _stops = CacheService.getAllStops());
+  void _loadStops() {
+    setState(() => _stops = CacheService.getAllStops());
+    // The stop widgets list the same stops, in the same order. Not
+    // awaited: it catches its own errors
+    unawaited(StopWidgetsFeed.saveStops(_stops));
+  }
 
   Future<void> _addStop() async {
     final choice = await _showAddStopDialog();

@@ -1,0 +1,304 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Stop widget Mis paradas (4 × 4): two stops, three buses each, and the links to Mi STM and Recarga. TimbreMisParadasWidget fills it. -->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@android:id/background"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/widget_background"
+    android:clipToOutline="true">
+
+    <!-- Unlit LEDs behind the header, as on the app bar -->
+    <ImageView
+        android:layout_width="match_parent"
+        android:layout_height="54dp"
+        android:layout_marginStart="1dp"
+        android:layout_marginTop="1dp"
+        android:layout_marginEnd="1dp"
+        android:importantForAccessibility="no"
+        android:scaleType="fitXY"
+        android:src="@drawable/widget_led_band" />
+
+    <LinearLayout
+        android:id="@+id/w_board"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="vertical"
+        android:paddingStart="14dp"
+        android:paddingTop="10dp"
+        android:paddingEnd="14dp"
+        android:paddingBottom="12dp">
+
+        <!-- The TIMBRE MVD plate and the refresh button -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="30dp"
+            android:layout_marginBottom="6dp"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <ImageView
+                android:layout_width="0dp"
+                android:layout_height="20dp"
+                android:layout_weight="1"
+                android:adjustViewBounds="true"
+                android:contentDescription="Timbre MVD"
+                android:scaleType="fitStart"
+                android:src="@drawable/widget_plate" />
+
+            <!-- 44 dp touch target over an 18 dp icon -->
+            <ImageView
+                android:id="@+id/w_refresh"
+                android:layout_width="44dp"
+                android:layout_height="44dp"
+                android:layout_marginTop="-8dp"
+                android:layout_marginEnd="-12dp"
+                android:layout_marginBottom="-8dp"
+                android:contentDescription="Actualizar"
+                android:padding="13dp"
+                android:src="@drawable/widget_ic_refresh" />
+
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/w_section_1"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="24dp"
+                android:orientation="horizontal">
+
+                <LinearLayout
+                    android:id="@+id/w_header_1"
+                    android:layout_width="0dp"
+                    android:layout_height="24dp"
+                    android:layout_weight="1"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+
+                    <ImageView
+                        android:layout_width="14dp"
+                        android:layout_height="14dp"
+                        android:importantForAccessibility="no"
+                        android:src="@drawable/widget_ic_stop" />
+
+                    <!-- Name and, smaller, " · 574" (spans) -->
+                    <TextView
+                        android:id="@+id/w_stop_name_1"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="6dp"
+                        android:ellipsize="end"
+                        android:fontFamily="sans-serif-condensed"
+                        android:maxLines="1"
+                        android:textColor="@color/papel"
+                        android:textSize="15sp"
+                        android:textStyle="bold" />
+
+                </LinearLayout>
+
+            </LinearLayout>
+
+            <!-- One widget_stop_row per bus, added by TimbreStopWidget -->
+            <LinearLayout
+                android:id="@+id/w_rows_1"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical" />
+
+            <!-- "Sin próximos ómnibus…" or "Sin datos recientes" -->
+            <TextView
+                android:id="@+id/w_message_1"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:paddingTop="8dp"
+                android:paddingBottom="8dp"
+                android:gravity="center"
+                android:maxLines="2"
+                android:textColor="@color/etiqueta"
+                android:textSize="14sp"
+                android:visibility="gone" />
+        </LinearLayout>
+
+        <ImageView
+            android:id="@+id/w_divider"
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:layout_marginTop="6dp"
+            android:layout_marginBottom="6dp"
+            android:importantForAccessibility="no"
+            android:scaleType="fitXY"
+            android:src="@color/linea_noche" />
+
+        <LinearLayout
+            android:id="@+id/w_section_2"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="24dp"
+                android:orientation="horizontal">
+
+                <LinearLayout
+                    android:id="@+id/w_header_2"
+                    android:layout_width="0dp"
+                    android:layout_height="24dp"
+                    android:layout_weight="1"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+
+                    <ImageView
+                        android:layout_width="14dp"
+                        android:layout_height="14dp"
+                        android:importantForAccessibility="no"
+                        android:src="@drawable/widget_ic_stop" />
+
+                    <!-- Name and, smaller, " · 574" (spans) -->
+                    <TextView
+                        android:id="@+id/w_stop_name_2"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="6dp"
+                        android:ellipsize="end"
+                        android:fontFamily="sans-serif-condensed"
+                        android:maxLines="1"
+                        android:textColor="@color/papel"
+                        android:textSize="15sp"
+                        android:textStyle="bold" />
+
+                </LinearLayout>
+
+            </LinearLayout>
+
+            <!-- One widget_stop_row per bus, added by TimbreStopWidget -->
+            <LinearLayout
+                android:id="@+id/w_rows_2"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical" />
+
+            <!-- "Sin próximos ómnibus…" or "Sin datos recientes" -->
+            <TextView
+                android:id="@+id/w_message_2"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:paddingTop="8dp"
+                android:paddingBottom="8dp"
+                android:gravity="center"
+                android:maxLines="2"
+                android:textColor="@color/etiqueta"
+                android:textSize="14sp"
+                android:visibility="gone" />
+        </LinearLayout>
+
+        <FrameLayout
+            android:id="@+id/w_spacer"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <ImageView
+                android:id="@+id/w_footer_icon"
+                android:layout_width="13dp"
+                android:layout_height="13dp"
+                android:layout_marginEnd="6dp"
+                android:importantForAccessibility="no"
+                android:src="@drawable/widget_ic_warning"
+                android:visibility="gone" />
+
+            <TextView
+                android:id="@+id/w_footer"
+                android:layout_width="0dp"
+                android:layout_weight="1"
+                android:layout_height="wrap_content"
+                android:ellipsize="end"
+                android:maxLines="2"
+                android:textColor="@color/tenue"
+                android:textSize="11sp" />
+
+            <TextView
+                android:id="@+id/w_btn_mistm"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:background="@drawable/widget_button_bg"
+                android:drawableEnd="@drawable/widget_ic_external"
+                android:drawablePadding="5dp"
+                android:gravity="center_vertical"
+                android:minHeight="44dp"
+                android:paddingStart="12dp"
+                android:paddingEnd="10dp"
+                android:text="Mi STM"
+                android:textColor="@color/ambar"
+                android:textSize="13sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/w_btn_recarga"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:background="@drawable/widget_button_bg"
+                android:drawableEnd="@drawable/widget_ic_external"
+                android:drawablePadding="5dp"
+                android:gravity="center_vertical"
+                android:minHeight="44dp"
+                android:paddingStart="12dp"
+                android:paddingEnd="10dp"
+                android:text="Recarga"
+                android:textColor="@color/ambar"
+                android:textSize="13sp"
+                android:textStyle="bold" />
+
+        </LinearLayout>
+
+    </LinearLayout>
+
+    <!-- No saved stops: the app's empty list, a sign over unlit LEDs -->
+    <LinearLayout
+        android:id="@+id/w_empty"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:layout_margin="6dp"
+        android:background="@drawable/widget_led_field"
+        android:gravity="center"
+        android:orientation="vertical"
+        android:padding="10dp"
+        android:visibility="gone">
+
+        <ImageView
+            android:layout_width="28dp"
+            android:layout_height="28dp"
+            android:importantForAccessibility="no"
+            android:src="@drawable/widget_ic_bus" />
+
+        <ImageView
+            android:layout_width="wrap_content"
+            android:layout_height="20dp"
+            android:layout_marginTop="8dp"
+            android:adjustViewBounds="true"
+            android:contentDescription="Sin paradas"
+            android:src="@drawable/widget_sin_paradas" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:gravity="center"
+            android:maxLines="3"
+            android:text="Agregá una parada en Mis paradas para verla acá."
+            android:textColor="@color/etiqueta"
+            android:textSize="13sp" />
+
+    </LinearLayout>
+
+</FrameLayout>

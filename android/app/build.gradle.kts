@@ -32,6 +32,11 @@ android {
         versionName = flutter.versionName
     }
 
+    // StopWidgetRenderTest inflates the widgets with the app's resources
+    testOptions {
+        unitTests.isIncludeAndroidResources = true
+    }
+
     buildTypes {
         release {
             // TODO: Add your own signing config for the release build.
@@ -47,4 +52,12 @@ flutter {
 
 dependencies {
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
+
+    // StopWidgetDataTest: the stop widgets' rules on the JVM. org.json is a
+    // stub there, the real one stands in
+    testImplementation("junit:junit:4.13.2")
+    testImplementation("org.json:json:20240303")
+    // StopWidgetRenderTest: the widgets drawn as a launcher would
+    testImplementation("org.robolectric:robolectric:4.14.1")
+    testImplementation("androidx.test:core:1.6.1")
 }

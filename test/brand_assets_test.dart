@@ -8,6 +8,7 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:stm_app/services/home_widget_feed.dart';
+import 'package:stm_app/services/stop_widgets_feed.dart';
 
 String _read(String path) => File(path).readAsStringSync();
 
@@ -120,6 +121,86 @@ void main() {
       expect(provider, contains('"$key"'), reason: key);
     }
     expect(provider, contains('EXPIRED_AFTER_MS = 2 * 60 * 1000L'));
+  });
+
+  test('the stop widgets are night boards in three sizes', () {
+    const kotlin = 'android/app/src/main/kotlin/com/liberontech/stmapp';
+    final provider = _read('$kotlin/TimbreStopWidget.kt');
+    final manifest = _read('android/app/src/main/AndroidManifest.xml');
+    final layouts = {
+      for (final size in ['small', 'medium', 'large'])
+        size: _read('$res/layout/widget_stop_$size.xml'),
+    };
+    final row = _read('$res/layout/widget_stop_row.xml');
+
+    for (final (size, kind) in [
+      ('small', 'TimbreProximoWidget'),
+      ('medium', 'TimbreParadaWidget'),
+      ('large', 'TimbreMisParadasWidget'),
+    ]) {
+      // The app redraws each provider by its class name
+      expect(StopWidgetsFeed.providers, contains(kind));
+      expect(provider, contains('class $kind : TimbreStopWidget()'));
+      expect(manifest, contains('android:name=".$kind"'));
+      expect(manifest, contains('@xml/widget_stop_${size}_info'));
+      final info = _read('$res/xml/widget_stop_${size}_info.xml');
+      expect(info,
+          contains('android:initialLayout="@layout/widget_stop_$size"'));
+      // The picker shows sample data (Android 12+)
+      expect(info, contains('android:previewLayout='
+          '"@layout/widget_stop_${size}_preview"'));
+      expect(_read('$res/layout/widget_stop_${size}_preview.xml'),
+          contains('SAN JOSE y ANDES'));
+
+      final layout = layouts[size]!;
+      expect(layout, contains('android:id="@android:id/background"'));
+      expect(layout, contains('@drawable/widget_background'));
+      expect(layout, contains('@drawable/widget_led_band'));
+      // Refresh is a 44 dp target; so are Mi STM and Recarga
+      expect(
+          layout,
+          matches(RegExp(r'w_refresh"\s+android:layout_width="44dp"\s+'
+              r'android:layout_height="44dp"')));
+      for (final m
+          in RegExp(r'android:minHeight="(\d+)dp"').allMatches(layout)) {
+        expect(int.parse(m.group(1)!), greaterThanOrEqualTo(44));
+      }
+      // Only views RemoteViews can draw: no View, no Space
+      expect(layout, isNot(contains('<View')));
+      expect(layout, isNot(contains('<Space')));
+    }
+    expect(row, isNot(contains('<View')));
+
+    // Every view the provider fills exists in a layout (android.R.id is
+    // the system's)
+    final all = layouts.values.join() + row;
+    for (final id in RegExp(r'(?<!android\.)R\.id\.(\w+)')
+        .allMatches(provider)
+        .map((m) => m.group(1)!)
+        .toSet()) {
+      expect(all, contains('@+id/$id'), reason: id);
+    }
+    // It reads the keys the app writes, and writes the ones it reads
+    for (final key in [
+      StopWidgetsFeed.keySavedStops,
+      StopWidgetsFeed.keyShownStops,
+      StopWidgetsFeed.keyPlacedWidgets,
+    ]) {
+      expect(provider, contains('"$key"'), reason: key);
+    }
+    expect(provider, contains('"stop_board_"'));
+    expect(StopWidgetsFeed.keyBoard(574), 'stop_board_574');
+    // Its refresh button reaches the app's Dart code
+    expect(manifest,
+        contains('es.antonborri.home_widget.HomeWidgetBackgroundReceiver'));
+    expect(manifest,
+        contains('es.antonborri.home_widget.HomeWidgetBackgroundService'));
+
+    // Times are estimates, never amber; line numbers get a dim outline
+    final time = RegExp(r'w_row_time"[^>]*').firstMatch(row)!.group(0)!;
+    expect(time, contains('@color/papel'));
+    expect(_read('$res/drawable/widget_badge_lit_bg.xml'),
+        contains('@color/ambar_tenue'));
   });
 
   test('iOS has light, dark and tinted 1024 px icons', () {

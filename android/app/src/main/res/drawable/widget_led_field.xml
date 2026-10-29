@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A board with nothing to announce: unlit LEDs all over, as the app's
+     empty list (LedMatrix at 11 %) -->
+<bitmap xmlns:android="http://schemas.android.com/apk/res/android"
+    android:src="@drawable/widget_led_dot_dim"
+    android:tileMode="repeat" />
