@@ -556,7 +556,9 @@ void main() {
   });
 
   testWidgets('the home widget follows each refresh', (tester) async {
-    final fetchedAt = DateTime.now().toUtc();
+    // The source stamped the boards 6 min before the phone's clock
+    final fetchedAt =
+        DateTime.now().toUtc().subtract(const Duration(minutes: 6));
     var failing = false;
     answer = (request) async => failing
         ? http.Response('{"error":"upstream_timeout"}', 504)
@@ -573,8 +575,13 @@ void main() {
       expect(widgetData['route_dest'], 'POCITOS');
       expect(widgetData['route_eta_min'], 9);
       expect(widgetData['route_eta_at'], '20:01');
-      expect(widgetData['route_expected_at_ms'],
-          '${fetchedAt.add(const Duration(minutes: 9)).millisecondsSinceEpoch}');
+      // Due 9 min after the stamp, kept on the phone's clock: 6 min later.
+      // Real time: the board takes a moment to reach the widget
+      final dueOnPhone = fetchedAt
+          .add(const Duration(minutes: 9 + 6))
+          .millisecondsSinceEpoch;
+      expect(int.parse(widgetData['route_expected_at_ms']! as String),
+          inInclusiveRange(dueOnPhone, dueOnPhone + 5000));
 
       // Offline: the row stays while its bus is still due
       failing = true;
@@ -583,6 +590,37 @@ void main() {
       await tester.pump();
       expect(widgetData['route_status'], 'offline');
       expect(widgetData['route_line'], '116');
+    }, () => client);
+  });
+
+  testWidgets('a wait started from a board stamped 6 min before the phone '
+      'takes that offset, and each refresh hands over the stamp',
+      (tester) async {
+    final fake = _FakeWaitPlatform();
+    final previous = BusWaitService.platform;
+    BusWaitService.platform = fake;
+    addTearDown(() {
+      BusWaitService.platform = previous;
+      BusWaitService.current.value = null;
+    });
+    final fetchedAt =
+        DateTime.now().toUtc().subtract(const Duration(minutes: 6));
+    answer = (request) async => boards(request, fetchedAt: fetchedAt);
+
+    await http.runWithClient(() async {
+      await tester.pumpWidget(app());
+      await tester.pump();
+      await tester.tap(find.text('116'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Avisarme cuando llegue'));
+      await tester.pumpAndSettle();
+      // Real time: the board reached the phone a moment after the stamp
+      expect(fake.started.single.clockOffset.inSeconds,
+          inInclusiveRange(360, 365));
+
+      await tester.pump(StopsPage.autoRefreshInterval);
+      await tester.pump();
+      expect(fake.fetchedAts, [fetchedAt]);
     }, () => client);
   });
 
@@ -638,6 +676,11 @@ void main() {
 }
 
 class _FakeWaitPlatform implements BusWaitPlatform {
+  final started = <BusWait>[];
+
+  /// The board's stamp of each [onArrivals].
+  final fetchedAts = <DateTime?>[];
+
   @override
   Future<void> init({required ValueChanged<DateTime> onEnded}) async {}
 
@@ -645,12 +688,18 @@ class _FakeWaitPlatform implements BusWaitPlatform {
   Future<BusWait?> restore() async => null;
 
   @override
-  Future<bool> start(BusWait wait, BusArrival trip) async => true;
+  Future<bool> start(BusWait wait, BusArrival trip) async {
+    started.add(wait);
+    return true;
+  }
 
   @override
   Future<void> stop() async {}
 
   @override
-  Future<bool> onArrivals(BusWait wait, List<BusArrival>? arrivals) async =>
-      false;
+  Future<bool> onArrivals(BusWait wait, List<BusArrival>? arrivals,
+      {DateTime? fetchedAt}) async {
+    fetchedAts.add(fetchedAt);
+    return false;
+  }
 }

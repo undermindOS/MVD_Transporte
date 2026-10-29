@@ -288,6 +288,13 @@ de `sched-…` a `bus-…` cuando aparece su GPS), toma el del mismo `variantId`
 (o, si falta, de la misma línea y destino) con el `expectedAt` más cercano, a
 menos de 10 min, y adopta su `tripId` y su `expectedAt`.
 
+`expectedAt` queda en el reloj de la fuente, para compararlo con el de los
+arribos. Para «ya pasó» y el recordatorio de iOS se usa
+`BusWait.expectedOnPhone`: `expectedAt` más `clockOffset`, la hora del
+teléfono menos el `fetchedAt` del tablero, que `check` mide con cada tablero
+(al empezar, `_showWaitSheet` le pasa la del tablero de la fila). Así un
+teléfono con la hora corrida no termina la espera ni avisa antes de tiempo.
+
 ### Aviso fijo (Android) y recordatorio (iOS)
 
 | Qué se ve | Modelo | Campo /v1 | Fuente |
@@ -298,13 +305,13 @@ menos de 10 min, y adopta su `tripId` y su `expectedAt`.
 | Android, texto: «Según horario 20:01, sin GPS todavía · …» | `etaLabel` | `clockTime` | `horaDesc` |
 | Android, texto: «Sin datos del ómnibus por ahora · …» | el viaje no está en la respuesta | – | – |
 | Android, texto: «Sin conexión, reintentando… · …» | el pedido falló | – | – |
-| iOS: recordatorio «Línea 116 — ~5 min» | `BusWait.expectedAt` menos `alertMinutes` | `expectedAt` | `time` |
+| iOS: recordatorio «Línea 116 — ~5 min» | `BusWait.expectedOnPhone` menos `alertMinutes` | `expectedAt`, `fetchedAt` | `time` |
 
 En Android, `BusWaitTaskHandler` pide los arribos cada 30 s
 (`pollInterval`). En iOS no hay consultas de fondo: el recordatorio se
-programa para `expectedAt − alertMinutes` y se mueve cada vez que la app
-recibe un tablero nuevo de esa parada. Cuando el ómnibus está cerca sale el
-aviso de parada de la sección siguiente.
+programa para `expectedOnPhone − alertMinutes` y se mueve cada vez que la
+app recibe un tablero nuevo de esa parada. Cuando el ómnibus está cerca sale
+el aviso de parada de la sección siguiente.
 
 ## Avisos de fondo
 
@@ -334,7 +341,7 @@ acto, aunque quede una alerta de parada.
 | Línea | `route_line` | `BusArrival.line` | `line` | `linea` |
 | Destino | `route_dest` | `destination`; si está vacío, `RouteAlert.destinationName` | `destination` | `destino` |
 | «~20:01» | `route_eta_at` | `clockTime` | `clockTime` | `horaDesc` |
-| La fila se oculta 2 min después de esa hora | `route_expected_at_ms` | `expectedAt` | `expectedAt` | `time` |
+| La fila se oculta 2 min después de esa hora, en el reloj del teléfono | `route_expected_at_ms` | `expectedAt` más la hora del teléfono al consultar, menos `fetchedAt` | `expectedAt`, `fetchedAt` | `time` |
 | – (compatibilidad) | `route_eta_min` | `etaMinutes` | `etaMinutes` | `minutos` |
 | – (Kotlin no la lee) | `route_checked_at_ms`, `route_status` | hora del tablero; `ok`, `none`, `offline` u `off` | – | – |
 
@@ -360,7 +367,7 @@ app.
 | `arrivals[].tripId` | seguir el viaje de «Estoy esperando» y marcar la fila esperada; en el Mapa, reconocer un ómnibus que va a dos paradas |
 | `arrivals[].variantId` | filtro de rutas (`preferredVariantIds`), seguimiento, chips HACIA de respaldo |
 | `arrivals[].expectedAt` | filas estimadas, seguimiento, recordatorio de iOS, caducidad del widget |
-| `fetchedAt` de los arribos | «Datos de las H:MM» y, en Mis paradas y en el Mapa, el «ahora» de la fuente para sacar filas estimadas vencidas (las edades, 1 y 5 min, se cuentan desde que el tablero llegó al teléfono). En el Mapa, además: cuál de dos tableros de una parada es el más nuevo y de qué tablero sale la posición de un ómnibus que va a dos paradas; el «tablero de menos de 30 s» también se cuenta desde que llegó al teléfono |
+| `fetchedAt` de los arribos | «Datos de las H:MM» y, en Mis paradas y en el Mapa, el «ahora» de la fuente para sacar filas estimadas vencidas (las edades, 1 y 5 min, se cuentan desde que el tablero llegó al teléfono). En el widget y en «Estoy esperando», la diferencia entre el reloj del teléfono y el de la fuente, para pasar `expectedAt` al reloj del teléfono. En el Mapa, además: cuál de dos tableros de una parada es el más nuevo y de qué tablero sale la posición de un ómnibus que va a dos paradas; el «tablero de menos de 30 s» también se cuenta desde que llegó al teléfono |
 | `id` de la parada y de los arribos | ninguno: `V1Parser` usa el número pedido |
 | `directions[].variantIds` | se guardan en `RouteAlert.preferredVariantIds` |
 | `stops[].location` | la distancia en «Paradas cercanas»; se guarda en la parada elegida (`BusStop.latitude`, `longitude`) y, con proxy, completa la de una parada guardada sin ubicación: es su lugar en el Mapa |

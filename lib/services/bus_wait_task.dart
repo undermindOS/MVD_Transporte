@@ -52,8 +52,11 @@ class BusWaitTaskHandler extends TaskHandler {
     if (wait == null || _checking) return;
     _checking = true;
     try {
-      final arrivals = await MvdApiService.getNextArrivals(wait.stopId);
-      final result = wait.check(arrivals, DateTime.now());
+      // The board, not just its arrivals: its fetchedAt gives the clock
+      // offset. Any failure is null, as with getNextArrivals
+      final board = (await MvdApiService.getBoard(wait.stopId)).valueOrNull;
+      final result = wait.check(board?.arrivals, DateTime.now(),
+          fetchedAt: board?.fetchedAt);
       switch (result.outcome) {
         case WaitOutcome.alert:
           await NotificationService.showBusAlert(

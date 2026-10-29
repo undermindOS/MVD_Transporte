@@ -162,7 +162,7 @@ Archivos:
 | `route_dest` | String | El `destination` del ómnibus; si viene vacío, el nombre que el usuario le puso a la ruta (`RouteAlert.destinationName`) | Sí |
 | `route_eta_min` | int | `etaMinutes` en el momento de la consulta | Sí, solo como respaldo |
 | `route_eta_at` | String | El `clockTime` del ómnibus, «H:MM» sin cero adelante («8:07», «19:56») | Sí |
-| `route_expected_at_ms` | String | `expectedAt` en milisegundos desde 1970, en decimal | Sí |
+| `route_expected_at_ms` | String | `expectedAt` pasado al reloj del teléfono (más la hora del teléfono al consultar, menos el `fetchedAt` del tablero), en milisegundos desde 1970, en decimal | Sí |
 | `route_checked_at_ms` | String | Cuándo se consultó el tablero, en milisegundos | No |
 | `route_status` | String | `ok`, `none`, `offline` u `off` | No |
 
@@ -177,7 +177,8 @@ Archivos:
   - tablero bien y hay ómnibus → `ok`, se escribe la fila;
   - tablero bien y no hay ómnibus → `none`, `route_line` se borra;
   - el tablero falló o falta → `offline`; la fila anterior se queda mientras
-    `route_expected_at_ms` esté en el futuro, si no `route_line` se borra;
+    `route_expected_at_ms` esté en el futuro del reloj del teléfono, si no
+    `route_line` se borra;
   - no hay ninguna ruta con aviso → `off`, `route_line` se borra.
 - **`WidgetFeed.clear('off')`:** lo llama `BackgroundWorker.sync()` cada vez
   que no queda ninguna ruta con el aviso activado, aunque una alerta de
@@ -193,8 +194,10 @@ Archivos:
 - **Redibujo:** después de escribir, `WidgetFeed` siempre llama a
   `HomeWidget.updateWidget`, con su propio manejo de errores. Además Android
   redibuja cada 30 min (`updatePeriodMillis` = 1800000).
-- **Caducidad:** Kotlin oculta la fila cuando la hora actual pasa
-  `route_expected_at_ms` + 2 min (`EXPIRED_AFTER_MS`). Solo se comprueba al
+- **Caducidad:** Kotlin oculta la fila cuando la hora del teléfono pasa
+  `route_expected_at_ms` + 2 min (`EXPIRED_AFTER_MS`). Las dos están en el
+  reloj del teléfono, así que uno con la hora corrida respecto de la fuente
+  no oculta la fila antes ni después de tiempo. Solo se comprueba al
   redibujar, así que entre redibujos un ómnibus que ya pasó puede verse hasta
   unos 30 min. Es un tema abierto: un redibujo programado a esa hora lo
   cerraría.
@@ -292,11 +295,16 @@ nombre que le pusiste a la ruta («Centro»). El texto largo usa
   actualiza el aviso fijo. Termina cuando el ómnibus seguido tiene GPS y está
   a los minutos elegidos o menos (entonces manda el aviso de parada), cuando
   el viaje pasó (no aparece 2 min después de su hora), a los 60 min o con el
-  botón. No vuelve a arrancar solo (`allowAutoRestart: false`).
+  botón. «Su hora» es `BusWait.expectedOnPhone`: el `expectedAt` de la fuente
+  más la diferencia de relojes que se mide con cada tablero (la hora del
+  teléfono menos su `fetchedAt`). No vuelve a arrancar solo
+  (`allowAutoRestart: false`).
 - **«Estoy esperando» en iOS** (`ScheduledBusWait`): iOS no deja consultar en
   segundo plano sin un servidor de push, así que la app programa un
-  recordatorio a `expectedAt − minutos elegidos` (o a los 5 s, si esa hora ya
-  pasó). Cada vez que la app actualiza Mis paradas en primer plano, mueve el
+  recordatorio a `expectedOnPhone − minutos elegidos` (o a los 5 s, si esa
+  hora ya pasó): las notificaciones locales van con el reloj del teléfono.
+  Al empezar, la diferencia de relojes es la del tablero de la fila. Cada
+  vez que la app actualiza Mis paradas en primer plano, mueve el
   recordatorio a la hora nueva; si en ese momento el ómnibus tiene GPS y está
   a los minutos elegidos o menos, manda enseguida el aviso de parada y
   termina. `AppDelegate.swift` registra el delegado de notificaciones para que

@@ -352,6 +352,31 @@ void main() {
       expect(redraws, 3);
     });
 
+    test('a phone clock 6 min ahead of the proxy: the due time is kept on '
+        'the phone\'s clock', () async {
+      await saveRoute(lines: ['116']);
+      // The proxy stamped the board at _t0, the phone read _t0 + 6 min
+      final phone = _t0.add(const Duration(minutes: 6));
+      await checkAt(phone);
+      // Due 4 min after the stamp: 10 min after _t0 on the phone's clock
+      final dueOnPhone = _t0.add(const Duration(minutes: 10));
+      expect(widget[WidgetFeed.keyExpectedAtMs],
+          '${dueOnPhone.millisecondsSinceEpoch}');
+      // The time shown is still the source's
+      expect(widget[WidgetFeed.keyClockTime], '19:56');
+      expect(widget[WidgetFeed.keyCheckedAtMs],
+          '${phone.millisecondsSinceEpoch}');
+
+      // Offline 3 min later: still due on the phone's clock, the row stays
+      proxyUp = false;
+      await checkAt(phone.add(const Duration(minutes: 3)));
+      expect(widget[WidgetFeed.keyLine], '116');
+      expect(widget[WidgetFeed.keyStatus], 'offline');
+      // 5 min later it was due: the empty state
+      await checkAt(phone.add(const Duration(minutes: 5)));
+      expect(widget[WidgetFeed.keyLine], isNull);
+    });
+
     test('no bus of the route coming, or no route at all', () async {
       final route = await saveRoute(lines: ['999']);
       await checkAt(_t0);

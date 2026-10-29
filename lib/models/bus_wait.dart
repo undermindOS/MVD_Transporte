@@ -36,7 +36,12 @@ class BusWait {
   /// Notify when the GPS-tracked bus is at most this many minutes away.
   final int alertMinutes;
   final DateTime startedAt;
+
+  /// When the trip is due, on the source's clock, as the boards give it.
   DateTime expectedAt;
+
+  /// The phone's clock minus the source's, measured when a board arrives.
+  Duration clockOffset;
 
   /// The wait ends on its own after this long.
   static const maxDuration = Duration(minutes: 60);
@@ -44,7 +49,7 @@ class BusWait {
   /// A bus further than this from [expectedAt] is another trip.
   static const sameTripTolerance = Duration(minutes: 10);
 
-  /// Not listed this long after [expectedAt]: the bus has passed.
+  /// Not listed this long after [expectedOnPhone]: the bus has passed.
   static const passedGrace = Duration(minutes: 2);
 
   BusWait({
@@ -57,6 +62,7 @@ class BusWait {
     required this.alertMinutes,
     required this.startedAt,
     required this.expectedAt,
+    this.clockOffset = Duration.zero,
   });
 
   factory BusWait.forTrip({
@@ -65,6 +71,7 @@ class BusWait {
     required BusArrival trip,
     required int alertMinutes,
     required DateTime now,
+    Duration clockOffset = Duration.zero,
   }) =>
       BusWait(
         stopId: stopId,
@@ -76,11 +83,16 @@ class BusWait {
         alertMinutes: alertMinutes,
         startedAt: now,
         expectedAt: trip.expectedAt,
+        clockOffset: clockOffset,
       );
 
   String get title => destination.isEmpty
       ? 'Esperando el $line'
       : 'Esperando el $line → $destination';
+
+  /// [expectedAt] on the phone's clock: what "passed" and the iOS reminder
+  /// are measured against.
+  DateTime get expectedOnPhone => expectedAt.add(clockOffset);
 
   /// The followed trip in [arrivals], or null when it is not listed.
   BusArrival? findTrip(List<BusArrival> arrivals, DateTime now) {
@@ -119,17 +131,22 @@ class BusWait {
   }
 
   /// One poll: follows the trip ([expectedAt] moves) and decides whether
-  /// to notify. [arrivals] null = the request failed.
-  WaitCheck check(List<BusArrival>? arrivals, DateTime now) {
+  /// to notify. [arrivals] null = the request failed. [fetchedAt] is the
+  /// board's, and [now] the phone's clock right after the fetch.
+  WaitCheck check(List<BusArrival>? arrivals, DateTime now,
+      {DateTime? fetchedAt}) {
     if (now.difference(startedAt) >= maxDuration) {
       return const WaitCheck(WaitOutcome.over);
     }
     if (arrivals == null) {
       return const WaitCheck(WaitOutcome.waiting, failed: true);
     }
+    // The board just arrived: up to its edge-cache age, this is how far
+    // the phone's clock is from the source's
+    if (fetchedAt != null) clockOffset = now.difference(fetchedAt);
     final trip = findTrip(arrivals, now);
     if (trip == null) {
-      return WaitCheck(now.isAfter(expectedAt.add(passedGrace))
+      return WaitCheck(now.isAfter(expectedOnPhone.add(passedGrace))
           ? WaitOutcome.over
           : WaitOutcome.waiting);
     }
@@ -169,6 +186,7 @@ class BusWait {
         'alertMinutes': alertMinutes,
         'startedAt': startedAt.millisecondsSinceEpoch,
         'expectedAt': expectedAt.millisecondsSinceEpoch,
+        'clockOffsetMs': clockOffset.inMilliseconds,
       };
 
   factory BusWait.fromJson(Map<String, dynamic> json) => BusWait(
@@ -183,5 +201,8 @@ class BusWait {
             DateTime.fromMillisecondsSinceEpoch(json['startedAt'] as int),
         expectedAt:
             DateTime.fromMillisecondsSinceEpoch(json['expectedAt'] as int),
+        // A wait saved by an older build has none
+        clockOffset:
+            Duration(milliseconds: json['clockOffsetMs'] as int? ?? 0),
       );
 }

@@ -241,8 +241,9 @@ class _StopsPageState extends State<StopsPage>
       });
     }
     final results = await MvdApiService.getBoards(ids);
-    results.forEach((id, result) =>
-        BusWaitService.onArrivals(id, result.valueOrNull?.arrivals));
+    results.forEach((id, result) => BusWaitService.onArrivals(
+        id, result.valueOrNull?.arrivals,
+        fetchedAt: result.valueOrNull?.fetchedAt));
 
     Duration? busyFor;
     for (final result in results.values) {
@@ -629,12 +630,20 @@ class _StopsPageState extends State<StopsPage>
       return;
     }
 
+    // The clock offset of the board the row came from: the iOS reminder
+    // is set with it before any refresh
+    final view = _boards[stopId];
+    final board = view?.lastGood;
+    final receivedAt = view?.receivedAt;
     final wait = BusWait.forTrip(
       stopId: stopId,
       stopName: stopName,
       trip: trip,
       alertMinutes: choice,
       now: DateTime.now(),
+      clockOffset: board == null || receivedAt == null
+          ? Duration.zero
+          : receivedAt.difference(board.fetchedAt),
     );
     final started = await BusWaitService.start(wait, trip);
     if (!mounted) return;

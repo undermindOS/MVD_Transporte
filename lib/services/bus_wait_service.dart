@@ -56,12 +56,14 @@ class BusWaitService {
     await platform.stop();
   }
 
-  /// Fresh arrivals of [stopId] while the app is open.
-  static Future<void> onArrivals(
-      int stopId, List<BusArrival>? arrivals) async {
+  /// Fresh arrivals of [stopId] while the app is open; [fetchedAt] is
+  /// their board's.
+  static Future<void> onArrivals(int stopId, List<BusArrival>? arrivals,
+      {DateTime? fetchedAt}) async {
     final wait = current.value;
     if (wait == null || wait.stopId != stopId) return;
-    final ended = await platform.onArrivals(wait, arrivals);
+    final ended =
+        await platform.onArrivals(wait, arrivals, fetchedAt: fetchedAt);
     if (ended) current.value = null;
   }
 
@@ -84,8 +86,10 @@ abstract class BusWaitPlatform {
 
   Future<void> stop();
 
-  /// Returns true when the wait is over.
-  Future<bool> onArrivals(BusWait wait, List<BusArrival>? arrivals);
+  /// Returns true when the wait is over. [fetchedAt], the board's, gives
+  /// the clock offset ([BusWait.check]).
+  Future<bool> onArrivals(BusWait wait, List<BusArrival>? arrivals,
+      {DateTime? fetchedAt});
 }
 
 /// Foreground service: polls by itself, the app only starts and stops it.
@@ -164,7 +168,8 @@ class AndroidBusWait implements BusWaitPlatform {
   }
 
   @override
-  Future<bool> onArrivals(BusWait wait, List<BusArrival>? arrivals) async =>
+  Future<bool> onArrivals(BusWait wait, List<BusArrival>? arrivals,
+          {DateTime? fetchedAt}) async =>
       false; // the service checks on its own
 }
 
@@ -183,7 +188,7 @@ class ScheduledBusWait implements BusWaitPlatform {
     final wait = BusWait.fromJson(jsonDecode(json));
     final now = DateTime.now();
     final over = now.difference(wait.startedAt) >= BusWait.maxDuration ||
-        now.isAfter(wait.expectedAt.add(BusWait.passedGrace));
+        now.isAfter(wait.expectedOnPhone.add(BusWait.passedGrace));
     if (over) {
       await prefs.remove(_prefsKey);
       return null;
@@ -206,8 +211,9 @@ class ScheduledBusWait implements BusWaitPlatform {
   }
 
   @override
-  Future<bool> onArrivals(BusWait wait, List<BusArrival>? arrivals) async {
-    final result = wait.check(arrivals, DateTime.now());
+  Future<bool> onArrivals(BusWait wait, List<BusArrival>? arrivals,
+      {DateTime? fetchedAt}) async {
+    final result = wait.check(arrivals, DateTime.now(), fetchedAt: fetchedAt);
     switch (result.outcome) {
       case WaitOutcome.alert:
         await stop();
@@ -223,8 +229,9 @@ class ScheduledBusWait implements BusWaitPlatform {
   }
 
   Future<void> _schedule(BusWait wait) async {
+    // Local notifications fire on the phone's clock
     final at =
-        wait.expectedAt.subtract(Duration(minutes: wait.alertMinutes));
+        wait.expectedOnPhone.subtract(Duration(minutes: wait.alertMinutes));
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_prefsKey, jsonEncode(wait.toJson()));
     await NotificationService.scheduleWaitReminder(

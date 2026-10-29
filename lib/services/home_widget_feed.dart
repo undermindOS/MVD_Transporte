@@ -28,7 +28,9 @@ abstract final class WidgetFeed {
   /// The bus's clock time at the stop (String, "19:56").
   static const keyClockTime = 'route_eta_at';
 
-  /// When the bus is expected (String: ms since epoch, in decimal).
+  /// When the bus is expected, on the phone's clock (String: ms since
+  /// epoch, in decimal): `expectedAt` is on the source's, and the widget
+  /// compares this with the phone's.
   static const keyExpectedAtMs = 'route_expected_at_ms';
 
   /// When the board was last fetched (String: ms since epoch, in decimal).
@@ -52,7 +54,8 @@ abstract final class WidgetFeed {
 
   /// The row for the first of [enabledRoutes], from its origin's board in
   /// [boards] (a board missing there counts as failed). [now] is when the
-  /// boards were fetched.
+  /// boards were fetched, on the phone's clock: minus a board's fetchedAt,
+  /// it is how far the phone's clock is from the source's.
   static Future<void> update({
     required List<RouteAlert> enabledRoutes,
     required Map<int, ApiResult<ArrivalsBoard>> boards,
@@ -83,8 +86,10 @@ abstract final class WidgetFeed {
                   : bus.destination);
           await HomeWidget.saveWidgetData<int>(keyEtaMinutes, bus.etaMinutes);
           await HomeWidget.saveWidgetData<String>(keyClockTime, bus.clockTime);
+          final dueOnPhone =
+              bus.expectedAt.add(now.difference(board.fetchedAt));
           await HomeWidget.saveWidgetData<String>(
-              keyExpectedAtMs, '${bus.expectedAt.millisecondsSinceEpoch}');
+              keyExpectedAtMs, '${dueOnPhone.millisecondsSinceEpoch}');
         }
         await HomeWidget.saveWidgetData<String>(
             keyCheckedAtMs, '${now.millisecondsSinceEpoch}');

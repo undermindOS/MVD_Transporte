@@ -60,8 +60,9 @@ class MVDTransporteWidgetProvider : AppWidgetProvider() {
         val routeDest = widgetData.getString("route_dest", null)
         // Absolute time stays correct between background refreshes (≥15 min)
         val routeEtaAt = widgetData.getString("route_eta_at", null)
-        // When the bus is due (ms since epoch, as text): a row the app
-        // could not refresh must not show a bus that has passed
+        // When the bus is due, on the phone's clock (ms since epoch, as
+        // text): a row the app could not refresh must not show a bus that
+        // has passed
         val routeExpectedAtMs =
             widgetData.getString("route_expected_at_ms", null)?.toLongOrNull()
         val expired = routeExpectedAtMs != null &&

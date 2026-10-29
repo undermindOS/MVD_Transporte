@@ -591,7 +591,8 @@ class _FakeWaitPlatform implements BusWaitPlatform {
   Future<void> stop() async => stopped = true;
 
   @override
-  Future<bool> onArrivals(BusWait wait, List<BusArrival>? arrivals) async =>
+  Future<bool> onArrivals(BusWait wait, List<BusArrival>? arrivals,
+          {DateTime? fetchedAt}) async =>
       false;
 }
 

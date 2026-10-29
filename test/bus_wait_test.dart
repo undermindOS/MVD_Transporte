@@ -46,6 +46,7 @@ BusArrival _bus(String line, int minutes,
 
 /// GET /v1/stops/3140/arrivals at [at]: GPS buses of the 116 to POCITOS.
 String _v1Answer(DateTime at, List<(String, int)> buses) => jsonEncode({
+      'fetchedAt': at.toUtc().toIso8601String(),
       'arrivals': [
         for (final (tripId, minutes) in buses)
           {
@@ -207,6 +208,65 @@ void main() {
           WaitOutcome.over);
     });
 
+    test('a phone clock 5 min ahead: "passed" is measured on the phone\'s '
+        'clock', () {
+      final wait = waitFor(_bus('116', 6));
+      final due = wait.expectedAt; // on the source's clock
+      final other = [_bus('116', 30)]; // next one, too far to be the same
+      const ahead = Duration(minutes: 5);
+      // Each board just arrived, stamped 5 min before the phone's clock
+      WaitOutcome checkAt(DateTime now) =>
+          wait.check(other, now, fetchedAt: now.subtract(ahead)).outcome;
+
+      // 3 min after the source's due time is 2 min before the phone's
+      expect(checkAt(due.add(const Duration(minutes: 3))),
+          WaitOutcome.waiting);
+      expect(wait.clockOffset, ahead);
+      expect(wait.expectedAt, due);
+      expect(
+          checkAt(due.add(ahead + BusWait.passedGrace)
+              .add(const Duration(seconds: 1))),
+          WaitOutcome.over);
+    });
+
+    test('each board updates the clock offset, which is stored', () {
+      final wait = waitFor(_bus('116', 20));
+      final now = _t0.add(const Duration(minutes: 1));
+      wait.check([], now, fetchedAt: now.subtract(const Duration(minutes: 5)));
+      expect(wait.clockOffset, const Duration(minutes: 5));
+      // Now the phone is 2 min behind the source
+      wait.check([], now, fetchedAt: now.add(const Duration(minutes: 2)));
+      expect(wait.clockOffset, const Duration(minutes: -2));
+      // A check without a board's stamp keeps it
+      wait.check([], now);
+      expect(wait.clockOffset, const Duration(minutes: -2));
+      expect(wait.expectedOnPhone, _t0.add(const Duration(minutes: 18)));
+
+      // Read back as local time: the same instant
+      final copy = BusWait.fromJson(jsonDecode(jsonEncode(wait.toJson())));
+      expect(copy.clockOffset, const Duration(minutes: -2));
+      expect(copy.expectedOnPhone.isAtSameMomentAs(wait.expectedOnPhone),
+          isTrue);
+    });
+
+    test('forTrip takes the clock offset of the board the trip came from',
+        () {
+      final trip = _bus('116', 9);
+      final wait = BusWait.forTrip(
+        stopId: 3140,
+        stopName: 'BV BATLLE',
+        trip: trip,
+        alertMinutes: 5,
+        now: _t0,
+        clockOffset: const Duration(minutes: 6),
+      );
+      expect(wait.clockOffset, const Duration(minutes: 6));
+      expect(wait.expectedAt, trip.expectedAt);
+      expect(wait.expectedOnPhone,
+          trip.expectedAt.add(const Duration(minutes: 6)));
+      expect(waitFor(trip).clockOffset, Duration.zero);
+    });
+
     test('offline keeps waiting; the wait ends after an hour', () {
       final wait = waitFor(_bus('116', 50));
       final offline = wait.check(null, _t0.add(const Duration(minutes: 1)));
@@ -239,6 +299,9 @@ void main() {
         'expectedAt': expected.millisecondsSinceEpoch,
       })));
       expect((wait.tripId, wait.variantId), (null, null));
+      // Nor a clock offset: none, as before
+      expect(wait.clockOffset, Duration.zero);
+      expect(wait.expectedOnPhone.isAtSameMomentAs(expected), isTrue);
 
       final at = _t0.add(const Duration(minutes: 2));
       final result = wait.check(
@@ -353,6 +416,39 @@ void main() {
           contains('Llega en 12 min · BV BATLLE'));
     });
 
+    test('a proxy 5 min behind the phone: the trip has not passed yet',
+        () async {
+      MvdApiService.proxyUrl = 'https://proxy.test';
+      addTearDown(() => MvdApiService.proxyUrl = '');
+      final now = DateTime.now();
+      final fetchedAt = now.subtract(const Duration(minutes: 5));
+      // Due 1 min after the proxy's stamp: 4 min ago on the phone's clock,
+      // in 1 min once moved to it. Not on the board, which has only the 116
+      final wait = BusWait.forTrip(
+        stopId: 3140,
+        stopName: 'BV BATLLE',
+        trip: _bus('121', 1, at: fetchedAt),
+        alertMinutes: 4,
+        now: now,
+      );
+      final proxy = MockClient((request) async {
+        expect('${request.url}', 'https://proxy.test/v1/stops/3140/arrivals');
+        return http.Response.bytes(
+            utf8.encode(_v1Answer(fetchedAt, [('bus-50-222', 30)])), 200);
+      });
+      await http.runWithClient(() => startHandler(wait), () => proxy);
+
+      expect(serviceCalls.map((c) => c.method), isNot(contains('stopService')));
+      final update =
+          serviceCalls.singleWhere((c) => c.method == 'updateService');
+      expect(jsonEncode(update.arguments),
+          contains('Sin datos del ómnibus por ahora · BV BATLLE'));
+      // The offset is kept for an app restart
+      final saved = BusWait.fromJson(jsonDecode(
+          (await FlutterForegroundTask.getData<String>(key: busWaitDataKey))!));
+      expect(saved.clockOffset.inSeconds, inInclusiveRange(300, 305));
+    });
+
     test('"Dejar de esperar" stops the service without alerting', () async {
       minutes = 20;
       final wait = BusWait.forTrip(
@@ -428,6 +524,62 @@ void main() {
       ]);
       expect(result, isFalse);
       expect(scheduled.last, now.add(const Duration(minutes: 21)).toUtc());
+    });
+
+    test('is set on the phone\'s clock, with the offset of each board',
+        () async {
+      // Whole seconds: the plugin gets the time with milliseconds
+      final now = DateTime.fromMillisecondsSinceEpoch(
+          DateTime.now().millisecondsSinceEpoch ~/ 1000 * 1000);
+      // The board the row came from was stamped 5 min before the phone
+      final source = now.subtract(const Duration(minutes: 5));
+      final trip = _bus('116', 20, at: source, tripId: 'bus-50-111');
+      final wait = BusWait.forTrip(
+        stopId: 3140,
+        stopName: 'BV BATLLE',
+        trip: trip,
+        alertMinutes: 5,
+        now: now,
+        clockOffset: const Duration(minutes: 5),
+      );
+      final ios = ScheduledBusWait();
+      expect(await ios.start(wait, trip), isTrue);
+      // In 15 min on the phone, not in 10
+      expect(scheduled.single, now.add(const Duration(minutes: 15)).toUtc());
+
+      // A new board, stamped 7 min before the phone, says the same time
+      final fetchedAt = DateTime.now().subtract(const Duration(minutes: 7));
+      expect(
+          await ios.onArrivals(wait, [trip], fetchedAt: fetchedAt), isFalse);
+      final at = trip.expectedAt.add(const Duration(minutes: 7 - 5));
+      expect(scheduled.last.difference(at).inSeconds, inInclusiveRange(0, 2));
+    });
+
+    test('a restored wait ends 2 min after its time on the phone\'s clock',
+        () async {
+      final now = DateTime.now();
+      const ahead = Duration(minutes: 5);
+      // Saved by start(), then read back as at an app start
+      Future<BusWait?> restore({required Duration dueAgo}) async {
+        SharedPreferences.setMockInitialValues({});
+        final trip = _bus('116', 0, at: now.subtract(dueAgo));
+        final wait = BusWait.forTrip(
+          stopId: 3140,
+          stopName: 'BV BATLLE',
+          trip: trip,
+          alertMinutes: 5,
+          now: now,
+          clockOffset: ahead,
+        );
+        await ScheduledBusWait().start(wait, trip);
+        return ScheduledBusWait().restore();
+      }
+
+      // Due 6 min ago on the source's clock, 1 min ago on the phone's
+      expect((await restore(dueAgo: const Duration(minutes: 6)))?.clockOffset,
+          ahead);
+      // 8 min ago on the source's, 3 min ago on the phone's: passed
+      expect(await restore(dueAgo: const Duration(minutes: 8)), isNull);
     });
   });
 }
