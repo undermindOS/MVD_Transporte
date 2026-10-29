@@ -1,7 +1,8 @@
 // MapBuses.from: the Mapa's buses from the boards of the saved stops. A GPS
 // bus on several boards is one bus, rows without a bus id stay per stop,
 // positions past the basemap are dropped, and after a failed refresh the
-// last buses are estimates for 5 min after their board, then gone.
+// last buses are estimates for 5 min after their board, then gone. Each ETA
+// is live or an estimate as its own board.
 
 import 'package:flutter_map/flutter_map.dart' show LatLngBounds;
 import 'package:flutter_test/flutter_test.dart';
@@ -133,6 +134,44 @@ void main() {
       {for (final b in buses) b.key: b.live},
       {'bus-50-111': false, 'bus-50-139': true},
     );
+  });
+
+  test('a bus on a current board and on a failed one: its ETA to the '
+      'failed stop is an estimate', () {
+    final buses = _buses(
+      {
+        574: _board(574, [
+          _arrival('bus-50-678', eta: 8),
+        ], age: const Duration(minutes: 3)),
+        3140: _board(3140, [_arrival('bus-50-678', eta: 2)]),
+      },
+      failed: {574},
+    );
+    final bus = buses.single;
+    // Its position is from the current board
+    expect(bus.live, isTrue);
+    expect(bus.etas.map((e) => (e.stopId, e.etaMinutes, e.live)), [
+      (3140, 2, true),
+      (574, 8, false),
+    ]);
+  });
+
+  test('a bus as an estimate: unlit, and every ETA too', () {
+    final bus = _buses({
+      574: _board(574, [_arrival('bus-50-111', eta: 4)]),
+      3140: _board(3140, [_arrival('bus-50-111', eta: 9)]),
+    }).single;
+    expect(bus.etas.every((e) => e.live), isTrue);
+    final estimate = bus.estimate;
+    expect(
+      (estimate.key, estimate.line, estimate.position),
+      (bus.key, bus.line, bus.position),
+    );
+    expect(estimate.live, isFalse);
+    expect(estimate.etas.map((e) => (e.stopId, e.clockTime, e.live)), [
+      (574, '19:54', false),
+      (3140, '19:59', false),
+    ]);
   });
 
   test('a board a minute old is not live, even with no failure', () {

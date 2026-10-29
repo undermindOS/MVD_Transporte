@@ -58,7 +58,8 @@ class BusLayer extends StatefulWidget {
   final BusLayerHandle handle;
 
   /// Moves glide over [moveDuration]. false, or reduced motion, makes them
-  /// jump: the map is not on screen, its ticker is off.
+  /// jump: the map is not on screen, its ticker is off. The first buses
+  /// after it turns true jump too: they moved while it was away.
   final bool animate;
 
   /// Below this style zoom buses are dots: at z13 a pill covers a few
@@ -125,7 +126,10 @@ class _BusLayerState extends State<BusLayer>
       widget.handle._state = this;
     }
     if (!_glides) _jump();
-    if (!identical(old.buses, widget.buses)) _apply(widget.buses);
+    // Back on screen: what moved while it was away jumps there
+    if (!identical(old.buses, widget.buses)) {
+      _apply(widget.buses, glide: old.animate);
+    }
   }
 
   /// A move under way ends where it was going.
@@ -155,10 +159,17 @@ class _BusLayerState extends State<BusLayer>
   /// World position at zoom 0 (a 256 px world).
   static Offset _world(LatLng p) => _crs.latLngToOffset(p, 0);
 
-  void _apply(List<MapBus> buses) {
+  void _apply(List<MapBus> buses, {bool glide = true}) {
     final t = _curve.transform(_move.value);
+    // Only a new target starts a move: the page rebuilds once per board,
+    // and a move under way to the same places goes on as it is
+    final moved = buses.any((bus) {
+      final track = _tracks[bus.key];
+      if (track == null) return false;
+      final to = _world(bus.position);
+      return to.dx != track.toX || to.dy != track.toY;
+    });
     final next = <String, _Track>{};
-    var moved = false;
     for (final bus in buses) {
       final to = _world(bus.position);
       final track = _tracks[bus.key];
@@ -166,22 +177,22 @@ class _BusLayerState extends State<BusLayer>
         next[bus.key] = _Track(bus, to.dx, to.dy)..from = bus.position;
         continue;
       }
-      // Start from where it is drawn now, mid-move included
-      final x = t >= 1
-          ? track.toX
-          : track.fromX + (track.toX - track.fromX) * t;
-      final y = t >= 1
-          ? track.toY
-          : track.fromY + (track.toY - track.fromY) * t;
-      track
-        ..from = _lerp(track.from, track.bus.position, t)
-        ..fromX = x
-        ..fromY = y
-        ..toX = to.dx
-        ..toY = to.dy
-        ..bus = bus;
-      if (x != to.dx || y != to.dy) moved = true;
-      next[bus.key] = track;
+      if (moved) {
+        // Start from where it is drawn now, mid-move included
+        final x = t >= 1
+            ? track.toX
+            : track.fromX + (track.toX - track.fromX) * t;
+        final y = t >= 1
+            ? track.toY
+            : track.fromY + (track.toY - track.fromY) * t;
+        track
+          ..from = _lerp(track.from, track.bus.position, t)
+          ..fromX = x
+          ..fromY = y
+          ..toX = to.dx
+          ..toY = to.dy;
+      }
+      next[bus.key] = track..bus = bus;
     }
     _tracks
       ..clear()
@@ -197,7 +208,7 @@ class _BusLayerState extends State<BusLayer>
     _wanted = {for (final t in _order) (t.bus.line, t.bus.live)};
     // A new _order repaints the layer once; a move repaints every frame
     if (!moved) return;
-    if (_glides) {
+    if (_glides && glide) {
       _move.forward(from: 0);
     } else {
       _move.value = 1;

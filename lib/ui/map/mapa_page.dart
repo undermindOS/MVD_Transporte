@@ -75,7 +75,7 @@ class MapaPage extends StatefulWidget {
   const MapaPage({
     super.key,
     this.active = true,
-    this.basemapLoader = MapaBasemap.bundled,
+    this.basemapLoader = _defaultLoader,
   });
 
   /// The Mapa is on screen: its tab is selected, no page covers it and the
@@ -86,6 +86,14 @@ class MapaPage extends StatefulWidget {
   /// Tests pass a basemap without tiles.
   @visibleForTesting
   final MapaBasemapLoader basemapLoader;
+
+  /// The loader of a page built without one, as the app's is: tests of the
+  /// whole app set a basemap without tiles (the bundled style is read in a
+  /// worker isolate, which never answers inside fake async).
+  @visibleForTesting
+  static MapaBasemapLoader defaultBasemapLoader = MapaBasemap.bundled;
+
+  static Future<MapaBasemap> _defaultLoader() => defaultBasemapLoader();
 
   /// The phone's clock, against the boards' `fetchedAt`. Tests move it.
   @visibleForTesting
@@ -128,8 +136,10 @@ class _MapaPageState extends State<MapaPage> with WidgetsBindingObserver {
   // The boards last seen in MvdApiService.latestBoards
   Map<int, ArrivalsBoard> _seen = const {};
 
-  // StopLocationsService.fillMissing has answered once
-  bool _located = false;
+  // Saved stops StopLocationsService.fillMissing has answered for, and
+  // those it is looking up now: only the first can be "not placed"
+  final _lookedUp = <int>{};
+  final _lookingUp = <int>{};
 
   // Rebuilds an open sheet with the page
   final _sheet = ValueNotifier<int>(0);
@@ -258,10 +268,17 @@ class _MapaPageState extends State<MapaPage> with WidgetsBindingObserver {
 
   /// Saved stops with no location get one; the map follows.
   void _locate() {
+    // One still looked up by an earlier call is skipped by this one
+    final asked = {
+      for (final s in _stops)
+        if (!s.hasLocation && !_lookingUp.contains(s.id)) s.id,
+    };
+    _lookingUp.addAll(asked);
     StopLocationsService.fillMissing(_stops).then((filled) {
+      _lookingUp.removeAll(asked);
       if (!mounted) return;
       _changed(() {
-        _located = true;
+        _lookedUp.addAll(asked);
         if (filled > 0) _stops = CacheService.getAllStops();
       });
     });
@@ -359,11 +376,17 @@ class _MapaPageState extends State<MapaPage> with WidgetsBindingObserver {
       builder: (_) => ValueListenableBuilder<int>(
         valueListenable: _sheet,
         builder: (context, _, _) {
-          // The same bus after a refresh; the last seen once it is gone
+          // The same bus after a refresh. Once no board has it, the last
+          // seen as an estimate: old minutes must not look live
+          MapBus? current;
           for (final bus in _buses()) {
-            if (bus.key == tapped.key) last = bus;
+            if (bus.key == tapped.key) current = bus;
           }
-          return BusSheet(bus: last, stops: {for (final s in _stops) s.id: s});
+          if (current != null) last = current;
+          return BusSheet(
+            bus: current ?? last.estimate,
+            stops: {for (final s in _stops) s.id: s},
+          );
         },
       ),
     );
@@ -411,10 +434,18 @@ class _MapaPageState extends State<MapaPage> with WidgetsBindingObserver {
     final now = MapaPage.clock();
     final buses = _buses();
     final located = _stops.where((s) => s.hasLocation).toList();
-    final unlocated = _located
-        ? _stops.where((s) => !s.hasLocation).toList()
-        : const <BusStop>[];
+    final unlocated = _stops
+        .where((s) => !s.hasLocation && _lookedUp.contains(s.id))
+        .toList();
     final boards = MvdApiService.latestBoards.value;
+    final liveness = {
+      for (final s in located)
+        s.id: MapBuses.liveness(
+          boards[s.id],
+          failed: _failed.contains(s.id),
+          now: now,
+        ),
+    };
     final known = _stops.any((s) {
       final board = boards[s.id];
       return board != null &&
@@ -445,6 +476,7 @@ class _MapaPageState extends State<MapaPage> with WidgetsBindingObserver {
           child: _MapaView(
             basemap: basemap,
             located: located,
+            liveness: liveness,
             buses: buses,
             animate: widget.active,
             onStop: _showStop,
@@ -493,6 +525,7 @@ class _MapaView extends StatefulWidget {
   const _MapaView({
     required this.basemap,
     required this.located,
+    required this.liveness,
     required this.buses,
     required this.animate,
     required this.onStop,
@@ -503,6 +536,9 @@ class _MapaView extends StatefulWidget {
 
   /// The saved stops with a location.
   final List<BusStop> located;
+
+  /// [MapBuses.liveness] of each located stop's board, by stop id.
+  final Map<int, bool?> liveness;
   final List<MapBus> buses;
   final bool animate;
   final ValueChanged<BusStop> onStop;
@@ -605,6 +641,7 @@ class _MapaViewState extends State<_MapaView> {
                 height: TimbreSpace.touch,
                 child: _StopMarker(
                   stop: stop,
+                  live: widget.liveness[stop.id],
                   buses: widget.buses
                       .where((b) => b.etas.any((e) => e.stopId == stop.id))
                       .length,
@@ -621,15 +658,22 @@ class _MapaViewState extends State<_MapaView> {
 
 /// A saved stop: the pixel stop sign on an ink tile, unlit (ámbar is for
 /// the buses), in a 44 px target. Screen readers hear the stop and how
-/// many GPS buses are on their way, since the buses are paint only.
+/// many GPS buses are on their way, since the buses are paint only: as
+/// estimates when they are drawn unlit, nothing when no board is known.
 class _StopMarker extends StatelessWidget {
   const _StopMarker({
     required this.stop,
+    required this.live,
     required this.buses,
     required this.onTap,
   });
 
   final BusStop stop;
+
+  /// [MapBuses.liveness] of its board.
+  final bool? live;
+
+  /// The buses drawn on their way to it.
   final int buses;
   final VoidCallback onTap;
 
@@ -640,12 +684,14 @@ class _StopMarker extends StatelessWidget {
   static const _glyph = 16.0;
 
   String get _phrase {
-    final coming = switch (buses) {
-      0 => 'sin ómnibus con GPS en camino',
-      1 => '1 ómnibus con GPS en camino',
-      _ => '$buses ómnibus con GPS en camino',
+    final coming = switch ((live, buses)) {
+      // Unknown, or only old minutes: "no buses" is not known either
+      (null, _) || (false, 0) => null,
+      (false, _) => '$buses ómnibus en camino, estimado',
+      (true, 0) => 'sin ómnibus con GPS en camino',
+      (true, _) => '$buses ómnibus con GPS en camino',
     };
-    return '${stopPhrase(stop)}, $coming';
+    return coming == null ? stopPhrase(stop) : '${stopPhrase(stop)}, $coming';
   }
 
   @override

@@ -2,7 +2,8 @@
 // layer): no archive copy, no tile decoding, no worker isolate in the
 // fake-async zone. The network is a MockClient: transporteRest in direct
 // mode, the /v1 goldens in proxy mode. Stops are saved with their
-// coordinates.
+// coordinates. Old minutes must never look live: not on the map, not in a
+// sheet, not in what a screen reader hears.
 //
 // Only the first test awaits a Hive write (StopLocationsService saves the
 // location it finds): only the first test of a file can (see
@@ -61,6 +62,15 @@ const _arrivals574 =
     '{"linea":"144","destino":"CEMENTERIO DEL NORTE","minutos":20,'
     '"real":false,"horaDesc":"9:12"}]';
 
+// The next board of 574: bus 678 has passed it
+const _after678 =
+    '['
+    '{"linea":"121","destino":"PUNTA CARRETAS","minutos":3,'
+    '"real":true,"idBus":111,"idEmpresa":50,"horaDesc":"8:56",'
+    '"coordinates":[-56.2070,-34.9090]},'
+    '{"linea":"144","destino":"CEMENTERIO DEL NORTE","minutos":19,'
+    '"real":false,"horaDesc":"9:12"}]';
+
 // Timetable only: no position to draw
 const _noGps =
     '[{"linea":"144","destino":"CEMENTERIO DEL NORTE",'
@@ -78,22 +88,28 @@ void main() {
   late String wfsNone;
   late _FakeBrowser browser;
   final requests = <Uri>[];
-  // The next refreshes fail
+  // The next refreshes fail: all, or those of these stops
   var failing = false;
+  var failingStops = <int>{};
   // siguientesParada bodies by stop
   var bodies = <int, String>{};
   // MapaPage.clock is real time moved by this much
   var later = Duration.zero;
 
-  // The basemap: loads counted, failing on demand, or held
+  // The basemap: loads and closes counted, failing on demand, or held
   var loads = 0;
+  var disposed = 0;
   Object? loadError;
   Completer<void>? held;
   Future<MapaBasemap> basemap() async {
     loads++;
     await held?.future;
     if (loadError case final error?) throw error;
-    return MapaBasemap(bounds: _bounds, attribution: '© OpenStreetMap');
+    return MapaBasemap(
+      bounds: _bounds,
+      attribution: '© OpenStreetMap',
+      onDispose: () => disposed++,
+    );
   }
 
   final client = MockClient((request) async {
@@ -111,6 +127,7 @@ void main() {
     const prefix = '/transporteRest/siguientesParada/';
     if (path.startsWith(prefix)) {
       final id = int.parse(path.substring(prefix.length));
+      if (failingStops.contains(id)) return http.Response('', 500);
       final body = bodies[id] ?? (id == 3140 ? arrivals3140 : '[]');
       return http.Response(
         body,
@@ -125,8 +142,15 @@ void main() {
       .where((u) => u.path.startsWith('/transporteRest/siguientesParada/'))
       .length;
 
-  Widget app({bool active = true}) => MaterialApp(
+  /// [bottomInset]: a phone's home indicator.
+  Widget app({bool active = true, double bottomInset = 0}) => MaterialApp(
     theme: buildTimbreTheme(),
+    builder: (context, child) => MediaQuery(
+      data: MediaQuery.of(
+        context,
+      ).copyWith(padding: EdgeInsets.only(bottom: bottomInset)),
+      child: child!,
+    ),
     home: Scaffold(
       body: MapaPage(active: active, basemapLoader: basemap),
     ),
@@ -154,6 +178,25 @@ void main() {
   BusLayer busLayer(WidgetTester tester) =>
       tester.widget<BusLayer>(find.byType(BusLayer));
 
+  /// Taps the map where a bus is drawn and waits for its sheet.
+  Future<void> tapBus(WidgetTester tester, LatLng at) async {
+    final map = tester.widget<FlutterMap>(find.byType(FlutterMap));
+    final offset = map.mapController!.camera.latLngToScreenOffset(at);
+    await tester.tapAt(tester.getTopLeft(find.byType(FlutterMap)) + offset);
+    // The map tells a tap from a double tap (zoom) first
+    await tester.pump(kDoubleTapTimeout);
+    await tester.pumpAndSettle();
+  }
+
+  /// Every label a screen reader can reach.
+  List<String> labels() => [
+    for (final node
+        in find.semantics
+            .byPredicate((node) => node.label.isNotEmpty)
+            .evaluate())
+      node.label,
+  ];
+
   setUpAll(() async {
     hiveDir = await Directory.systemTemp.createTemp('mvd_mapa_test');
     await CacheService.init(path: hiveDir.path);
@@ -169,10 +212,12 @@ void main() {
     UrlLauncherPlatform.instance = browser;
     requests.clear();
     failing = false;
+    failingStops = {};
     bodies = {574: _arrivals574};
     later = Duration.zero;
     MapaPage.clock = () => DateTime.now().add(later);
     loads = 0;
+    disposed = 0;
     loadError = null;
     held = null;
     MvdApiService.resetLatestBoards();
@@ -283,6 +328,16 @@ void main() {
         unorderedEquals(['bus-50-678', 'bus-50-111']),
       );
       expect(buses.every((b) => b.live), isTrue);
+      // The buses are paint only: the markers say it all
+      expect(
+        labels(),
+        unorderedEquals([
+          'Parada 574, San Jose y Andes, 2 ómnibus con GPS en camino',
+          'Parada 3140, Av Ramon Anador y Tiburcio '
+              'Gomez, 1 ómnibus con GPS en camino',
+          '© OpenStreetMap',
+        ]),
+      );
       final shared = buses.singleWhere((b) => b.key == 'bus-50-678');
       expect(shared.etas.map((e) => (e.stopId, e.etaMinutes)), [
         (3140, 7),
@@ -384,12 +439,15 @@ void main() {
       expect(arrivalRequests(), 4);
 
       await tester.pumpWidget(app(active: false));
+      // Off screen the buses jump, with no ticker
+      expect(busLayer(tester).animate, isFalse);
       await tester.pump(StopsPage.autoRefreshInterval * 3);
       expect(arrivalRequests(), 4);
 
       // Back on screen half a minute later: refreshed at once
       later = StopsPage.autoRefreshInterval;
       await open(tester);
+      expect(busLayer(tester).animate, isTrue);
       expect(arrivalRequests(), 6);
       await tester.pump(StopsPage.autoRefreshInterval);
       expect(arrivalRequests(), 8);
@@ -449,8 +507,10 @@ void main() {
     tester,
   ) async {
     await save(tester, [_stop574()]);
+    final handle = tester.ensureSemantics();
     await http.runWithClient(() async {
       await open(tester);
+      expect(busLayer(tester).buses, hasLength(2));
       expect(busLayer(tester).buses.every((b) => b.live), isTrue);
       expect(find.text('Reintentar'), findsNothing);
 
@@ -465,6 +525,13 @@ void main() {
       final stale = busLayer(tester).buses;
       expect(stale, hasLength(2));
       expect(stale.any((b) => b.live), isFalse);
+      // Heard as estimates too, not as GPS buses on their way
+      expect(
+        find.bySemanticsLabel(
+          'Parada 574, San Jose y Andes, 2 ómnibus en camino, estimado',
+        ),
+        findsOneWidget,
+      );
 
       // Five minutes after their board: gone
       later = const Duration(minutes: 5);
@@ -477,16 +544,117 @@ void main() {
       );
       // Not "no buses are coming": that is unknown
       expect(find.textContaining('ningún ómnibus'), findsNothing);
+      expect(
+        find.bySemanticsLabel('Parada 574, San Jose y Andes'),
+        findsOneWidget,
+      );
 
-      // Back online
+      // Back online, with a board fetched now
       failing = false;
+      later = Duration.zero;
       final asked = arrivalRequests();
       await tester.tap(find.text('Reintentar'));
       await tester.pump();
       await tester.pump();
       expect(arrivalRequests(), asked + 1);
       expect(find.text('Reintentar'), findsNothing);
+      expect(busLayer(tester).buses, hasLength(2));
       expect(busLayer(tester).buses.every((b) => b.live), isTrue);
+      expect(
+        find.bySemanticsLabel(
+          'Parada 574, San Jose y Andes, 2 ómnibus con GPS en camino',
+        ),
+        findsOneWidget,
+      );
+    }, () => client);
+    handle.dispose();
+  });
+
+  testWidgets('one stop failed: its buses and minutes are estimates, the '
+      'other stop stays lit', (tester) async {
+    await save(tester, [_stop574(), _stop3140()]);
+    final handle = tester.ensureSemantics();
+    await http.runWithClient(() async {
+      await open(tester);
+      failingStops = {574};
+      await tester.pump(StopsPage.autoRefreshInterval);
+      await tester.pump();
+      // The other stop answered: no banner
+      expect(find.text('Reintentar'), findsNothing);
+      expect(
+        find.bySemanticsLabel(
+          'Parada 574, San Jose y Andes, 2 ómnibus en camino, estimado',
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.bySemanticsLabel(
+          'Parada 3140, Av Ramon Anador y Tiburcio '
+          'Gomez, 1 ómnibus con GPS en camino',
+        ),
+        findsOneWidget,
+      );
+
+      // Bus 678 is on both boards: its 574 minutes are old
+      await tapBus(tester, const LatLng(-34.88043, -56.1465));
+      final sheet = find.byType(BottomSheet);
+      final badge = tester.widget<LineBadge>(
+        find.descendant(of: sheet, matching: find.byType(LineBadge)),
+      );
+      expect((badge.line, badge.live), ('145', true));
+      final lit = tester.widgetList<MinutosEnVivo>(
+        find.descendant(of: sheet, matching: find.byType(MinutosEnVivo)),
+      );
+      expect(lit.map((w) => w.minutes), [7]);
+      expect(
+        find.descendant(of: sheet, matching: find.text('~9:04')),
+        findsOneWidget,
+      );
+      expect(
+        find.bySemanticsLabel(
+          'A la parada 574, San Jose y Andes, alrededor de las 9:04, '
+          'estimado',
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.bySemanticsLabel(
+          'A la parada 3140, Av Ramon Anador y Tiburcio Gomez, llega en 7 '
+          'minutos, con GPS',
+        ),
+        findsOneWidget,
+      );
+    }, () => client);
+    handle.dispose();
+  });
+
+  testWidgets('a bus no board has any more: its open sheet turns to an '
+      'estimate', (tester) async {
+    await save(tester, [_stop574(), _stop3140()]);
+    await http.runWithClient(() async {
+      await open(tester);
+      await tapBus(tester, const LatLng(-34.88043, -56.1465));
+      final sheet = find.byType(BottomSheet);
+      Finder lit() =>
+          find.descendant(of: sheet, matching: find.byType(MinutosEnVivo));
+      expect(lit(), findsNWidgets(2));
+
+      // It passed both stops
+      bodies = {574: _after678, 3140: '[]'};
+      await tester.pump(StopsPage.autoRefreshInterval);
+      await tester.pump();
+      expect(busLayer(tester).buses.map((b) => b.key), ['bus-50-111']);
+      final badge = tester.widget<LineBadge>(
+        find.descendant(of: sheet, matching: find.byType(LineBadge)),
+      );
+      expect((badge.line, badge.live), ('145', false));
+      expect(lit(), findsNothing);
+      for (final time in ['~8:59', '~9:04']) {
+        expect(
+          find.descendant(of: sheet, matching: find.text(time)),
+          findsOneWidget,
+        );
+      }
     }, () => client);
   });
 
@@ -504,6 +672,8 @@ void main() {
     await http.runWithClient(() async {
       await open(tester);
       final asked = requests.length;
+      // Only the page's own wait holds the ticks now
+      MvdApiService.resetBusy();
       await tester.pump(StopsPage.autoRefreshInterval * 3);
       expect(requests, hasLength(asked));
       expect(find.text('Reintentar'), findsNothing);
@@ -515,6 +685,7 @@ void main() {
   testWidgets('no GPS bus on the way: a note over the map', (tester) async {
     bodies = {574: _noGps};
     await save(tester, [_stop574()]);
+    final handle = tester.ensureSemantics();
     await http.runWithClient(() async {
       await open(tester);
       expect(find.byType(FlutterMap), findsOneWidget);
@@ -522,7 +693,14 @@ void main() {
         find.text('Ahora ningún ómnibus con GPS viene a tus paradas.'),
         findsOneWidget,
       );
+      expect(
+        find.bySemanticsLabel(
+          'Parada 574, San Jose y Andes, sin ómnibus con GPS en camino',
+        ),
+        findsOneWidget,
+      );
     }, () => client);
+    handle.dispose();
   });
 
   testWidgets('stops the city does not place: a short note', (tester) async {
@@ -532,6 +710,27 @@ void main() {
     ]);
     await http.runWithClient(() async {
       await open(tester);
+      await tester.pump();
+      expect(
+        find.text('No se pudo ubicar en el mapa la parada 9999999.'),
+        findsOneWidget,
+      );
+    }, () => client);
+  });
+
+  testWidgets('a stop saved meanwhile is not called unplaced before it is '
+      'looked up', (tester) async {
+    await save(tester, [_stop574()]);
+    await http.runWithClient(() async {
+      await open(tester);
+      await tester.pumpWidget(app(active: false));
+      // Saved in Mis paradas, with no location
+      await save(tester, [BusStop(id: 9999999, name: 'Parada 9999999')]);
+
+      later = StopsPage.autoRefreshInterval;
+      await tester.pumpWidget(app());
+      expect(find.textContaining('No se pudo ubicar'), findsNothing);
+      await tester.pump();
       await tester.pump();
       expect(
         find.text('No se pudo ubicar en el mapa la parada 9999999.'),
@@ -588,7 +787,9 @@ void main() {
     }, () => client);
   });
 
-  testWidgets('one basemap load at a time', (tester) async {
+  testWidgets('one basemap load at a time, closed with the page', (
+    tester,
+  ) async {
     await save(tester, [_stop574()]);
     held = Completer<void>();
     await http.runWithClient(() async {
@@ -602,6 +803,10 @@ void main() {
       await tester.pump();
       await tester.pump();
       expect(find.byType(FlutterMap), findsOneWidget);
+      expect(disposed, 0);
+
+      await tester.pumpWidget(const SizedBox());
+      expect(disposed, 1);
     }, () => client);
   });
 
@@ -610,20 +815,19 @@ void main() {
     await save(tester, [_stop574()]);
     final handle = tester.ensureSemantics();
     await http.runWithClient(() async {
-      await open(tester);
+      // A phone with a home indicator
+      await tester.pumpWidget(app(bottomInset: 34));
+      await tester.pump();
+      await tester.pump();
 
       final label = find.text('© OpenStreetMap');
       expect(label, findsOneWidget);
-      expect(
-        find.ancestor(of: label, matching: find.byType(SafeArea)),
-        findsOneWidget,
-      );
-      // Bottom left, inside the map
+      // Bottom left, inside the map, above the home indicator
       final map = tester.getRect(find.byType(FlutterMap));
       final rect = tester.getRect(label);
       expect(map.contains(rect.bottomLeft - const Offset(-1, 1)), isTrue);
       expect(rect.left - map.left, lessThan(10));
-      expect(map.bottom - rect.bottom, lessThan(10));
+      expect(map.bottom - rect.bottom, inInclusiveRange(34, 44));
       expect(
         tester.getSemantics(find.bySemanticsLabel('© OpenStreetMap')),
         isSemantics(isLink: true, hasTapAction: true),

@@ -3,8 +3,10 @@ import 'package:latlong2/latlong.dart' show LatLng;
 
 import '../../models/arrivals_board.dart';
 
-/// When a bus reaches one saved stop, from that stop's board.
-typedef MapBusEta = ({int stopId, int etaMinutes, String clockTime});
+/// When a bus reaches one saved stop, from that stop's board. [live] as
+/// that board ([MapBuses.liveness]): a bus on a current board and on one
+/// whose refresh failed has one lit ETA and one estimate.
+typedef MapBusEta = ({int stopId, int etaMinutes, String clockTime, bool live});
 
 /// A bus on the Mapa: one GPS position and the saved stops it is on its
 /// way to.
@@ -25,12 +27,31 @@ class MapBus {
   final String destination;
   final LatLng position;
 
-  /// From a current board. false: an estimate kept from the last board
-  /// after a failed refresh, or one not refreshed for a while. Unlit.
+  /// Its position is from a current board. false: an estimate kept from
+  /// the last board after a failed refresh, or one not refreshed for a
+  /// while. Unlit.
   final bool live;
 
   /// The saved stops it approaches, soonest first.
   final List<MapBusEta> etas;
+
+  /// This bus once no board has it any more: an estimate, every ETA too.
+  MapBus get estimate => MapBus(
+    key: key,
+    line: line,
+    destination: destination,
+    position: position,
+    live: false,
+    etas: [
+      for (final e in etas)
+        (
+          stopId: e.stopId,
+          etaMinutes: e.etaMinutes,
+          clockTime: e.clockTime,
+          live: false,
+        ),
+    ],
+  );
 }
 
 /// The Mapa's buses from the boards of the saved stops. Pure: no widgets,
@@ -48,11 +69,24 @@ abstract final class MapBuses {
   /// An estimate due longer ago than this is dropped.
   static const staleRowGrace = Duration(minutes: 1);
 
+  /// Whether the buses on [board] are live (true) or estimates (false):
+  /// not live once its stop's latest refresh [failed] or it is [liveFor]
+  /// old. null: nothing is known, no board or one [staleFor] old.
+  static bool? liveness(
+    ArrivalsBoard? board, {
+    required bool failed,
+    required DateTime now,
+  }) {
+    if (board == null) return null;
+    final age = now.difference(board.fetchedAt);
+    if (age >= staleFor) return null;
+    return !failed && age < liveFor;
+  }
+
   /// The buses with a location inside [bounds] on the boards of
-  /// [stopIds]. A board is live unless its stop is in [failed] (its latest
-  /// refresh failed) or it is [liveFor] old; one [staleFor] old is
-  /// ignored. A GPS bus on several boards is one bus, at its position on
-  /// the newest board.
+  /// [stopIds], each board live or not by [liveness] (a stop in [failed]:
+  /// its latest refresh failed). A GPS bus on several boards is one bus,
+  /// at its position on the newest board.
   static List<MapBus> from({
     required Iterable<int> stopIds,
     required Map<int, ArrivalsBoard> boards,
@@ -64,10 +98,8 @@ abstract final class MapBuses {
     final cutoff = now.subtract(staleRowGrace);
     for (final stopId in stopIds.toSet()) {
       final board = boards[stopId];
-      if (board == null) continue;
-      final age = now.difference(board.fetchedAt);
-      if (age >= staleFor) continue;
-      final live = !failed.contains(stopId) && age < liveFor;
+      final live = liveness(board, failed: failed.contains(stopId), now: now);
+      if (board == null || live == null) continue;
       for (final arrival in board.arrivals) {
         final location = arrival.location;
         if (location == null) continue;
@@ -83,6 +115,7 @@ abstract final class MapBuses {
           stopId: stopId,
           etaMinutes: arrival.etaMinutes,
           clockTime: arrival.clockTime,
+          live: live,
         );
         final bus = buses[key];
         if (bus == null) {

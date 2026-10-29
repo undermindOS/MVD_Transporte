@@ -12,10 +12,12 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_map/flutter_map.dart' show LatLngBounds;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
+import 'package:latlong2/latlong.dart' show LatLng;
 import 'package:local_auth/error_codes.dart' as auth_error;
 import 'package:url_launcher_platform_interface/link.dart';
 import 'package:url_launcher_platform_interface/url_launcher_platform_interface.dart';
@@ -411,9 +413,15 @@ void main() {
     await tester.runAsync(
         () => Future<void>.delayed(const Duration(milliseconds: 100)));
     lockSetting(true);
+    // No tiles: the bundled basemap is not read inside fake async
+    MapaPage.defaultBasemapLoader = () async => MapaBasemap(
+        bounds: LatLngBounds(
+            const LatLng(-34.97, -56.80), const LatLng(-34.50, -55.70)),
+        attribution: '© OpenStreetMap');
     addTearDown(() {
       MvdApiService.resetLatestBoards();
       MapaPage.clock = DateTime.now;
+      MapaPage.defaultBasemapLoader = MapaBasemap.bundled;
     });
     bool mapaPolling() => tester
         .widget<MapaPage>(find.byType(MapaPage, skipOffstage: false))
@@ -427,6 +435,9 @@ void main() {
       final requested = arrivals.length;
       expect(requested, greaterThan(0));
 
+      // Back minutes later: the boards are old, only the lock holds the
+      // refresh
+      MapaPage.clock = () => DateTime.now().add(const Duration(minutes: 6));
       auth.autoAnswer = null;
       await tripToBackground(tester);
       await tester.pump(StopsPage.autoRefreshInterval * 3);
@@ -435,8 +446,7 @@ void main() {
       // Not even on the way back
       expect(arrivals, hasLength(requested));
 
-      // Unlocked minutes later: refreshed at once
-      MapaPage.clock = () => DateTime.now().add(const Duration(minutes: 6));
+      // Unlocked: refreshed at once
       auth.answer(true);
       await tester.pump();
       await tester.pump();

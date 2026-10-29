@@ -8,9 +8,11 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
+import 'package:latlong2/latlong.dart' show LatLng;
 import 'package:local_auth_platform_interface/local_auth_platform_interface.dart';
 import 'package:url_launcher_platform_interface/link.dart';
 import 'package:url_launcher_platform_interface/url_launcher_platform_interface.dart';
@@ -257,7 +259,15 @@ void main() {
         longitude: -56.198255));
     await tester.runAsync(
         () => Future<void>.delayed(const Duration(milliseconds: 100)));
-    addTearDown(MvdApiService.resetLatestBoards);
+    // No tiles: the bundled basemap is not read inside fake async
+    MapaPage.defaultBasemapLoader = () async => MapaBasemap(
+        bounds: LatLngBounds(
+            const LatLng(-34.97, -56.80), const LatLng(-34.50, -55.70)),
+        attribution: '© OpenStreetMap');
+    addTearDown(() {
+      MvdApiService.resetLatestBoards();
+      MapaPage.defaultBasemapLoader = MapaBasemap.bundled;
+    });
 
     await http.runWithClient(() async {
       await tester.pumpWidget(const MiTransporteMVDApp());
@@ -275,6 +285,7 @@ void main() {
       expect(arrivals, hasLength(1));
       await tester.pump(StopsPage.autoRefreshInterval);
       expect(arrivals, hasLength(2));
+      expect(find.byType(FlutterMap), findsOneWidget);
 
       // Another tab
       await tester.tap(find.text('Servicios'));

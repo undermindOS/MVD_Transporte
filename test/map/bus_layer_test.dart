@@ -1,8 +1,9 @@
 // The Mapa's bus layer on a FlutterMap with no tiles: a tap finds the bus
 // under it, also mid-move; pills from style z14, dots below; estimates are
-// unlit; moves jump with reduced motion or off screen; the pill atlas is
-// drawn again after a trip to the background.
-
+// unlit; moves jump with reduced motion, off screen and back on screen, and
+// a rebuild with the same positions leaves a move as it is; the pill atlas
+// is drawn again after a trip to the background, never while away (iOS:
+// inactive too).
 
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
@@ -17,13 +18,18 @@ import 'package:stm_app/ui/theme/timbre_tokens.dart';
 const _a = LatLng(-34.9060, -56.1950);
 const _b = LatLng(-34.9080, -56.1900);
 
-MapBus _bus(LatLng at, {String key = 'bus-50-1', bool live = true}) => MapBus(
+MapBus _bus(
+  LatLng at, {
+  String key = 'bus-50-1',
+  String line = '145',
+  bool live = true,
+}) => MapBus(
   key: key,
-  line: '145',
+  line: line,
   destination: 'BV ARTIGAS Y BV ESPAÑA',
   position: at,
   live: live,
-  etas: const [(stopId: 3140, etaMinutes: 7, clockTime: '8:59')],
+  etas: [(stopId: 3140, etaMinutes: 7, clockTime: '8:59', live: live)],
 );
 
 void main() {
@@ -181,7 +187,7 @@ void main() {
     );
   });
 
-  testWidgets('off screen a bus jumps, and a move under way ends', (
+  testWidgets('off and back on screen a bus jumps, and a move under way ends', (
     tester,
   ) async {
     await tester.pumpWidget(map([_bus(_a)]));
@@ -203,6 +209,26 @@ void main() {
       handle.hitTest(camera.latLngToScreenOffset(_a), camera)?.key,
       'bus-50-1',
     );
+
+    // Back on screen, where it went meanwhile: a jump, not a 1 s sweep
+    await tester.pumpWidget(map([_bus(_b)]));
+    expect(tester.hasRunningAnimations, isFalse);
+    expect(
+      handle.hitTest(camera.latLngToScreenOffset(_b), camera)?.key,
+      'bus-50-1',
+    );
+  });
+
+  testWidgets('a rebuild with the same positions leaves a move as it is', (
+    tester,
+  ) async {
+    await tester.pumpWidget(map([_bus(_a)]));
+    await tester.pumpWidget(map([_bus(_b)]));
+    await tester.pump(const Duration(milliseconds: 600));
+    // The same place in a new list, as on every board that comes in
+    await tester.pumpWidget(map([_bus(_b)]));
+    await tester.pump(const Duration(milliseconds: 500));
+    expect(tester.hasRunningAnimations, isFalse);
   });
 
   testWidgets('back from the background the pill atlas is drawn again', (
@@ -235,4 +261,27 @@ void main() {
     expect(handle.atlasVersion, drawn + 2);
     expect(handle.hasAtlas, isTrue);
   });
+
+  // iOS has the GPU away while inactive too, and frames still run then
+  testWidgets(
+    'on iOS no pill is drawn while the app is inactive',
+    (tester) async {
+      await tester.pumpWidget(map([_bus(_a)]));
+      final drawn = handle.atlasVersion;
+
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+      // A line the atlas lacks
+      await tester.pumpWidget(
+        map([_bus(_a), _bus(_b, key: 'bus-50-2', line: '121')]),
+      );
+      expect(handle.drawn, hasLength(2));
+      expect(handle.atlasVersion, drawn);
+
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      await tester.pump();
+      expect(handle.atlasVersion, drawn + 2);
+      expect(handle.hasAtlas, isTrue);
+    },
+    variant: TargetPlatformVariant.only(TargetPlatform.iOS),
+  );
 }

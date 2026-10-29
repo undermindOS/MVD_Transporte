@@ -18,7 +18,8 @@ String stopPhrase(BusStop stop) => stop.name == 'Parada ${stop.id}'
     : 'Parada ${stop.id}, ${spokenName(stop.name)}';
 
 /// A tapped bus: its line and destination, and when it reaches each saved
-/// stop it approaches. Lit only while [MapBus.live].
+/// stop it approaches. The badge is lit while [MapBus.live], each row while
+/// its [MapBusEta.live].
 class BusSheet extends StatelessWidget {
   const BusSheet({super.key, required this.bus, required this.stops});
 
@@ -58,8 +59,7 @@ class BusSheet extends StatelessWidget {
           ),
         ),
         const Divider(),
-        for (final eta in bus.etas)
-          _EtaRow(eta: eta, stop: stops[eta.stopId], live: bus.live),
+        for (final eta in bus.etas) _EtaRow(eta: eta, stop: stops[eta.stopId]),
       ],
     );
   }
@@ -67,11 +67,10 @@ class BusSheet extends StatelessWidget {
 
 /// "a la parada 574 · SAN JOSE y ANDES" and the minutes there.
 class _EtaRow extends StatelessWidget {
-  const _EtaRow({required this.eta, required this.stop, required this.live});
+  const _EtaRow({required this.eta, required this.stop});
 
   final MapBusEta eta;
   final BusStop? stop;
-  final bool live;
 
   bool get _named => stop != null && stop!.name != 'Parada ${eta.stopId}';
 
@@ -79,7 +78,7 @@ class _EtaRow extends StatelessWidget {
     final where = _named
         ? 'A la parada ${eta.stopId}, ${spokenName(stop!.name)}'
         : 'A la parada ${eta.stopId}';
-    final when = !live
+    final when = !eta.live
         ? 'alrededor de las ${eta.clockTime}, estimado'
         : eta.etaMinutes <= 0
         ? 'llegando, con GPS'
@@ -93,7 +92,7 @@ class _EtaRow extends StatelessWidget {
         ? 'a la parada ${eta.stopId} · ${stop!.name}'
         : 'a la parada ${eta.stopId}';
     // Lit digits only for a current GPS time; an estimate shows its clock
-    final time = live
+    final time = eta.live
         ? MinutosEnVivo(minutes: eta.etaMinutes, size: 26)
         : Row(
             mainAxisSize: MainAxisSize.min,
