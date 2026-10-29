@@ -116,7 +116,7 @@ Línea {line} a {spokenName(destination)}, {cuándo}[, accesible][, aire acondic
 
 | Qué se ve | Modelo | Campo /v1 | Fuente |
 |---|---|---|---|
-| «No se pudo actualizar. Datos de las 19:52. Deslizá para reintentar.» | `MvdApiService.montevideoClock(ArrivalsBoard.fetchedAt)` | `fetchedAt` | el reloj del Worker cuando contestó transporteRest; modo directo: el reloj del teléfono cuando llegó la respuesta |
+| «No se pudo actualizar. Datos de las 19:52. Deslizá para reintentar.» | `MvdApiService.montevideoClock(ArrivalsBoard.fetchedAt)` | `fetchedAt` | el reloj del Worker cuando contestó transporteRest; modo directo: el encabezado `Date` de transporteRest (si no viene, el reloj del teléfono cuando llegó la respuesta) |
 | Filas estimadas debajo de esa nota | `BusArrival.expectedAt` desde hace 1 min o después | `arrivals[].expectedAt` | `time` (ms); si no viene, `fetchedAt` más los minutos |
 | Solo «No se pudo actualizar. Deslizá para reintentar» | no hay tablero bueno, o llegó al teléfono hace 5 min o más | – (la hora en que llegó al teléfono) | – |
 | Filas estimadas sin nota (no hubo fallo) | el tablero llegó hace 1 min o más (`_BoardView.receivedAt`); quedan las de `expectedAt` desde hace 1 min o después. Desde los 5 min, o sin filas, el indicador de carga | `arrivals[].expectedAt` | – |
@@ -292,11 +292,11 @@ menos de 10 min, y adopta su `tripId` y su `expectedAt`.
 arribos. Para «ya pasó» y el recordatorio de iOS se usa
 `BusWait.expectedOnPhone`: `expectedAt` más `clockOffset`, la hora del
 teléfono menos el `fetchedAt` del tablero, que `check` mide con cada tablero
-(al empezar, `_showWaitSheet` le pasa la del tablero de la fila). Con proxy,
-así un teléfono con la hora corrida no termina la espera ni avisa antes de
-tiempo. Sin proxy, `fetchedAt` es la hora del teléfono cuando llega la
-respuesta: `clockOffset` da casi cero y «ya pasó» y el recordatorio siguen
-comparando la hora que da la Intendencia (`time`) con la del teléfono.
+(al empezar, `_showWaitSheet` le pasa la del tablero de la fila). Así un
+teléfono con la hora corrida no termina la espera ni avisa antes de tiempo,
+con proxy o sin él. Sin proxy, `fetchedAt` es el encabezado `Date` de
+transporteRest, en el mismo reloj que `time`; si no viene, la hora del
+teléfono cuando llega la respuesta, y `clockOffset` da casi cero.
 
 ### Aviso fijo (Android) y recordatorio (iOS)
 

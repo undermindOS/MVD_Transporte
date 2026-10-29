@@ -41,8 +41,8 @@ class BusWait {
   DateTime expectedAt;
 
   /// The phone's clock minus the board's fetchedAt, measured when a board
-  /// arrives: how far the phone is from the proxy. In direct mode fetchedAt
-  /// is the phone's clock, so this stays about zero.
+  /// arrives: how far the phone is from the source (the proxy, or IM's Date
+  /// header in direct mode; about zero when that header is missing).
   Duration clockOffset;
 
   /// The wait ends on its own after this long.

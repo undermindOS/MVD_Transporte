@@ -446,6 +446,32 @@ void main() {
       expect(board.arrivals.map((a) => a.airConditioning), everyElement(isNull));
     });
 
+    test('arrivals are stamped with the Date header, on the source\'s clock',
+        () async {
+      // The Date of a live answer: IM's clock, not the test's
+      final date = DateTime.utc(2026, 10, 29, 13, 58, 21);
+      Future<DateTime> fetchedAt(Map<String, String> headers) async {
+        final dated = MockClient((_) async => http.Response.bytes(
+            utf8.encode(_siguientesParada3140), 200, headers: headers));
+        final result = await http.runWithClient(
+            () => MvdApiService.getBoard(3140), () => dated);
+        return result.valueOrNull!.fetchedAt;
+      }
+
+      expect(await fetchedAt({'date': HttpDate.format(date)}), date);
+      // No header, or one that does not parse: the phone's clock, as before
+      for (final headers in [
+        <String, String>{},
+        {'date': 'yesterday'},
+      ]) {
+        final before = DateTime.now().millisecondsSinceEpoch;
+        final stamp = (await fetchedAt(headers)).millisecondsSinceEpoch;
+        expect(stamp,
+            inInclusiveRange(before, DateTime.now().millisecondsSinceEpoch),
+            reason: '$headers');
+      }
+    });
+
     test('an answer of the wrong shape is a failure, not "no buses"',
         () async {
       final result = await run(() => MvdApiService.getBoard(574));
@@ -679,9 +705,9 @@ void main() {
 
       test('a phone clock put back: new boards are taken, not frozen out',
           () async {
-        // Without the proxy fetchedAt is the phone's clock (here the boards
-        // are stamped as it would): put back 10 min, every new board looks
-        // older than the kept one
+        // Without the proxy and with no Date header, fetchedAt is the
+        // phone's clock (here the boards are stamped as it would): put back
+        // 10 min, every new board looks older than the kept one
         var phone = DateTime.utc(2026, 10, 19, 23, 2, 40);
         MvdApiService.clock = () => phone;
         addTearDown(() => MvdApiService.clock = DateTime.now);

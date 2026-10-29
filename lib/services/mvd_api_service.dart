@@ -101,9 +101,9 @@ class MvdApiService {
     final boards = latestBoards.value;
     final known = boards[stopId];
     final now = clock();
-    // A phone clock put back makes every new board look older (without
-    // the proxy, fetchedAt is the phone's clock): one received "later
-    // than now" gives way
+    // A phone clock put back makes every new board look older when
+    // fetchedAt is the phone's clock (no proxy and no Date header): one
+    // received "later than now" gives way
     if (known != null &&
         known.board.fetchedAt.isAfter(board.fetchedAt) &&
         !known.receivedAt.isAfter(now)) {

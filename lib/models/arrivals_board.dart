@@ -21,8 +21,9 @@ class ArrivalsBoard {
 
 /// A board and when it reached the phone, on the phone's clock. How old a
 /// board is gets measured from [receivedAt], as Mis paradas does:
-/// [ArrivalsBoard.fetchedAt] is on the source's clock (the proxy's), and a
-/// phone a minute or more off would make every board look old, or new.
+/// [ArrivalsBoard.fetchedAt] is on the source's clock (the proxy's, or IM's
+/// Date header in direct mode), and a phone a minute or more off would make
+/// every board look old, or new.
 typedef ReceivedBoard = ({ArrivalsBoard board, DateTime receivedAt});
 
 /// The source's clock, seen from the phone.

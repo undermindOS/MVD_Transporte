@@ -55,8 +55,9 @@ abstract final class WidgetFeed {
   /// The row for the first of [enabledRoutes], from its origin's board in
   /// [boards] (a board missing there counts as failed). [now] is when the
   /// boards were fetched, on the phone's clock: minus a board's fetchedAt,
-  /// it is how far the phone's clock is from the proxy's (about zero in
-  /// direct mode, where fetchedAt is the phone's clock).
+  /// it is how far the phone's clock is from the source's (the proxy's, or
+  /// IM's Date header in direct mode; about zero when that header is
+  /// missing).
   static Future<void> update({
     required List<RouteAlert> enabledRoutes,
     required Map<int, ApiResult<ArrivalsBoard>> boards,

@@ -449,6 +449,42 @@ void main() {
       expect(saved.clockOffset.inSeconds, inInclusiveRange(300, 305));
     });
 
+    test('without the proxy, IM 5 min behind the phone: its Date header '
+        'gives the offset, the trip has not passed yet', () async {
+      final now = DateTime.now();
+      final date = now.subtract(const Duration(minutes: 5));
+      // Due 1 min after IM's stamp: 4 min ago on the phone's clock, in
+      // 1 min once moved to it. Not on the board, which has only the 116
+      final wait = BusWait.forTrip(
+        stopId: 3140,
+        stopName: 'BV BATLLE',
+        trip: _bus('121', 1, at: date),
+        alertMinutes: 4,
+        now: now,
+      );
+      final im = MockClient((request) async {
+        expect(request.url.path, '/transporteRest/siguientesParada/3140');
+        return http.Response(_answer([('116', 30, true)]), 200,
+            headers: {'date': HttpDate.format(date)});
+      });
+      await http.runWithClient(() => startHandler(wait), () => im);
+      final took = DateTime.now().difference(now);
+
+      expect(serviceCalls.map((c) => c.method), isNot(contains('stopService')));
+      final update =
+          serviceCalls.singleWhere((c) => c.method == 'updateService');
+      expect(jsonEncode(update.arguments),
+          contains('Sin datos del ómnibus por ahora · BV BATLLE'));
+      // 5 min, plus up to the second the header drops, plus the check
+      final saved = BusWait.fromJson(jsonDecode(
+          (await FlutterForegroundTask.getData<String>(key: busWaitDataKey))!));
+      const behind = Duration(minutes: 5);
+      expect(
+          saved.clockOffset.inMilliseconds,
+          inInclusiveRange(behind.inMilliseconds,
+              (behind + const Duration(seconds: 1) + took).inMilliseconds));
+    });
+
     test('"Dejar de esperar" stops the service without alerting', () async {
       minutes = 20;
       final wait = BusWait.forTrip(

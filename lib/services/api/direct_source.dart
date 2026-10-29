@@ -34,11 +34,12 @@ class DirectSource implements V1Source {
 
   @override
   Future<SourceAnswer> arrivals(int id) async {
+    String? date;
     final raw = await _get(TransporteRestAdapter.arrivalsUrl(id),
-        transporteRest: true);
+        transporteRest: true, onDate: (value) => date = value);
     if (raw.failure != null) return raw;
     return _converted(() => TransporteRestAdapter.arrivalsToV1(raw.json, id,
-        fetchedAt: DateTime.now()));
+        fetchedAt: _answeredAt(date)));
   }
 
   @override
@@ -96,9 +97,22 @@ class DirectSource implements V1Source {
     }
   }
 
-  /// The decoded JSON of [url], or why there is none.
+  /// When transporteRest answered, on its clock: the `Date` header [date]
+  /// shares the clock of the rows' `time`, so the due times can be moved
+  /// to the phone's clock as with the proxy. The phone's clock when there
+  /// is no header, or it does not parse.
+  static DateTime _answeredAt(String? date) {
+    try {
+      return HttpDate.parse(date ?? '');
+    } catch (_) {
+      return DateTime.now();
+    }
+  }
+
+  /// The decoded JSON of [url], or why there is none. [onDate] gets the
+  /// answer's `Date` header.
   static Future<SourceAnswer> _get(String url,
-      {bool transporteRest = false}) async {
+      {bool transporteRest = false, void Function(String?)? onDate}) async {
     final http.Response response;
     try {
       response = await http
@@ -114,6 +128,7 @@ class DirectSource implements V1Source {
       debugPrint('❌ Direct API error: $e');
       return answerFailure(ApiFailure.failed);
     }
+    onDate?.call(response.headers['date']);
 
     final body = utf8.decode(response.bodyBytes, allowMalformed: true);
     if (response.statusCode != 200) {

@@ -377,6 +377,38 @@ void main() {
       expect(widget[WidgetFeed.keyLine], isNull);
     });
 
+    test('without the proxy, IM 6 min behind the phone: its Date header '
+        'keeps the due time on the phone\'s clock', () async {
+      MvdApiService.proxyUrl = '';
+      await saveRoute(lines: ['116']);
+      // IM answered at _t0 by its Date header, the phone read _t0 + 6 min
+      final due = _t0.add(const Duration(minutes: 4));
+      final im = MockClient((request) async => http.Response(
+          jsonEncode([
+            {
+              'linea': '116',
+              'destino': 'POCITOS',
+              'minutos': 4,
+              'real': true,
+              'idEmpresa': 50,
+              'idBus': 139,
+              'horaDesc': '19:56',
+              'time': due.millisecondsSinceEpoch,
+            }
+          ]),
+          200,
+          headers: {'date': HttpDate.format(_t0)}));
+      final phone = _t0.add(const Duration(minutes: 6));
+      await http.runWithClient(
+          () => BackgroundWorker.checkAlerts(phone), () => im);
+
+      // Due 4 min after IM's stamp: 10 min after _t0 on the phone's clock
+      final dueOnPhone = _t0.add(const Duration(minutes: 10));
+      expect(widget[WidgetFeed.keyExpectedAtMs],
+          '${dueOnPhone.millisecondsSinceEpoch}');
+      expect(widget[WidgetFeed.keyClockTime], '19:56');
+    });
+
     test('no bus of the route coming, or no route at all', () async {
       final route = await saveRoute(lines: ['999']);
       await checkAt(_t0);

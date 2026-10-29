@@ -141,7 +141,7 @@ igual que si viniera del proxy.
 | Forma | Fuente y adaptador | Máscara frente al golden |
 |---|---|---|
 | parada | `transporteRest/lineas/{id}` → `TransporteRestAdapter.stopToV1` | `directions` |
-| arribos | `transporteRest/siguientesParada/{id}` → `TransporteRestAdapter.arrivalsToV1` (`fetchedAt` = cuando llegó la respuesta) | `arrivals[].airConditioning`, `arrivals[].zeroEmission` |
+| arribos | `transporteRest/siguientesParada/{id}` → `TransporteRestAdapter.arrivalsToV1` (`fetchedAt` = el encabezado `Date` de la respuesta; si no viene o no se puede leer, cuando llegó) | `arrivals[].airConditioning`, `arrivals[].zeroEmission` |
 | horario | `transporteRest/siguientesParada/{id}/{HABIL\|SABADO\|DOMINGO}/{H:MM}` → `TransporteRestAdapter.scheduleToV1` | ninguna |
 | catálogo | ninguna: `DirectSource.catalogStops()` contesta `ApiFailure.unavailable` | – |
 | cercanas | caja WFS (sección 8) → `WfsAdapter.featuresToCatalogItems` → los elementos del catálogo | – |
@@ -215,8 +215,11 @@ esta sección.
   pci con `[]` da 502 y un índice de paradas vacío cuenta como falla.
 - **`fetchedAt`** es una hora ISO en UTC con milisegundos
   (`2026-10-19T22:52:10.000Z`). Qué hora es depende de la ruta:
-  - arribos: cuando contestó transporteRest (en el Worker, o en el teléfono en
-    modo directo). Desde la caché de borde puede tener hasta 15 s más;
+  - arribos: cuando contestó transporteRest. Con el proxy es el reloj del
+    Worker, y desde la caché de borde puede tener hasta 15 s más; en modo
+    directo, el encabezado `Date` de transporteRest, en el mismo reloj que
+    `time` (si no viene o no se puede leer, el reloj del teléfono cuando
+    llegó la respuesta);
   - novedades y GPS: el reloj del Worker al armar la respuesta;
   - catálogo: cuando `ImGateway` cargó las paradas de la API oficial. Esa
     copia vive solo en la memoria del objeto: se renueva al día, o antes si
@@ -909,10 +912,11 @@ arribos puede venir sin confort, y hasta que termine el primer armado del
   Mientras siga así, `smoke.js` marca esa ruta como FAIL: es un problema de la
   fuente, no del proxy. Cambiar de parada pide una captura y un golden nuevos
   para las dos suites.
-- **Reloj del modo directo.** `DirectSource` no permite inyectar el reloj. Los
-  goldens directos de arribos coinciden porque todas las filas capturadas
-  traen `time`; una captura con filas sin `time` dependería del reloj de la
-  prueba.
+- **Reloj del modo directo.** Sin encabezado `Date`, `DirectSource` toma la
+  hora del teléfono, que la prueba no fija, y las capturas de `cases.json` no
+  traen `Date`. Los goldens directos de arribos coinciden porque todas las
+  filas capturadas traen `time`; una captura con filas sin `time` necesitaría
+  un `Date` en su entrada de `upstream`.
 - **Sin medir en Cloudflare.** El tiempo de CPU del armado del índice dentro
   del Durable Object (unos 50 ms en Node para el CSV de 2,5 MB) y el bloqueo
   posible del F5/BigIP se ven recién con el Worker desplegado.
