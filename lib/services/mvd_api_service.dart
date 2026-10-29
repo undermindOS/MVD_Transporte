@@ -81,8 +81,12 @@ class MvdApiService {
   /// for it ([getBoard], [getBoards]): the Mapa draws from it at once, and
   /// skips its own fetch right after Mis paradas refreshed. A new map on
   /// every change, so listeners fire.
-  static final ValueNotifier<Map<int, ArrivalsBoard>> latestBoards =
+  static final ValueNotifier<Map<int, ReceivedBoard>> latestBoards =
       ValueNotifier(const {});
+
+  /// Stamps [ReceivedBoard.receivedAt]. Tests move it.
+  @visibleForTesting
+  static DateTime Function() clock = DateTime.now;
 
   /// Upcoming buses of a stop, soonest first.
   static Future<ApiResult<ArrivalsBoard>> getBoard(int stopId) async {
@@ -96,8 +100,13 @@ class MvdApiService {
   static void _publish(int stopId, ArrivalsBoard board) {
     final boards = latestBoards.value;
     final known = boards[stopId];
-    if (known != null && known.fetchedAt.isAfter(board.fetchedAt)) return;
-    latestBoards.value = {...boards, stopId: board};
+    if (known != null && known.board.fetchedAt.isAfter(board.fetchedAt)) {
+      return;
+    }
+    latestBoards.value = {
+      ...boards,
+      stopId: (board: board, receivedAt: clock()),
+    };
   }
 
   /// Forgets [latestBoards], as at app start.

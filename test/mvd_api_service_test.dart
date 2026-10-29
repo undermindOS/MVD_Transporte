@@ -604,7 +604,7 @@ void main() {
         // A failure changes nothing
         final first = MvdApiService.latestBoards.value;
         expect(first.keys, [574]);
-        expect(first[574]!.fetchedAt, DateTime.utc(2026, 10, 19, 22, 52, 10));
+        expect(first[574]!.board.fetchedAt, DateTime.utc(2026, 10, 19, 22, 52, 10));
         expect(notified, 1);
 
         pending.clear();
@@ -619,6 +619,26 @@ void main() {
         expect(identical(first, second), isFalse);
         expect(second.keys, unorderedEquals([574, 3140]));
         expect(notified, 2);
+      });
+
+      test('stamps when a board reached the phone, not the source time',
+          () async {
+        // A phone clock 3 min ahead of the proxy's
+        final phone = DateTime.utc(2026, 10, 19, 22, 55, 10);
+        MvdApiService.clock = () => phone;
+        addTearDown(() => MvdApiService.clock = DateTime.now);
+
+        await http.runWithClient(() async {
+          final board = MvdApiService.getBoard(574);
+          await pumpEventQueue();
+          pending['/v1/stops/574/arrivals']!
+              .complete(_json(at(574, '2026-10-19T22:52:10.000Z')));
+          await board;
+        }, () => client);
+
+        final received = MvdApiService.latestBoards.value[574]!;
+        expect(received.board.fetchedAt, DateTime.utc(2026, 10, 19, 22, 52, 10));
+        expect(received.receivedAt, phone);
       });
 
       test('an older board does not replace a newer one', () async {
@@ -636,10 +656,10 @@ void main() {
         await fetch('2026-10-19T22:52:40.000Z');
         // An edge-cached answer that came later
         await fetch('2026-10-19T22:52:10.000Z');
-        expect(MvdApiService.latestBoards.value[574]!.fetchedAt,
+        expect(MvdApiService.latestBoards.value[574]!.board.fetchedAt,
             DateTime.utc(2026, 10, 19, 22, 52, 40));
         await fetch('2026-10-19T22:53:10.000Z');
-        expect(MvdApiService.latestBoards.value[574]!.fetchedAt,
+        expect(MvdApiService.latestBoards.value[574]!.board.fetchedAt,
             DateTime.utc(2026, 10, 19, 22, 53, 10));
       });
     });

@@ -18,3 +18,9 @@ class ArrivalsBoard {
     required this.arrivals,
   });
 }
+
+/// A board and when it reached the phone, on the phone's clock. How old a
+/// board is gets measured from [receivedAt], as Mis paradas does:
+/// [ArrivalsBoard.fetchedAt] is on the source's clock (the proxy's), and a
+/// phone a minute or more off would make every board look old, or new.
+typedef ReceivedBoard = ({ArrivalsBoard board, DateTime receivedAt});

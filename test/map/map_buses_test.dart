@@ -1,8 +1,9 @@
 // MapBuses.from: the Mapa's buses from the boards of the saved stops. A GPS
 // bus on several boards is one bus, rows without a bus id stay per stop,
 // positions past the basemap are dropped, and after a failed refresh the
-// last buses are estimates for 5 min after their board, then gone. Each ETA
-// is live or an estimate as its own board.
+// last buses are estimates for 5 min after their board reached the phone,
+// then gone. Each ETA is live or an estimate as its own board. Ages count
+// on the phone's clock, never on the source's.
 
 import 'package:flutter_map/flutter_map.dart' show LatLngBounds;
 import 'package:flutter_test/flutter_test.dart';
@@ -37,18 +38,24 @@ BusArrival _arrival(
   location: at,
 );
 
-ArrivalsBoard _board(
+/// A board that reached the phone [age] ago; the source stamped it
+/// [fetchedAt] (by default the same moment, a source clock that agrees).
+ReceivedBoard _board(
   int stopId,
   List<BusArrival> arrivals, {
   Duration age = const Duration(seconds: 10),
-}) => ArrivalsBoard(
-  stopId: stopId,
-  fetchedAt: _now.subtract(age),
-  arrivals: arrivals,
+  DateTime? fetchedAt,
+}) => (
+  board: ArrivalsBoard(
+    stopId: stopId,
+    fetchedAt: fetchedAt ?? _now.subtract(age),
+    arrivals: arrivals,
+  ),
+  receivedAt: _now.subtract(age),
 );
 
 List<MapBus> _buses(
-  Map<int, ArrivalsBoard> boards, {
+  Map<int, ReceivedBoard> boards, {
   Set<int> failed = const {},
   DateTime? now,
 }) => MapBuses.from(
@@ -183,11 +190,11 @@ void main() {
     expect(buses.single.live, isFalse);
   });
 
-  test('estimates go 5 min after their board was fetched', () {
+  test('estimates go 5 min after their board reached the phone', () {
     final boards = {
       574: _board(574, [_arrival('bus-50-111', eta: 9)]),
     };
-    final fetched = boards[574]!.fetchedAt;
+    final fetched = boards[574]!.receivedAt;
     final atFour = _buses(
       boards,
       failed: {574},
@@ -200,6 +207,44 @@ void main() {
     );
     // Without a failure too
     expect(_buses(boards, now: fetched.add(MapBuses.staleFor)), isEmpty);
+  });
+
+  test('a phone clock off from the source: ages from the arrival', () {
+    // The proxy stamped these boards 3 min before the phone's clock says
+    // it got them, or 3 min after: both just arrived, both live
+    final behind = _board(
+      574,
+      [_arrival('bus-50-1')],
+      fetchedAt: _now.subtract(const Duration(minutes: 3)),
+    );
+    final ahead = _board(
+      3140,
+      [_arrival('bus-50-2')],
+      fetchedAt: _now.add(const Duration(minutes: 3)),
+    );
+    final buses = _buses({574: behind, 3140: ahead});
+    expect(buses.map((b) => (b.key, b.live)), [
+      ('bus-50-1', true),
+      ('bus-50-2', true),
+    ]);
+    expect(MapBuses.liveness(behind, failed: false, now: _now), isTrue);
+
+    // Stamped just now by the source but received 2 min ago: not live
+    final late = _board(
+      574,
+      [_arrival('bus-50-1')],
+      age: const Duration(minutes: 2),
+      fetchedAt: _now,
+    );
+    expect(_buses({574: late}).single.live, isFalse);
+    // Received 5 min ago: gone, whatever the source's stamp
+    final old = _board(
+      574,
+      [_arrival('bus-50-1')],
+      age: MapBuses.staleFor,
+      fetchedAt: _now,
+    );
+    expect(_buses({574: old}), isEmpty);
   });
 
   test('an estimate due more than a minute ago is dropped', () {

@@ -150,15 +150,15 @@ class StopSheet extends StatelessWidget {
   const StopSheet({
     super.key,
     required this.stop,
-    required this.board,
+    required this.received,
     required this.failed,
     required this.now,
   });
 
   final BusStop stop;
 
-  /// The newest board of the stop, if any.
-  final ArrivalsBoard? board;
+  /// The newest board of the stop and when it reached the phone, if any.
+  final ReceivedBoard? received;
 
   /// The latest refresh of the stop failed.
   final bool failed;
@@ -195,8 +195,9 @@ class StopSheet extends StatelessWidget {
   }
 
   List<Widget> _rows() {
-    final board = this.board;
-    final age = board == null ? null : now.difference(board.fetchedAt);
+    final board = received?.board;
+    // From when it reached the phone, as Mis paradas counts
+    final age = received == null ? null : now.difference(received!.receivedAt);
     const waiting = Padding(
       padding: EdgeInsets.all(16),
       child: Center(

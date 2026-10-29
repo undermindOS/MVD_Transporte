@@ -95,7 +95,8 @@ class MapaPage extends StatefulWidget {
 
   static Future<MapaBasemap> _defaultLoader() => defaultBasemapLoader();
 
-  /// The phone's clock, against the boards' `fetchedAt`. Tests move it.
+  /// The phone's clock, against when the boards reached the phone
+  /// ([ReceivedBoard.receivedAt]). Tests move it.
   @visibleForTesting
   static DateTime Function() clock = DateTime.now;
 
@@ -134,7 +135,7 @@ class _MapaPageState extends State<MapaPage> with WidgetsBindingObserver {
   // The latest refresh brought no board at all
   bool _refreshFailed = false;
   // The boards last seen in MvdApiService.latestBoards
-  Map<int, ArrivalsBoard> _seen = const {};
+  Map<int, ReceivedBoard> _seen = const {};
 
   // Saved stops StopLocationsService.fillMissing has answered for, and
   // those it is looking up now: only the first can be "not placed"
@@ -291,7 +292,8 @@ class _MapaPageState extends State<MapaPage> with WidgetsBindingObserver {
     var fresh = false;
     for (final stop in _stops) {
       final board = boards[stop.id];
-      if (board != null && !identical(board, _seen[stop.id])) {
+      // Records have no identity: a new board is a new ArrivalsBoard
+      if (board != null && board != _seen[stop.id]) {
         _failed.remove(stop.id);
         fresh = true;
       }
@@ -309,7 +311,7 @@ class _MapaPageState extends State<MapaPage> with WidgetsBindingObserver {
     return ids.every((id) {
       final board = boards[id];
       if (board == null) return false;
-      final age = now.difference(board.fetchedAt);
+      final age = now.difference(board.receivedAt);
       return !age.isNegative && age < StopsPage.autoRefreshInterval;
     });
   }
@@ -400,7 +402,7 @@ class _MapaPageState extends State<MapaPage> with WidgetsBindingObserver {
         valueListenable: _sheet,
         builder: (context, _, _) => StopSheet(
           stop: stop,
-          board: MvdApiService.latestBoards.value[stop.id],
+          received: MvdApiService.latestBoards.value[stop.id],
           failed: _failed.contains(stop.id) || _refreshFailed,
           now: MapaPage.clock(),
         ),
@@ -449,7 +451,7 @@ class _MapaPageState extends State<MapaPage> with WidgetsBindingObserver {
     final known = _stops.any((s) {
       final board = boards[s.id];
       return board != null &&
-          now.difference(board.fetchedAt) < MapBuses.staleFor;
+          now.difference(board.receivedAt) < MapBuses.staleFor;
     });
     final notes = <Widget>[
       if (_refreshFailed)

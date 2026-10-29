@@ -109,7 +109,8 @@ parada ya se está pidiendo, el pedido nuevo espera ese mismo resultado. Una par
 frena a las demás, tampoco sin proxy cuando su respuesta no se puede convertir. Deslizar para
 actualizar pide solo las paradas de su subpestaña: las paradas guardadas en Paradas, los orígenes
 en Rutas. Cada tablero que llega bien queda en `MvdApiService.latestBoards`, el más nuevo por
-parada: el Mapa dibuja también los que pidió Mis paradas.
+parada, con la hora en que llegó al teléfono: el Mapa dibuja también los que pidió Mis paradas, y
+cuenta su edad desde esa hora, como Mis paradas, no desde `fetchedAt`.
 
 ### Demasiados pedidos: `Retry-After`
 
@@ -645,9 +646,3 @@ Lo anotamos para corregirlo en el código cuando se toque ese archivo:
 - **Agregar ruta:** «Guardar» sin número o sin destino no hace nada y no dice por qué.
 - **Estoy esperando** muestra los minutos del momento en que tocaste la fila y no se actualiza
   mientras la hoja está abierta.
-- **Con proxy, el Mapa cuenta la edad de un tablero desde `fetchedAt`**, la hora del servidor, y no
-  desde que llegó al teléfono, como Mis paradas (`_BoardView.receivedAt`). Con el reloj del
-  teléfono adelantado un minuto o más, sus ómnibus salen sin encender aunque el tablero acabe de
-  llegar; con el reloj atrasado, o adelantado más de 30 s, el Mapa vuelve a pedir los tableros que
-  Mis paradas acaba de traer. Sin proxy, `fetchedAt` es la hora del teléfono cuando llega la
-  respuesta (`DirectSource.arrivals`) y esto no pasa.

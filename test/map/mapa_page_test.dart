@@ -850,8 +850,8 @@ void main() {
     final golden = File(
       'proxy/contract/v1/responses/arrivals_574.json',
     ).readAsBytesSync();
-    // When the golden was fetched, ten seconds later
-    MapaPage.clock = () => DateTime.utc(2026, 10, 19, 22, 52, 20);
+    // The golden's fetchedAt is days behind the phone's clock: the buses
+    // are as old as their arrival on the phone, so they are lit
     final proxy = MockClient((request) async {
       requests.add(request.url);
       return request.url.path == '/v1/stops/574/arrivals'
@@ -870,6 +870,7 @@ void main() {
         busLayer(tester).buses.map((b) => b.key),
         unorderedEquals(['bus-50-111', 'bus-50-1118', 'bus-50-139']),
       );
+      expect(busLayer(tester).buses.every((b) => b.live), isTrue);
       expect(requests.map((u) => u.host).toSet(), {'proxy.test'});
     }, () => proxy);
   });

@@ -58,8 +58,8 @@ class MapBus {
 /// the clock passed in.
 abstract final class MapBuses {
   /// After a failed refresh the last buses stay this long after their
-  /// board was fetched, as estimates, then they are dropped (as in Mis
-  /// paradas).
+  /// board reached the phone, as estimates, then they are dropped (as in
+  /// Mis paradas).
   static const staleFor = Duration(minutes: 5);
 
   /// Two refresh intervals: an older board is not live any more, even
@@ -69,16 +69,18 @@ abstract final class MapBuses {
   /// An estimate due longer ago than this is dropped.
   static const staleRowGrace = Duration(minutes: 1);
 
-  /// Whether the buses on [board] are live (true) or estimates (false):
+  /// Whether the buses on [received] are live (true) or estimates (false):
   /// not live once its stop's latest refresh [failed] or it is [liveFor]
-  /// old. null: nothing is known, no board or one [staleFor] old.
+  /// old. null: nothing is known, no board or one [staleFor] old. Ages
+  /// count from [ReceivedBoard.receivedAt], on the phone's clock like
+  /// [now].
   static bool? liveness(
-    ArrivalsBoard? board, {
+    ReceivedBoard? received, {
     required bool failed,
     required DateTime now,
   }) {
-    if (board == null) return null;
-    final age = now.difference(board.fetchedAt);
+    if (received == null) return null;
+    final age = now.difference(received.receivedAt);
     if (age >= staleFor) return null;
     return !failed && age < liveFor;
   }
@@ -89,7 +91,7 @@ abstract final class MapBuses {
   /// at its position on the newest board.
   static List<MapBus> from({
     required Iterable<int> stopIds,
-    required Map<int, ArrivalsBoard> boards,
+    required Map<int, ReceivedBoard> boards,
     required Set<int> failed,
     required LatLngBounds bounds,
     required DateTime now,
@@ -97,9 +99,14 @@ abstract final class MapBuses {
     final buses = <String, _Bus>{};
     final cutoff = now.subtract(staleRowGrace);
     for (final stopId in stopIds.toSet()) {
-      final board = boards[stopId];
-      final live = liveness(board, failed: failed.contains(stopId), now: now);
-      if (board == null || live == null) continue;
+      final received = boards[stopId];
+      final live = liveness(
+        received,
+        failed: failed.contains(stopId),
+        now: now,
+      );
+      if (received == null || live == null) continue;
+      final board = received.board;
       for (final arrival in board.arrivals) {
         final location = arrival.location;
         if (location == null) continue;
