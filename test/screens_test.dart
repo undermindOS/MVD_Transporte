@@ -1,6 +1,10 @@
 // Servicios, Novedades, Horarios and Info on the Timbre design system:
 // what each screen promises the user, independent of pixels. Real fonts
-// and a phone-sized screen, so overflow checks mean something.
+// and a phone-sized screen, so overflow checks mean something. The app's
+// lock sits above the Navigator, as in main.dart, with no lock on: Info
+// reads it. Hive lives in a temp directory.
+
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
@@ -9,7 +13,10 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:stm_app/models/bus_stop.dart';
 import 'package:stm_app/models/scheduled_pass.dart';
 import 'package:stm_app/models/transport_news.dart';
+import 'package:stm_app/services/cache_service.dart';
+import 'package:stm_app/services/device_auth.dart';
 import 'package:stm_app/services/official_sites.dart';
+import 'package:stm_app/ui/app_lock.dart';
 import 'package:stm_app/ui/info_page.dart';
 import 'package:stm_app/ui/news_list.dart';
 import 'package:stm_app/ui/privacy_policy_page.dart';
@@ -34,7 +41,7 @@ Widget _app(Widget home, {double textScale = 1}) => MaterialApp(
       builder: (context, child) => MediaQuery(
         data: MediaQuery.of(context)
             .copyWith(textScaler: TextScaler.linear(textScale)),
-        child: child!,
+        child: AppLock(deviceAuth: const _NoLock(), child: child!),
       ),
       home: home,
     );
@@ -95,13 +102,36 @@ Widget _pushed(Widget page) => Builder(
       ),
     );
 
-Widget _info() => InfoPage(
-      biometricLockEnabled: false,
-      onToggleBiometricLock: (v) async => v,
-    );
+Widget _info() => const InfoPage();
+
+/// A phone with no screen lock and nothing enrolled: the lock stays off.
+class _NoLock implements DeviceAuth {
+  const _NoLock();
+
+  @override
+  Future<bool> isAvailable() async => false;
+
+  @override
+  Future<BiometricKind?> biometrics() async => null;
+
+  @override
+  Future<bool> authenticate(String reason,
+          {bool biometricOnly = false, bool sticky = true}) async =>
+      false;
+}
 
 void main() {
-  setUpAll(loadBundledFonts);
+  late Directory hiveDir;
+
+  setUpAll(() async {
+    await loadBundledFonts();
+    hiveDir = await Directory.systemTemp.createTemp('mvd_screens_test');
+    await CacheService.init(path: hiveDir.path);
+  });
+
+  tearDownAll(() async {
+    await hiveDir.delete(recursive: true);
+  });
 
   group('Servicios', () {
     testWidgets('card services and Cómo Ir in two sections', (tester) async {

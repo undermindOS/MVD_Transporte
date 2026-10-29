@@ -36,6 +36,9 @@ dependencies:
   cupertino_icons: ^1.0.8
   geolocator: ^13.0.2
   local_auth: ^2.3.0
+  # Spanish texts in the system prompt (lib/services/device_auth.dart)
+  local_auth_android: ^1.0.56
+  local_auth_darwin: ^1.6.1
   shared_preferences: ^2.3.3
 
   # Native splash screen

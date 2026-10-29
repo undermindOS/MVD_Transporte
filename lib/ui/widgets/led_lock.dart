@@ -108,7 +108,9 @@ class _LedLockState extends State<LedLock> with TickerProviderStateMixin {
           painter: _LedLockPainter(
             intro: _intro,
             scan: _scan,
-            scanning: widget.scanning,
+            // A still lock has no beam: standing at its start, it would
+            // glow over the top row
+            scanning: widget.scanning && !_still,
           ),
         ),
       ),

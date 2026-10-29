@@ -8,6 +8,10 @@
 		<string>$(DEVELOPMENT_LANGUAGE)</string>
 		<key>CFBundleDisplayName</key>
 		<string>Timbre MVD</string>
+		<key>CFBundleLocalizations</key>
+		<array>
+			<string>es</string>
+		</array>
 		<key>CFBundleExecutable</key>
 		<string>$(EXECUTABLE_NAME)</string>
 		<key>CFBundleIdentifier</key>
