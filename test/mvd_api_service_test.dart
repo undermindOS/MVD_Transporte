@@ -735,6 +735,36 @@ void main() {
         expect(kept.board.fetchedAt, DateTime.utc(2026, 10, 19, 22, 52, 50));
         expect(kept.receivedAt, phone);
       });
+
+      test('boards on two clocks: a kept one gives way after a minute',
+          () async {
+        var phone = DateTime.utc(2026, 10, 19, 22, 57, 40);
+        MvdApiService.clock = () => phone;
+        addTearDown(() => MvdApiService.clock = DateTime.now);
+        Future<void> fetch(String fetchedAt) async {
+          pending.clear();
+          await http.runWithClient(() async {
+            final board = MvdApiService.getBoard(574);
+            await pumpEventQueue();
+            pending['/v1/stops/574/arrivals']!
+                .complete(_json(at(574, fetchedAt)));
+            await board;
+          }, () => client);
+        }
+
+        // Stamped by a phone 5 min ahead (no Date header), then by IM's
+        // Date: every later board looks older than the first
+        await fetch('2026-10-19T22:57:40.000Z');
+        phone = phone.add(const Duration(seconds: 30));
+        await fetch('2026-10-19T22:53:10.000Z');
+        expect(MvdApiService.latestBoards.value[574]!.board.fetchedAt,
+            DateTime.utc(2026, 10, 19, 22, 57, 40));
+        phone = phone.add(const Duration(seconds: 30));
+        await fetch('2026-10-19T22:53:40.000Z');
+        final kept = MvdApiService.latestBoards.value[574]!;
+        expect(kept.board.fetchedAt, DateTime.utc(2026, 10, 19, 22, 53, 40));
+        expect(kept.receivedAt, phone);
+      });
     });
   });
 

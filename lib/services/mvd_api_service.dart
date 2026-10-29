@@ -96,17 +96,24 @@ class MvdApiService {
     return result;
   }
 
+  /// How long a kept board stands against an older one.
+  static const _overtakenWithin = Duration(minutes: 1);
+
   /// Keeps [board] in [latestBoards] unless a newer one is there.
   static void _publish(int stopId, ArrivalsBoard board) {
     final boards = latestBoards.value;
     final known = boards[stopId];
     final now = clock();
-    // A phone clock put back makes every new board look older when
-    // fetchedAt is the phone's clock (no proxy and no Date header): one
-    // received "later than now" gives way
+    // An older board that came in behind a newer one (edge cache, parallel
+    // requests) is seconds old: within a minute of the kept board it is
+    // dropped. Later it is taken, so boards stamped on two clocks (IM's
+    // Date, the phone's when it is missing) do not freeze the stop. A
+    // phone clock put back makes every board stamped by the phone look
+    // older: one received "later than now" gives way at once
     if (known != null &&
         known.board.fetchedAt.isAfter(board.fetchedAt) &&
-        !known.receivedAt.isAfter(now)) {
+        !known.receivedAt.isAfter(now) &&
+        now.difference(known.receivedAt) < _overtakenWithin) {
       return;
     }
     latestBoards.value = {
