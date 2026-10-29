@@ -1,6 +1,6 @@
 # Íconos
 
-Un solo juego de íconos: `PixelGlyphs`, 35 glifos de 12 × 12 en
+Un solo juego de íconos: `PixelGlyphs`, 38 glifos de 12 × 12 en
 `lib/ui/widgets/pixel_glyphs.dart`, dibujados por `PixelIcon`
 (`lib/ui/widgets/pixel_icon.dart`). La app no usa los íconos de Material
 (`Icons.`), ni emoji, ni íconos de línea de otros juegos.
@@ -25,11 +25,15 @@ Un solo juego de íconos: `PixelGlyphs`, 35 glifos de 12 × 12 en
 |---|---|---|
 | `mark` | 14 | Marcas dentro de una fila: confort, campana del ómnibus que esperás, campana y flecha de la fila «Aviso N min antes», origen de una ruta, enlace externo en el rincón de los mosaicos de Servicios. `ArrivalRow` escribe el 14 como número, no con el token. |
 | `row` | 20 | Botones con ícono, notas de una tarjeta, paneles de aviso, snackbar de error, íconos de los campos de texto, enlaces de Info. |
-| `rowLarge` | 24 | Botón +, candado de Info, error de Horarios. 24 es también el tamaño del `iconTheme` del tema, de la app bar y de la barra de navegación, y el de los botones de ícono (campana de aviso, reloj de Horarios en la tarjeta). |
+| `rowLarge` | 24 | Botón +, glifos de la tarjeta del bloqueo en Info (el candado, la huella o la cara), filas de la bienvenida, error de Horarios. 24 es también el tamaño del `iconTheme` del tema, de la app bar y de la barra de navegación, y el de los botones de ícono (campana de aviso, reloj de Horarios en la tarjeta). |
 | `tile` | 48 | Íconos de los mosaicos de Servicios. |
 
 Hay tamaños sin token:
 
+- 96, los glifos grandes de la bienvenida: la huella o la cara de «Huella» y
+  `unlock` de «Listo» sin código (`lib/ui/welcome/welcome_page.dart`);
+- 28, las teclas de glifo del teclado del código, «Borrar» y el desbloqueo
+  rápido (`LedKeypad.glyphSize`);
 - 22, en las subpestañas (Paradas, Rutas, Novedades), en las paradas de las
   listas de Agregar parada y en la nota del navegador de Servicios;
 - 16, la parada sobre el mapa del Mapa, en su baldosa de 26
@@ -45,11 +49,11 @@ El color sale del contexto: casi siempre `PixelIcon` lo toma del
 
 | Color | Para qué | Ejemplos |
 |---|---|---|
-| `ambar` | Lo encendido y lo que actúa | Pestaña y subpestaña elegidas, íconos de `OutlinedButton` y `TextButton`, campana de un aviso activado, campana del ómnibus que esperás, mosaicos de Servicios, ícono de los paneles de aviso. |
+| `ambar` | Lo encendido y lo que actúa | Pestaña y subpestaña elegidas, íconos de `OutlinedButton` y `TextButton`, campana de un aviso activado, campana del ómnibus que esperás, mosaicos de Servicios, ícono de los paneles de aviso, la tecla del desbloqueo rápido y la tecla presionada del teclado del código, los glifos grandes de la bienvenida. |
 | `tinta` | Sobre un relleno ámbar | Íconos del botón principal («Avisarme cuando llegue», «Ver más», «Desbloquear») y del botón +; el ómnibus de una píldora encendida del Mapa. |
-| `papel` | Botones de la app bar y botones de ícono | Info, la flecha de atrás, «Ver líneas» en Agregar ruta; la parada sobre el mapa, en su baldosa `tinta`. |
-| `etiquetaCartel` | Marcas pasivas | Confort, origen de una ruta, íconos de los campos, paradas en las listas (`listTileTheme.iconColor`), candado de Info, reloj de Horarios en la tarjeta, flecha de la fila de aviso, nota del navegador; el ómnibus de una píldora estimada del Mapa. |
-| `tenue` | Lo apagado | Pestañas sin elegir, campana sin aviso, reloj de una fila sin GPS o estimada, «Sin ómnibus próximos», notas sobre el mapa. |
+| `papel` | Botones de la app bar y botones de ícono | Info, la flecha de atrás, «Ver líneas» en Agregar ruta; la parada sobre el mapa, en su baldosa `tinta`; «Borrar» del teclado del código. |
+| `etiquetaCartel` | Marcas pasivas | Confort, origen de una ruta, íconos de los campos, paradas en las listas (`listTileTheme.iconColor`), candado, huella y cara de la tarjeta del bloqueo en Info, glifos de las filas de la bienvenida («Hola», «Sin cuentas ni registros» y «Listo»), reloj de Horarios en la tarjeta, flecha de la fila de aviso, nota del navegador; el ómnibus de una píldora estimada del Mapa. |
+| `tenue` | Lo apagado | Pestañas sin elegir, campana sin aviso, reloj de una fila sin GPS o estimada, «Sin ómnibus próximos», notas sobre el mapa, teclas desactivadas del teclado del código. |
 | `ambarTenue` | Luz atenuada | Enlace externo en el rincón de los mosaicos de Servicios. |
 | `rojoLed` | Errores | Notas de error de una tarjeta y de la hoja de una parada del Mapa, snackbar de error, error de Horarios, error del mapa base. |
 | `noche` | Sobre `rojoLed` | Papelera de deslizar para borrar. |
@@ -68,14 +72,18 @@ tiene lo que está «prendido»:
   en `lib/ui/home_page.dart`);
 - la campana de un aviso activado (`_AlertButton` en
   `lib/ui/stops_page.dart`);
-- los íconos de los mosaicos de Servicios (`lib/ui/services_page.dart`).
+- los íconos de los mosaicos de Servicios (`lib/ui/services_page.dart`);
+- las teclas de glifo del teclado del código mientras se presionan
+  (`lib/ui/widgets/led_keypad.dart`);
+- los glifos grandes de la bienvenida: la huella o la cara de «Huella» y
+  `unlock` de «Listo» (`lib/ui/welcome/welcome_page.dart`).
 
 El resto de la luz del sistema está en
 [06-luz-y-movimiento.md](06-luz-y-movimiento.md).
 
-## Los 35 glifos
+## Los 38 glifos
 
-16 se dibujaron para Timbre. Los otros 19 son de pixelarticons (Gerrit
+19 se dibujaron para Timbre. Los otros 19 son de pixelarticons (Gerrit
 Halfmann, licencia MIT), pasados a la grilla de 12 × 12; en el código
 llevan `(pixelarticons)` en su comentario. La licencia está en
 `assets/licenses/MIT-pixelarticons.txt` y se registra junto con las de las
@@ -86,13 +94,13 @@ Tamaño y color de cada uso, en ese orden.
 
 | Glifo | Origen | Qué es | Dónde se usa |
 |---|---|---|---|
-| `bus` | Timbre | Frente de un ómnibus | Pestaña Mis paradas de la navegación (24); campo «Número de parada» de Agregar parada (20, `etiquetaCartel`); nota «Sin ómnibus próximos» de la tarjeta y de la hoja de una parada del Mapa (20, `tenue`); nota «Ahora ningún ómnibus con GPS viene a tus paradas.» sobre el mapa (20, `tenue`); ómnibus de las píldoras del Mapa (12, `tinta` encendida o `etiquetaCartel` estimada, pintado por `BusLayer`). |
-| `streets` | Timbre | Dos calles que se cruzan y un ómnibus | Pestaña Mapa de la navegación (24). |
-| `info` | Timbre | Info | Botón Info de la app bar (24, `papel`). |
+| `bus` | Timbre | Frente de un ómnibus | Pestaña Mis paradas de la navegación (24); campo «Número de parada» de Agregar parada (20, `etiquetaCartel`); nota «Sin ómnibus próximos» de la tarjeta y de la hoja de una parada del Mapa (20, `tenue`); nota «Ahora ningún ómnibus con GPS viene a tus paradas.» sobre el mapa (20, `tenue`); ómnibus de las píldoras del Mapa (12, `tinta` encendida o `etiquetaCartel` estimada, pintado por `BusLayer`); fila «Mis paradas» de «Hola» en la bienvenida (24, `etiquetaCartel`). |
+| `streets` | Timbre | Dos calles que se cruzan y un ómnibus | Pestaña Mapa de la navegación (24); fila «Mapa» de «Hola» en la bienvenida (24, `etiquetaCartel`). |
+| `info` | Timbre | Info | Botón Info de la app bar (24, `papel`); fila «Podés cambiarlo cuando quieras en Info.» de «Listo» en la bienvenida (24, `etiquetaCartel`). |
 | `stop` | Timbre | Una parada: el cartel con un ómnibus arriba del poste | Subpestaña Paradas (22); origen en la tarjeta de una ruta (14, `etiquetaCartel`); paradas cercanas y resultados por calles en Agregar parada (22, `etiquetaCartel`); campo «Parada de origen» de Agregar ruta (20, `etiquetaCartel`); paradas guardadas sobre el mapa del Mapa (16, `papel`, en una baldosa `tinta`); nota «No se pudo ubicar en el mapa…» (20, `tenue`). |
 | `clock` | Timbre | Horario | Botón Horarios de la tarjeta (24, `etiquetaCartel`); botón «Desde» de Horarios (20, `ambar`); hora de una fila sin GPS o estimada en `ArrivalRow` (14, `tenue`); hora estimada en la hoja de un ómnibus del Mapa (14, `tenue`). |
 | `bell` | Timbre | Aviso apagado | Campana de una parada o ruta sin aviso (`_AlertButton`, 24, `tenue`); «Dejar de esperar» en la hoja Estoy esperando (20, `ambar`); mosaico Avisos de Servicios (48, `ambar`, brillo). |
-| `bellRing` | Timbre | Aviso encendido, Estoy esperando | Campana de un aviso activado (`_AlertButton`, 24, `ambar`, brillo); fila «Aviso N min antes» (14, `ambar`); «Avisarme cuando llegue» (20, `tinta`); marca del ómnibus que esperás en `ArrivalRow` (14, `ambar`, se lee «Esperando»). |
+| `bellRing` | Timbre | Aviso encendido, Estoy esperando | Campana de un aviso activado (`_AlertButton`, 24, `ambar`, brillo); fila «Aviso N min antes» (14, `ambar`); «Avisarme cuando llegue» (20, `tinta`); marca del ómnibus que esperás en `ArrivalRow` (14, `ambar`, se lee «Esperando»); fila «Estoy esperando» de «Hola» en la bienvenida (24, `etiquetaCartel`). |
 | `plus` | Timbre | Agregar | Botón + de Paradas y Rutas (24, `tinta`). |
 | `trash` | Timbre | Borrar | Fondo de deslizar para borrar (24, `noche` sobre `rojoLed`, se lee «Eliminar»). |
 | `warning` | Timbre | Error o aviso | Snackbar de error y notas de error de la tarjeta (20, `rojoLed`); error de Horarios (24, `rojoLed`); panel «No se pudo actualizar» de Novedades y del Mapa (20, `ambar`); error del mapa base (24, `rojoLed`); nota de error en la hoja de una parada del Mapa (20, `rojoLed`). |
@@ -101,22 +109,25 @@ Tamaño y color de cada uso, en ese orden.
 | `route` | Timbre | Rutas guardadas | Subpestaña Rutas (22); campo «Destino» de Agregar ruta (20, `etiquetaCartel`). |
 | `live` | Timbre | Un LED encendido: dato con GPS | Sin uso. El punto de los minutos en vivo es `LiveDot`, no este glifo. |
 | `code` | Timbre | Código fuente | Sin uso. La fila «Código fuente» de Info usa `external`. |
+| `fingerprint` | Timbre | Una huella: el desbloqueo rápido con huella o Touch ID | Tecla del desbloqueo rápido de `LedKeypad` (28, `ambar`, con brillo al presionarla; se lee «Desbloquear con huella» o «Desbloquear con Touch ID»); glifo grande del paso «Huella» de la bienvenida (96, `ambar`, brillo); fila «Desbloquear con huella» de Info (24, `etiquetaCartel`); fila «También se abre con tu huella.» de «Listo» (24, `etiquetaCartel`). |
+| `face` | Timbre | Una cara entre esquinas de escaneo: el desbloqueo rápido con Face ID | Tecla del desbloqueo rápido de `LedKeypad` (28, `ambar`, con brillo al presionarla; se lee «Desbloquear con Face ID»); glifo grande del paso «Huella» de la bienvenida, con Face ID (96, `ambar`, brillo); fila «Desbloquear con Face ID» de Info (24, `etiquetaCartel`); fila «También se abre con Face ID.» de «Listo» (24, `etiquetaCartel`). |
+| `erase` | Timbre | Una etiqueta de borrar con una × | Tecla que borra la última cifra en `LedKeypad` (28, `papel`; `ambar` con brillo al presionarla; se lee «Borrar»). |
 | `grid` | pixelarticons | Servicios | Pestaña Servicios de la navegación (24). |
 | `back` | pixelarticons | Atrás | Flecha de las pantallas apiladas (Info, Privacidad, Horarios), desde `actionIconTheme` del tema (24, `papel`). |
 | `external` | pixelarticons | Se abre fuera de la app | Rincón de los mosaicos de Servicios (14, `ambarTenue`); nota del navegador en Servicios (22, `etiquetaCartel`); «Código fuente» en Info (20, `ambar`); «Ver más» de una novedad (20, `tinta`). |
 | `card` | pixelarticons | Mi STM | Mosaico Mi STM de Servicios (48, `ambar`, brillo). |
 | `money` | pixelarticons | Recarga | Mosaico Recarga de Servicios (48, `ambar`, brillo). |
 | `map` | pixelarticons | Cómo Ir | «Ver en Cómo Ir» de la tarjeta (20, `ambar`); mosaico Cómo Ir de Servicios (48, `ambar`, brillo). |
-| `lock` | pixelarticons | Bloqueo biométrico | Fila «Bloqueo biométrico» de Info (24, `etiquetaCartel`). |
-| `unlock` | pixelarticons | Desbloquear | Botón «Desbloquear» de la pantalla de bloqueo (24, `tinta`). |
+| `lock` | pixelarticons | Bloqueo | Fila «Código de acceso» de Info (24, `etiquetaCartel`); fila «La app pide tu código al abrirse.» de «Listo» en la bienvenida (24, `etiquetaCartel`). |
+| `unlock` | pixelarticons | Desbloquear | Botón «Desbloquear» de la pantalla del bloqueo anterior (24, `tinta`); paso «Listo» de la bienvenida sin código: el glifo grande (96, `ambar`, brillo) y la fila «La app se abre sin código.» (24, `etiquetaCartel`). |
 | `mail` | pixelarticons | Contacto | Fila «Contacto» de Info (20, `ambar`). |
 | `news` | pixelarticons | Novedades | Subpestaña Novedades (22), con la insignia de no leídas. |
 | `gps` | pixelarticons | Paradas cercanas | «Paradas cercanas» en Agregar parada (20, `ambar`). |
-| `chevronRight` | pixelarticons | Ver más opciones | Al final de la fila «Aviso N min antes» (14, `etiquetaCartel`); «Política de privacidad» en Info, que abre una pantalla de la app (20, `ambar`). |
+| `chevronRight` | pixelarticons | Ver más opciones | Al final de la fila «Aviso N min antes» (14, `etiquetaCartel`); «Política de privacidad» en Info, que abre una pantalla de la app (20, `ambar`); «Cambiar código» en Info, que abre las páginas del código (20, `ambar`). |
 | `chevronDown` | pixelarticons | Desplegar | «Ver las N» bajo las filas de una tarjeta (20, `ambar`). |
 | `minus` | pixelarticons | Plegar | «Ver menos» (20, `ambar`). |
 | `close` | pixelarticons | Cerrar | Ícono de cierre del tema (`closeButtonIconBuilder`). Hoy ninguna pantalla muestra un botón de cierre. |
-| `check` | pixelarticons | Hecho | Sin uso. |
+| `check` | pixelarticons | Hecho | Las tres frases de «Sin cuentas ni registros» en la bienvenida (24, `etiquetaCartel`). |
 | `search` | pixelarticons | Buscar | Campo «Buscar por calles» de Agregar parada (20, `etiquetaCartel`); botón «Ver líneas» de Agregar ruta (20, `papel`). |
 | `bolt` | pixelarticons | Cero emisiones | Marca de confort en `ArrivalRow` y en `CartelParada` (14, `etiquetaCartel`). |
 | `signal` | pixelarticons | Calidad del GPS | Panel de GPS parcial sobre Paradas y Rutas (20, `ambar`). |

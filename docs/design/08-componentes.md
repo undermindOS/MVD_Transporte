@@ -1,9 +1,10 @@
 # Componentes
 
-Las piezas con las que se arman las pantallas. Las públicas están en `lib/ui/widgets/`; las
-tarjetas, las notas y las filas de los diálogos son privadas de `lib/ui/stops_page.dart`,
-`lib/ui/schedule_page.dart`, `lib/ui/news_list.dart` y `lib/ui/map/`. Para cada una: qué es, sus estados, qué
-dato muestra (campo del modelo ← campo de /v1) y dónde se usa.
+Las piezas con las que se arman las pantallas. Las públicas están en `lib/ui/widgets/`, y las del
+código de la app en `lib/ui/passcode_entry.dart`; las tarjetas, las notas y las filas de los
+diálogos son privadas de `lib/ui/stops_page.dart`, `lib/ui/schedule_page.dart`,
+`lib/ui/news_list.dart` y `lib/ui/map/`. Para cada una: qué es, sus estados, qué dato muestra
+(campo del modelo ← campo de /v1) y dónde se usa.
 
 La cadena completa hasta la fuente de la ciudad (por ejemplo `clockTime` ← `horaDesc`) está en
 [pantalla-a-datos.md](pantalla-a-datos.md). Colores en [02-color.md](02-color.md), estilos de
@@ -135,7 +136,8 @@ vuelve a usar:
 `lib/ui/widgets/cartel.dart`. El ómnibus encendido y «TIMBRE» en `ambar` con « MVD» en
 `ambarTenue`, en Doto 22 (mínimo 19) sobre `tinta`. La escala de texto se limita entre 1 y 1.3,
 así que la placa no crece más de 130 %. El lector dice «Timbre MVD». No muestra datos. Es el
-título de todas las barras (`buildTimbreAppBar`) y va al pie de la pantalla de bloqueo.
+título de todas las barras (`buildTimbreAppBar`) y va al pie de cada `LedBoard`: las pantallas
+de bloqueo y los pasos de la bienvenida.
 
 ## `TimbreEmptyState`: una lista vacía
 
@@ -180,6 +182,7 @@ desvanecen hacia el título (`LedMatrix` con `TimbreOpacity.ledUnlit`) y abajo e
 | Horarios | «Horarios» | `BusStop.name` + « · » + `BusStop.id`, en Fira Sans Extra Condensed 17 `etiquetaCartel` | «Horarios de la parada 574, San Jose y Andes» |
 | Info | «Info» | — | «Info» |
 | Privacidad | «Privacidad» | — | «Privacidad» |
+| Código (desde Info) | «Código» | — | «Código» |
 
 El nombre de la parada en Horarios es el que guardaste (`BusStop.name`, que vino de /v1
 `name` o del catálogo).
@@ -199,6 +202,100 @@ Para el lector, el grupo tiene nombre (`semanticLabel`) y cada segmento es un bo
 | Horarios | «Hábiles», «Sábados», «Domingos» (`DayType.label`) | «Tipo de día» | `{day}` de `/v1/stops/{id}/schedule/{day}/{H:MM}`: `weekday`, `saturday`, `sunday` |
 | Estoy esperando | «3 min», «5 min», «10 min» (5 por defecto) | «Minutos antes de que llegue» | `BusWait.alertMinutes` |
 | Ajustes de aviso | «3 min», «5 min», «10 min» | «Minutos antes de que llegue» | `etaAlertMinutes` o `alertMinutes` |
+
+## `LedBoard`: el tablero de pantalla entera
+
+`lib/ui/widgets/led_board.dart`. El tablero de la pantalla de bloqueo, hecho pieza: la barra de
+estado con íconos claros y la de navegación en `tinta` (`AnnotatedRegion`), un `Scaffold` con
+fondo `tinta`, `LedMatrix` en toda la pantalla (paso 8, punto 2.4, `ambar` al 9 %), `SafeArea` y
+una vista que se desplaza y mide por lo menos el alto de la pantalla, con 24 px a los costados.
+Adentro va la columna del contenido (`child`) y, al pie, `CartelCompacto`, que viene puesto
+(`plate: true`); `plate: false` lo saca en las páginas del código de Info, que ya lo tienen en la
+barra. `header` pone algo arriba del contenido: en la bienvenida, los puntos de los pasos.
+
+No muestra datos. Lo usan `LockScreen`, `CodeLockScreen` y `NewCodeScreen`
+(`lib/ui/lock_screen.dart`), cada paso de la bienvenida (`lib/ui/welcome/`) y, sin la placa, las
+páginas del código de Info (`lib/ui/code_pages.dart`).
+
+## `CodeDots` y `LedKeypad`: el teclado del código
+
+`lib/ui/widgets/led_keypad.dart`.
+
+- **`CodeDots(filled, length, error)`:** una fila de `AppPasscode.length` (4) LED cuadrados de
+  16 px (2 × 2 píxeles), a 20 px uno de otro. Vacío, una marca tenue (`tenue`, 5.31:1 sobre
+  `tinta`: un LED apagado del tablero, a 1.35:1, no deja ver cuántos lugares faltan); lleno,
+  encendido en `ambar`, con la luz de un LED encendido; con `error`,
+  todos en `rojoLed`. El lector no lo ve:
+  `PasscodeEntry` dice cuántas cifras van.
+- **`LedKeypad(onDigit, onErase, biometric, enabled)`:** una grilla de 3 × 4,
+  `1 2 3 / 4 5 6 / 7 8 9 / [desbloqueo rápido o nada] 0 [borrar]`. Cada tecla mide 84 × 64, más
+  que `TimbreSpace.touch`, con 16 px entre columnas y 12 entre filas: el teclado entero mide
+  284 × 292. En un tablero más angosto (un teléfono de 320 dp deja 272), `PasscodeEntry` lo achica
+  entero (`FittedBox`) y las teclas siguen por encima de `TimbreSpace.touch`. La cifra va en Fira
+  Sans Extra Condensed 600 de 30 px (`TimbreFonts.firaCondensed`:
+  los números son su trabajo; Doto queda para los carteles y los datos en vivo), en `papel`, en una
+  ventana `noche` con borde `lineaNoche`.
+  - La tecla que se presiona se enciende: la cifra pasa a `ambar`, con su luz, y la tecla se
+    levanta como un panel `tintaAlta` con borde `ambarTenue`; al soltarla se apaga en 220 ms. Es
+    el ámbar de lo que pide una acción. Desactivadas, las cifras y los glifos pasan a `tenue`. Con
+    el foco del teclado físico, la tecla lleva un borde `ambar` de 2 px. Cada toque da una
+    vibración leve; un código equivocado, una más fuerte.
+  - «Borrar» es el glifo `erase`, en `papel`. La tecla del desbloqueo rápido, `fingerprint` o
+    `face` en `ambar`, aparece solo si se la pasa (`PasscodeBiometric`); el lector la llama
+    «Desbloquear con huella», «Desbloquear con Face ID» o «Desbloquear con Touch ID». Los dos
+    glifos miden 28 px y no tienen ventana.
+  - Cada tecla es un botón para el lector. Sin íconos de Material.
+  - La cifra crece con la letra del sistema hasta 1.3× y ahí se queda, porque la tecla tiene
+    tamaño fijo: a 2× no se desborda nada.
+
+## `PasscodeEntry` y `PasscodeCreate`: pedir y elegir el código
+
+`lib/ui/passcode_entry.dart`. Arman lo que va alrededor del teclado: arriba el cartel y el
+mensaje, abajo los botones.
+
+**`PasscodeEntry`** pide un código de 4 cifras. De arriba abajo: `leading` (el candado `LedLock`,
+un glifo), el cartel `sign` en Doto (`TimbreText.cartel`), el mensaje `message` en Fira, los
+`CodeDots`, el `LedKeypad` y `actions` (botones de texto como «¿Olvidaste el código?» o «Ahora
+no»). Con las 4 cifras llama a `onSubmit(code)`, que contesta con un `PasscodeFeedback`:
+
+| Estado | Cuándo | Qué se ve |
+|---|---|---|
+| Esperando | al abrirse | `message` y los puntos vacíos |
+| Ocupado | mientras corre `onSubmit` | los 4 puntos encendidos y el teclado apagado |
+| Aceptado | `onSubmit` devuelve `null` | sigue lleno y apagado: la pantalla que lo usa sigue sola |
+| Error | `onSubmit` devuelve `PasscodeError` (por ejemplo «Código incorrecto») | los puntos en `rojoLed` 650 ms, después vacíos, y el error en `rojoLed` |
+| Espera | `onSubmit` devuelve `PasscodeWait`, o `waitUntil` ya trae una al abrirse | «Demasiados intentos. Probá de nuevo en 30 s», con los segundos enteros que faltan según `AppPasscode.clock`, y el teclado apagado; al terminar, vuelve `message` |
+| Desactivado | `enabled: false`, mientras está abierto un pedido del sistema | el teclado atenuado |
+
+- `error` muestra un error ni bien se abre: lo usa `PasscodeCreate` para «No coinciden. Elegí el
+  código de nuevo.».
+- Con `biometric`, el teclado suma la tecla del desbloqueo rápido.
+- El cartel es un encabezado con la frase `signLabel` («Aplicación bloqueada» para «BLOQUEADA»),
+  no se achica con la letra más chica del sistema (`withClampedTextScaling(minScaleFactor: 1)`,
+  como «NO OFICIAL» de Info) y nunca baja de 19 px. Los puntos se escuchan como «2 de 4 cifras».
+  El error y la espera son regiones en vivo.
+
+**`PasscodeCreate`** elige un código nuevo en dos pasos, con `PasscodeEntry`:
+
+1. El cartel y el mensaje que recibe (`sign`, `signLabel`, `message`), con sus `actions`.
+2. «REPETILO» (el lector oye «Repetí el código») e «Ingresá el mismo código otra vez.», con el
+   botón de texto «Volver», que regresa al paso 1.
+
+Si los dos códigos no coinciden, vuelve al paso 1 con «No coinciden. Elegí el código de nuevo.».
+Si coinciden, espera a `onCreated(code)` con el teclado ocupado. No maneja el botón atrás: lo
+maneja la pantalla que lo contiene.
+
+| Dónde | Componente | Cartel (lector) | Mensaje | `actions` |
+|---|---|---|---|---|
+| Pantalla del código (`CodeLockScreen`) | `PasscodeEntry`, con `LedLock` y el desbloqueo rápido | «BLOQUEADA» («Aplicación bloqueada») | «Ingresá tu código» | «¿Olvidaste el código?» |
+| Después de «¿Olvidaste el código?» | `PasscodeCreate` | «CÓDIGO NUEVO» («Código nuevo») | «Elegí 4 cifras nuevas para abrir la app.» | «Ahora no» |
+| Bienvenida, «Tu código» | `PasscodeCreate` | «TU CÓDIGO» («Tu código») | «Elegí 4 cifras para abrir la app.» | «Ahora no» |
+| Info, código nuevo | `PasscodeCreate` | «CÓDIGO NUEVO» («Código nuevo») | «Elegí 4 cifras para abrir la app.» | — |
+| Info, código actual | `PasscodeEntry` | «TU CÓDIGO» («Tu código») | «Ingresá tu código actual.» | «¿Olvidaste el código?» |
+
+No comparan ni guardan nada: el código lo compara y lo guarda `AppPasscode`
+(`lib/services/app_passcode.dart`), a través de `AppLock`
+([09-pantallas.md](09-pantallas.md#bloqueo)).
 
 ## Tarjeta de parada
 

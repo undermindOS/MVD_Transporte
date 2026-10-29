@@ -37,6 +37,8 @@ void main() {
     TestWidgetsFlutterBinding.ensureInitialized();
     hiveDir = await Directory.systemTemp.createTemp('mvd_hive_test');
     await CacheService.init(path: hiveDir.path);
+    // Past the welcome of the first launch (test/welcome_test.dart)
+    await CacheService.set(CacheService.keyWelcomeDone, true);
   });
 
   setUp(() {
@@ -352,6 +354,9 @@ class _FakeLocalAuth extends LocalAuthPlatform {
 
   @override
   Future<bool> deviceSupportsBiometrics() async => true;
+
+  @override
+  Future<List<BiometricType>> getEnrolledBiometrics() async => const [];
 
   @override
   Future<bool> isDeviceSupported() async => true;

@@ -113,14 +113,32 @@ con `MVD_PROXY_URL` (ver la nota de arriba).
 | ¿Recopila o comparte datos? | No | Lo único que sale del teléfono son las consultas al servidor intermediario, que se procesan de forma efímera (fila de abajo) |
 | Ubicación | No recopilada | «Paradas cercanas» elige las paradas en el teléfono, con el catálogo `/v1/catalog/stops`, que se descarga sin coordenadas (`NearbyStopsService.fetchNearby` en `lib/services/nearby_stops_service.dart`). `test/proxy_privacy_test.dart` verifica que ningún pedido lleva la posición. La pestaña Mapa no pide la ubicación: dibuja las paradas guardadas y los ómnibus que vienen a ellas, y su mapa base viene dentro de la app (`assets/map/`), sin pedidos a servidores de mapas. Una build sin `MVD_PROXY_URL` sí manda un área aproximada al WFS de la Intendencia: con esa build la respuesta pasa a ser «Ubicación aproximada, funcionalidad de la app» |
 | Paradas y rutas guardadas | No recopilado | Quedan en el dispositivo (Hive) |
+| Código de la app | No recopilado | Es opcional. Queda en el dispositivo como un hash PBKDF2 con sal (`lib/services/app_passcode.dart`), nunca como las cifras, y la app no lo manda a ningún servidor |
 | Consultas al servidor intermediario (número de parada, IP) | No recopilado: procesamiento efímero | El proxy en Cloudflare (`proxy/`) reenvía las consultas de arribos, paradas, horarios, catálogo de paradas, novedades y estado del GPS, y no guarda la IP ni el número de parada. La IP solo es la clave del límite de pedidos por minuto (`IP_LIMITER` en `proxy/wrangler.jsonc`). Los logs de Workers están apagados (`wrangler.jsonc` no tiene bloque `observability`) y los únicos mensajes de error son textos fijos `<fuente>: <tipo>`, sin URL ni IP (`respond()` en `proxy/src/index.js`). Confirmar con Google antes de enviar: la [ayuda de Play](https://support.google.com/googleplay/android-developer/answer/10787469) dice que lo procesado de forma efímera no aparece en la sección pública, pero en un lugar pide declararlo igual en el formulario y en las preguntas frecuentes dice que no hace falta |
 | Credenciales de Mi STM | No recopilado | Se ingresan en el sitio oficial, en el navegador del sistema |
-| Biometría | No recopilado | La valida el sistema operativo; la app recibe solo sí/no |
+| Biometría | No recopilado | La valida el sistema operativo; la app recibe solo sí/no. Lo mismo con el bloqueo de pantalla del teléfono, que abre la app si se olvida el código |
 | Cifrado en tránsito | Sí | Todas las solicitudes son HTTPS |
 | Eliminación de datos | El usuario borra los datos de la app o la desinstala | No hay datos en servidores del desarrollador |
 
 Detalle de la privacidad del proxy y de los logs: [docs/design/contrato-v1.md](design/contrato-v1.md)
 y [proxy/README.md](../proxy/README.md).
+
+## Notas para la revisión (Play Console y App Store Connect)
+
+La app no tiene cuentas ni inicio de sesión: la revisión no necesita un usuario
+de prueba. En Play Console (Contenido de la app → Acceso a la app): todas las
+funciones están disponibles sin acceso especial.
+
+Texto propuesto para las notas de la revisión (en App Store Connect, en
+inglés):
+
+«Al abrirla por primera vez, la app muestra una bienvenida de 4 pantallas: qué
+hace, que no tiene cuentas ni registros, un código de 4 cifras para abrirla y
+un resumen. El código es opcional: en la pantalla "Tu código", el botón "Ahora
+no" sigue sin código y la app se usa entera. Si se elige un código, se puede
+sumar el desbloqueo con huella o Face ID, y se cambia o se apaga en Info. Si se
+olvida, el bloqueo de pantalla del teléfono abre la app y pide un código
+nuevo.»
 
 ## Permisos de servicio en primer plano (Play Console → Contenido de la app)
 

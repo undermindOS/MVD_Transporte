@@ -21,7 +21,10 @@ Ver también:
 - Frases cortas que dicen una sola cosa. Sin signos de exclamación, sin emoji, sin tono de
   publicidad.
 - La app habla en primera persona del plural solo cuando promete un aviso: «Te avisamos cuando
-  el 121 esté a 5 min», «Te avisamos a la hora estimada».
+  el 121 esté a 5 min», «Te avisamos a la hora estimada». La excepción es la bienvenida, cuando
+  dice qué no hace el proyecto con tus datos: «No registramos lo que hacés ni lo que buscás. Sin
+  publicidad, analíticas ni rastreo.», «Lo que guardás queda en tu teléfono, no en servidores
+  nuestros.».
 
 ## Palabras
 
@@ -142,13 +145,21 @@ Dónde se muestra (colores en [02-color.md](02-color.md)):
   `ambarTenue` e ícono en `ambar`. Lo usan el fallo de Novedades, el aviso de GPS parcial y el
   fallo del Mapa.
 - **Después de una acción:** un snack bar. En `lib/ui/stops_page.dart` (`_showError`) lleva el
-  ícono `warning` en `rojoLed`. En `home_page.dart`, `info_page.dart`, `app_lock.dart`,
-  `news_list.dart` y `map/mapa_page.dart` es texto solo.
+  ícono `warning` en `rojoLed`. En `home_page.dart`, `info_page.dart`, `news_list.dart` y
+  `map/mapa_page.dart` es texto solo.
+- **En el bloqueo:** en la misma pantalla, como región en vivo, porque encima del `Navigator` no
+  hay diálogos: «Código incorrecto», la espera y la nota de un teléfono sin bloqueo de pantalla.
+  El error del código va en `rojoLed`; la nota, que no es un error, en `etiquetaCartel`. Las
+  páginas del código de Info hacen lo mismo.
 
 **Excepción.** Las notas del Mapa sobre paradas sin ubicar («No se pudo ubicar en el mapa la
 parada 574.», «No se pudieron ubicar en el mapa 2 paradas.») van en `tenue` y tienen una sola
 frase: no hay nada que hacer, porque la app vuelve a buscar esas paradas sola, como mucho cada
 10 minutos, al volver al Mapa.
+
+**Excepción.** Los mensajes del teclado del código son cortos y van sin punto final: «Código
+incorrecto» no dice qué hacer, porque el teclado queda listo para probar otra vez, y «Demasiados
+intentos. Probá de nuevo en 30 s» cuenta los segundos que faltan.
 
 ### Mis paradas: tarjetas de parada y de ruta
 
@@ -265,10 +276,9 @@ Código: `lib/ui/map/mapa_page.dart` y `lib/ui/map/map_sheets.dart`.
 | Hoja de una parada que no se pudo actualizar | «No se pudo actualizar. Revisá la conexión.» | nota roja |
 | Hoja de una parada sin ómnibus | «Sin ómnibus próximos» | nota en `tenue` con el ícono `bus` |
 
-### Servicios, Info, Privacidad y bloqueo
+### Servicios, Info y Privacidad
 
-Código: `lib/ui/home_page.dart`, `lib/ui/info_page.dart`, `lib/ui/privacy_policy_page.dart`,
-`lib/ui/app_lock.dart`, `lib/ui/lock_screen.dart`.
+Código: `lib/ui/home_page.dart`, `lib/ui/info_page.dart`, `lib/ui/code_pages.dart`, `lib/ui/privacy_policy_page.dart`.
 
 | Situación | Texto |
 |---|---|
@@ -278,11 +288,59 @@ Código: `lib/ui/home_page.dart`, `lib/ui/info_page.dart`, `lib/ui/privacy_polic
 | Pantalla Privacidad | el texto de `docs/privacy-policy.md` tal cual, sin las líneas `>`; cada `## ` en mayúsculas («RESUMEN») |
 | No se abrió el navegador | «No se pudo abrir el navegador. Revisá que tengas uno activado.» |
 | No se abrió el correo | «No se pudo abrir el correo. Revisá que tengas una app de correo configurada.» |
-| El teléfono no tiene bloqueo de pantalla | «Tu dispositivo no tiene bloqueo de pantalla. Configuralo en Ajustes.» |
-| Pedido del sistema al activar el bloqueo | «Confirmá para activar el bloqueo biométrico» |
-| Pedido del sistema al abrir la app | «Autenticate para acceder a Timbre MVD» |
-| Bloqueo activado o desactivado | «Bloqueo biométrico activado», «Bloqueo biométrico desactivado» |
-| Pantalla de bloqueo | «BLOQUEADA», «Tus paradas y rutas guardadas están protegidas», «Desbloquear» |
+| Fila del bloqueo, en Info | «Código de acceso»; debajo, «La app lo pide al abrirse» (encendida) o «Protegé tus paradas y rutas guardadas» (apagada) |
+| Con un código, en Info | «Cambiar código»; «Desbloquear con huella» y debajo «El código queda de respaldo» |
+| Páginas del código | título «CÓDIGO»; cartel «CÓDIGO NUEVO» con «Elegí 4 cifras para abrir la app.»; cartel «TU CÓDIGO» (el lector oye «Tu código») con «Ingresá tu código actual.» y «¿Olvidaste el código?» |
+| Código equivocado o espera, en «TU CÓDIGO» | los del bloqueo: «Código incorrecto», «Demasiados intentos. Probá de nuevo en 30 s» |
+| Pedido del sistema de «¿Olvidaste el código?», en «TU CÓDIGO» | «Usá el bloqueo de tu teléfono para cambiar el código» o «Usá el bloqueo de tu teléfono para desactivar el código» |
+| «¿Olvidaste el código?» en «TU CÓDIGO», en un teléfono sin bloqueo de pantalla | «Tu teléfono no tiene bloqueo de pantalla, así que no puede confirmar que sos vos. Sin el código no se puede cambiar ni desactivar.» |
+| Pedido del sistema al encender el desbloqueo rápido (también en la bienvenida) | «Confirmá para abrir Timbre MVD con tu huella» |
+| Después de cambiar el bloqueo | «Código activado», «Código cambiado», «Bloqueo desactivado», «Desbloqueo con huella activado», «Desbloqueo con huella desactivado» |
+| El teléfono no tiene ninguna huella ni rostro | «Tu teléfono no tiene una huella ni un rostro configurados.» |
+
+Con Face ID o Touch ID, «huella» y «tu huella» pasan a «Face ID» o «Touch ID»
+(`BiometricKind.label` y `phrase`): «Desbloquear con Face ID», «Confirmá para abrir Timbre MVD con
+Face ID», «Desbloqueo con Face ID activado». En Android dice siempre «huella».
+
+### Bloqueo
+
+Código: `lib/ui/app_lock.dart`, `lib/ui/lock_screen.dart`, `lib/ui/passcode_entry.dart`,
+`lib/services/device_auth.dart`.
+
+| Situación | Texto |
+|---|---|
+| Pantalla del código | cartel «BLOQUEADA» (el lector oye «Aplicación bloqueada») e «Ingresá tu código» |
+| Código equivocado | «Código incorrecto» |
+| Espera, desde el quinto código equivocado seguido | «Demasiados intentos. Probá de nuevo en 30 s», con los segundos que faltan |
+| Teclas sin cifra (lo que oye el lector) | «Borrar»; «Desbloquear con huella», «Desbloquear con Face ID» o «Desbloquear con Touch ID» |
+| Debajo del teclado | «¿Olvidaste el código?» |
+| Pedido del sistema del desbloqueo rápido | «Desbloqueá Timbre MVD» |
+| Pedido del sistema de «¿Olvidaste el código?» | «Usá el bloqueo de tu teléfono para entrar a Timbre MVD» |
+| Código nuevo, después de olvidarlo | cartel «CÓDIGO NUEVO» (el lector oye «Código nuevo»), «Elegí 4 cifras nuevas para abrir la app.» y «Ahora no» |
+| Repetir un código nuevo (también en la bienvenida y en Info) | cartel «REPETILO» (el lector oye «Repetí el código»), «Ingresá el mismo código otra vez.» y «Volver» |
+| Los dos códigos no coinciden | «No coinciden. Elegí el código de nuevo.» |
+| Sin bloqueo de pantalla, en Android | «Tu teléfono no tiene bloqueo de pantalla, así que no puede confirmar que sos vos. Para entrar sin el código, borrá los datos de Timbre MVD en los ajustes del teléfono: se borran tus paradas y rutas.» |
+| Sin bloqueo de pantalla, en iOS | «Tu teléfono no tiene bloqueo de pantalla, así que no puede confirmar que sos vos. Para entrar sin el código, borrá Timbre MVD y volvé a instalarla: se borran tus paradas y rutas.» |
+| Bloqueo anterior, pantalla | «BLOQUEADA», «Tus paradas y rutas guardadas están protegidas», «Desbloquear» |
+| Bloqueo anterior, pedido del sistema | «Autenticate para acceder a Timbre MVD» |
+| Dentro del pedido del sistema, en Android (`AndroidAuthMessages`) | título «Timbre MVD», «Confirmá que sos vos» y, solo con huella o cara, el botón «Usar código». Con el bloqueo del teléfono no hay botón de la app: el sistema ofrece su propio PIN o patrón |
+| Dentro del pedido del sistema, en iOS (`IOSAuthMessages`) | «Usar código» después de un intento fallido de Face ID (solo con huella o cara); el aviso propio del plugin después de muchos intentos, «Face ID y Touch ID se bloquearon por muchos intentos. Bloqueá y desbloqueá el teléfono para volver a usarlos.», con «Aceptar» |
+
+### Bienvenida
+
+Código: `lib/ui/welcome/`.
+
+| Paso | Texto |
+|---|---|
+| Todos | «Paso 1 de 4» a «Paso 4 de 4»: lo que oye el lector en los puntos de arriba |
+| 1. Hola | cartel «HOLA» (el lector oye «Hola»); «Timbre MVD te muestra los ómnibus de Montevideo como el cartel de la parada.»; «Mis paradas»: «Los minutos en vivo de tus paradas, con el GPS de cada ómnibus.»; «Mapa»: «Los ómnibus que vienen a tus paradas.»; «Estoy esperando»: «Te avisamos cuando tu ómnibus está cerca.»; «App no oficial: no está afiliada con la Intendencia de Montevideo, el STM ni ninguna empresa de transporte.»; «Continuar» |
+| 2. Sin cuentas ni registros | cartel «SIN CUENTAS» / «NI REGISTROS» (el lector oye «Sin cuentas ni registros»); «No tenés que crear una cuenta: la app no te pide nombre, mail ni teléfono.»; «No registramos lo que hacés ni lo que buscás. Sin publicidad, analíticas ni rastreo.»; «Lo que guardás queda en tu teléfono, no en servidores nuestros.»; «Leer la política de privacidad»; «Continuar» |
+| 3. Tu código | cartel «TU CÓDIGO» (el lector oye «Tu código»); «Elegí 4 cifras para abrir la app.»; «Ahora no»; para repetirlo y si no coincide, los de «Bloqueo» |
+| 3b. Huella | cartel «HUELLA», «FACE ID» o «TOUCH ID» (el lector oye «Huella», «Face ID» o «Touch ID»); «Abrí Timbre MVD con tu huella. Si no funciona, usás el código.»; «Usar huella»; «Ahora no»; el pedido del sistema «Confirmá para abrir Timbre MVD con tu huella» |
+| 4. Listo | cartel «LISTO» (el lector oye «Listo»); con código, «La app pide tu código al abrirse.» y, con el desbloqueo rápido, «También se abre con tu huella.»; sin código, «La app se abre sin código.»; siempre, «Podés cambiarlo cuando quieras en Info.»; «Empezar» |
+
+«Lo que guardás queda en tu teléfono, no en servidores nuestros.» no dice «solo en este teléfono»:
+Android puede incluir los datos de la app en la copia de seguridad de Google de la persona.
 
 ### De `ApiFailure` al texto
 
@@ -318,8 +376,7 @@ no se muestra nada.
   | «SIN NOVEDADES» | «Sin novedades» | «Los desvíos y cambios de recorrido aparecen acá.» |
   | «SIN PASADAS» | «Sin pasadas para este horario» | «Probá con otro día o con una hora más temprano.» |
 
-- **Confirmaciones.** Snack bars: «Te avisamos cuando el 121 esté a 5 min», «Bloqueo biométrico
-  activado».
+- **Confirmaciones.** Snack bars: «Te avisamos cuando el 121 esté a 5 min», «Código activado».
 
 ## Notificaciones y widget
 
@@ -347,6 +404,9 @@ Lo dejamos anotado para corregirlo en el código cuando se toque ese archivo:
 - En «Agregar ruta», «Guardar» sin número de parada o sin destino no hace nada y no dice por qué.
 - Si una parada guardada dejó de existir, Horarios pide «Revisá la conexión.», porque
   `MvdApiService.getSchedule` devuelve `null` para cualquier fallo.
+- La bienvenida dice «Los minutos en vivo de tus paradas, con el GPS de cada ómnibus.»: en los
+  textos de la app se dice «con GPS», no «en vivo» (ver «Palabras»).
+- «Tu teléfono no tiene una huella ni un rostro configurados.» dice qué pasó, pero no qué hacer.
 
 ## Antes de agregar un texto
 

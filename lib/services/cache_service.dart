@@ -12,7 +12,18 @@ class CacheService {
   static const String _catalogBodyKey = 'body';
   static const String _catalogFetchedAtKey = 'fetched_at_ms';
 
+  // The lock from before the app had a code of its own: the system prompt
+  // only. Kept until the welcome is finished (AppLock)
   static const String keyBiometricEnabled = 'biometric_lock_enabled';
+  // The app's code (AppPasscode): its PBKDF2 hash, the wrong codes in a row
+  // and when the last wait started (ms since epoch)
+  static const String keyLockCode = 'lock_code';
+  static const String keyLockFailures = 'lock_code_failures';
+  static const String keyLockWaitFrom = 'lock_code_wait_from';
+  // A fingerprint or a face opens the app in place of the code
+  static const String keyLockBiometric = 'lock_biometric';
+  // The welcome shown at the first launch was finished
+  static const String keyWelcomeDone = 'welcome_done';
   // Transport news: cached messages (JSON string), paging start, last
   // fetch (ms since epoch) and the highest idMensaje the user has seen
   static const String keyNewsCache = 'news_cache';

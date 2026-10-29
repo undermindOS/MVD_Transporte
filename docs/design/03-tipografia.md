@@ -56,7 +56,7 @@ Tamaños de `cartel` en el código:
 | 22 | Destino y LLEGANDO de `CartelTira` | 0 |
 | 24 | Día de una novedad sin leer (`_DateTile` en `lib/ui/news_list.dart`) | 0 |
 | 26 | Línea de `CartelTira` | 0 |
-| 30 | «BLOQUEADA» de la pantalla de bloqueo | 2 |
+| 30 | Los carteles de las pantallas de bloqueo, de las páginas del código y de la bienvenida: «BLOQUEADA», «TU CÓDIGO», «CÓDIGO NUEVO», «REPETILO», «HOLA», «SIN CUENTAS» / «NI REGISTROS», «HUELLA», «LISTO». Los de la bienvenida se achican si con la letra más grande no entran en el ancho | 2 |
 | 34 | Minutos de `CartelTira` | 0 |
 | 24, 26, 30, 44, 72 | `CartelParada`, que hoy no se usa en ninguna pantalla | 0 o 1 |
 
@@ -178,14 +178,16 @@ lo mejor es llevarlo a un estilo existente o agregar uno nuevo a
 | Tamaño | Dónde |
 |---|---|
 | 12 | «NUEVA» (700, espaciado 0.72, `ambar`) y mes de la fecha (700, espaciado 0.96) en `lib/ui/news_list.dart`; nota «Publicadas por la Intendencia de Montevideo (Cómo Ir).» (`tenue`). |
-| 13 | Número de parada en la tarjeta y origen de una ruta; texto del panel de GPS parcial (interlineado 1.4); fila «Aviso N min antes» (700); notas y errores de los diálogos; «Horarios teóricos, sin ubicación GPS» y «Después de medianoche» (600) en Horarios; textos chicos de Info y de los mosaicos de Servicios; fecha en el detalle de una novedad; rótulos de confort de `CartelParada`; «#574» en la hoja de una parada del Mapa. Del tema: etiqueta de los chips (500), tooltip, subpestañas sin elegir (500). |
-| 15 | Número de línea en las píldoras de los ómnibus del Mapa (`TimbreText.lineBadge` a 15, Fira Sans Extra Condensed 800), pintado en el atlas de `BusLayer`. |
-| 16 | «Bloqueo biométrico» (600) en Info; título de los mosaicos de Servicios (700); títulos dentro del texto de una novedad (`lib/ui/safe_html.dart`, 700). El tema define 16 / 700 para `ElevatedButton` y `SegmentedButton`, que la app no usa. |
+| 13 | Número de parada en la tarjeta y origen de una ruta; texto del panel de GPS parcial (interlineado 1.4); fila «Aviso N min antes» (700); notas y errores de los diálogos; «Horarios teóricos, sin ubicación GPS» y «Después de medianoche» (600) en Horarios; textos chicos de Info y de los mosaicos de Servicios; fecha en el detalle de una novedad; rótulos de confort de `CartelParada`; «#574» en la hoja de una parada del Mapa; «App no oficial…» al pie de «Hola» en la bienvenida (interlineado 1.4). Del tema: etiqueta de los chips (500), tooltip, subpestañas sin elegir (500). |
+| 14 | Frases de las filas de «Hola» en la bienvenida (`etiquetaCartel`, interlineado 1.4). |
+| 15 | Número de línea en las píldoras de los ómnibus del Mapa (`TimbreText.lineBadge` a 15, Fira Sans Extra Condensed 800), pintado en el atlas de `BusLayer`; frases de «Sin cuentas ni registros» y de «Listo» en la bienvenida (`papel`, interlineado 1.4). |
+| 16 | «Código de acceso», «Cambiar código» y «Desbloquear con huella» (600) en Info; en la bienvenida, los nombres de las filas de «Hola» (600) y la frase de arriba de «Hola» y de «Huella» (interlineado 1.4); título de los mosaicos de Servicios (700); títulos dentro del texto de una novedad (`lib/ui/safe_html.dart`, 700). El tema define 16 / 700 para `ElevatedButton` y `SegmentedButton`, que la app no usa. |
 | 17 | Título de una novedad (600 leída, 700 sin leer, interlineado 1.25); subtítulo de Horarios con la parada (`_stopLine`: Fira Sans Extra Condensed 700, `etiquetaCartel`). |
-| 18 | Títulos de sección de Servicios (700); texto de «Desbloquear» (700). |
+| 18 | Títulos de sección de Servicios (700); texto de «Desbloquear» y de los botones principales de la bienvenida (700). |
 | 19 | `appBarTheme.titleTextStyle` (700). No se ve: el título de la app bar es `CartelCompacto`. |
 | 20 | Encabezado de hora de Horarios, «20 h» (Fira Sans Extra Condensed 800, `etiquetaCartel`). |
 | 26 | Día de una novedad leída (Fira Sans Extra Condensed 800, `etiquetaCartel`). |
+| 30 | Cifras del teclado del código (Fira Sans Extra Condensed 600, `lib/ui/widgets/led_keypad.dart`): crecen con la letra del sistema hasta 1.3×. |
 | 34 | Logotipo «Timbre MVD» de Info (Fira Sans Extra Condensed 800, « MVD» a 700 en `ambar`). El cartel TIMBRE MVD usa Doto y `ambarTenue`: ver [02-color.md](02-color.md#donde-el-código-todavía-no-cumple). |
 
 ## Cómo agregar un estilo

@@ -110,14 +110,9 @@ class _HomePageState extends State<HomePage> with RouteAware {
   }
 
   void _openInfoPage() {
-    final lock = AppLock.of(context);
+    // Info reads the lock itself (AppLock.of)
     Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => InfoPage(
-          biometricLockEnabled: lock.enabled,
-          onToggleBiometricLock: lock.setEnabled,
-        ),
-      ),
+      MaterialPageRoute(builder: (_) => const InfoPage()),
     );
   }
 

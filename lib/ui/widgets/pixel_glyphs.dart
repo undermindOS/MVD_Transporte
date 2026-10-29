@@ -329,7 +329,7 @@ abstract final class PixelGlyphs {
     '............',
   ]);
 
-  /// Biometric lock. (pixelarticons)
+  /// The lock. (pixelarticons)
   static const lock = PixelGlyph([
     '............',
     '....###.....',
@@ -358,6 +358,55 @@ abstract final class PixelGlyphs {
     '.#.......#..',
     '.#.......#..',
     '..#######...',
+    '............',
+  ]);
+
+  /// A fingerprint: the quick unlock key of the code keypad with «huella»
+  /// or Touch ID. Ridges end at different heights, like a real one.
+  static const fingerprint = PixelGlyph([
+    '............',
+    '....####....',
+    '..##....##..',
+    '.#..####..#.',
+    '.#.#....#.#.',
+    '.#.#.##.#.#.',
+    '.#.#.#..#.#.',
+    '.#.#.#..#.#.',
+    '...#.#..#.#.',
+    '...#.#....#.',
+    '.....#......',
+    '............',
+  ]);
+
+  /// A face in scan corners: the quick unlock key with Face ID.
+  static const face = PixelGlyph([
+    '............',
+    '.###....###.',
+    '.#........#.',
+    '.#.#....#.#.',
+    '...#..#.#...',
+    '......#.....',
+    '.....##.....',
+    '...#....#...',
+    '.#..####..#.',
+    '.#........#.',
+    '.###....###.',
+    '............',
+  ]);
+
+  /// A backspace tag with ×: erases the last digit on the code keypad.
+  static const erase = PixelGlyph([
+    '............',
+    '............',
+    '....#######.',
+    '...#......#.',
+    '..#..#..#.#.',
+    '.#....##..#.',
+    '.#....##..#.',
+    '..#..#..#.#.',
+    '...#......#.',
+    '....#######.',
+    '............',
     '............',
   ]);
 

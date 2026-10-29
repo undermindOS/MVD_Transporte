@@ -18,6 +18,7 @@ lib/
   ui/widgets/            componentes del tablero
   ui/*.dart              pantallas
   ui/map/                la pestaña Mapa: la página, los ómnibus y las hojas
+  ui/welcome/            la bienvenida de la primera vez
   services/              fachada de datos, caché, avisos, widget, navegador
   services/api/          capa /v1: fuentes, adaptadores, lector, reglas
   services/map/          el mapa base: el archivo PMTiles y el estilo
@@ -51,18 +52,20 @@ docs/design/             este sistema; tokens.json lo verifica una prueba
 |---|---|---|
 | `arrival_row.dart` | `ArrivalRow(arrival, waited, stale, onTap)`: un ómnibus en el tablero | Tarjetas de parada y de ruta (`stops_page.dart`), hoja de una parada del Mapa (`map/map_sheets.dart`) |
 | `line_badge.dart` | `LineBadge(line, live, compact)`: relleno con GPS, contorno sin GPS | `ArrivalRow`, Horarios, hoja de un ómnibus del Mapa |
-| `cartel.dart` | `CartelCompacto` (la placa TIMBRE MVD), `LiveDot`, `LlegandoChip`, `MinutosEnVivo`, `CartelTira` (la hoja de «Estoy esperando») y `CartelParada` | `CartelCompacto`, en la barra de cada pantalla y en el bloqueo; `MinutosEnVivo` (con `LiveDot`, o `LlegandoChip` a 0 min), en `ArrivalRow` y en la hoja de un ómnibus del Mapa; `CartelTira`, en `stops_page.dart`. `CartelParada` hoy solo aparece en `test/cartel_test.dart` |
+| `cartel.dart` | `CartelCompacto` (la placa TIMBRE MVD), `LiveDot`, `LlegandoChip`, `MinutosEnVivo`, `CartelTira` (la hoja de «Estoy esperando») y `CartelParada` | `CartelCompacto`, en la barra de cada pantalla y al pie de `LedBoard`; `MinutosEnVivo` (con `LiveDot`, o `LlegandoChip` a 0 min), en `ArrivalRow` y en la hoja de un ómnibus del Mapa; `CartelTira`, en `stops_page.dart`. `CartelParada` hoy solo aparece en `test/cartel_test.dart` |
 | `empty_state.dart` | `TimbreEmptyState(message, sign, detail)`: una lista vacía como cartel | Mis paradas, Horarios, Novedades, el Mapa sin paradas |
 | `segmented.dart` | `TimbreSegmented<T>` | Tipo de día en Horarios; 3, 5 o 10 min en «Estoy esperando» |
 | `page_title_bar.dart` | `PageTitleBar`: el título grande y el subtítulo (hasta 4 líneas, `subtitleMaxLines`), con la altura medida según la letra del sistema | `buildTimbreAppBar` |
 | `timbre_app_bar.dart` | `buildTimbreAppBar(…)`: el tablero de arriba con sus LED, la placa y el título | `HomePage`, Horarios, Info, Privacidad |
-| `led_matrix.dart` | `LedMatrix(pitch, dot, color, opacity, fadeFrom)`: los LED apagados | La barra de arriba, los mosaicos de Servicios, el bloqueo, Info, la fecha sin leer de Novedades, `TimbreEmptyState`, `TimbreAppIcon` |
-| `led_lock.dart` | `LedLock(pitch, scanning)`: el candado animado | Pantalla de bloqueo |
+| `led_matrix.dart` | `LedMatrix(pitch, dot, color, opacity, fadeFrom)`: los LED apagados | La barra de arriba, los mosaicos de Servicios, `LedBoard`, Info, la fecha sin leer de Novedades, `TimbreEmptyState`, `TimbreAppIcon` |
+| `led_lock.dart` | `LedLock(pitch, scanning)`: el candado animado | Las dos pantallas de bloqueo (la del código, con paso 6; la anterior y «Listo», con 8) y «Listo» de la bienvenida |
+| `led_board.dart` | `LedBoard(header, child, plate)`: el tablero de pantalla entera (barras del sistema, LED, `SafeArea`, desplazamiento y la placa al pie, que viene puesta: `plate: false` la saca), con `header` opcional | `LockScreen`, `CodeLockScreen`, `NewCodeScreen`, los pasos de la bienvenida y, sin la placa, las páginas del código de Info |
+| `led_keypad.dart` | `LedKeypad(onDigit, onErase, biometric, enabled)`: el teclado de 3 × 4; `CodeDots(filled, length, error)`: los puntos del código | `PasscodeEntry` |
 | `pixel_icon.dart` | `PixelGlyph` (12 filas de 12 celdas) y `PixelIcon(glyph, size, color, glow, semanticLabel)` | Todos los íconos de la app |
-| `pixel_glyphs.dart` | `PixelGlyphs`: los 35 glifos. Es `part of 'pixel_icon.dart'` | Ver [04-iconos.md](04-iconos.md) |
-| `timbre_bus.dart` | `TimbreBusPalette`, `TimbreBusDetail`, `TimbreBus`, `TimbreAppIcon` y `TimbreBusPainter`: el ómnibus de la marca | La placa, `TimbreEmptyState`; `TimbreAppIcon(size: 64)` en Info |
+| `pixel_glyphs.dart` | `PixelGlyphs`: los 38 glifos. Es `part of 'pixel_icon.dart'` | Ver [04-iconos.md](04-iconos.md) |
+| `timbre_bus.dart` | `TimbreBusPalette`, `TimbreBusDetail`, `TimbreBus`, `TimbreAppIcon` y `TimbreBusPainter`: el ómnibus de la marca | La placa, `TimbreEmptyState`; `TimbreAppIcon(size: 64)` en Info y el de «Hola» en la bienvenida |
 
-Tres archivos de apoyo están junto a las pantallas:
+Cuatro archivos de apoyo están junto a las pantallas:
 
 - `lib/ui/spoken_text.dart`: `spokenName()`, que pasa los nombres en
   mayúsculas de la API («PUNTA CARRETAS») a la forma en que los lee bien un
@@ -72,6 +75,10 @@ Tres archivos de apoyo están junto a las pantallas:
 - `lib/ui/policy_markdown.dart`: `policyToBlocks`, que lee solo el Markdown
   de `docs/privacy-policy.md` (`# `, `## `, párrafos, `- `, `**negrita**` y
   `` `código` ``) y deja afuera las líneas citadas (`>`).
+- `lib/ui/passcode_entry.dart`: `PasscodeEntry` y `PasscodeCreate`, que piden
+  y eligen el código con `LedKeypad` y `CodeDots`; `PasscodeFeedback`
+  (`PasscodeError`, `PasscodeWait`) y `PasscodeBiometric`
+  ([08-componentes.md](08-componentes.md)).
 
 Qué muestra cada componente y de qué campo sale: [08-componentes.md](08-componentes.md)
 y [pantalla-a-datos.md](pantalla-a-datos.md).
@@ -80,16 +87,18 @@ y [pantalla-a-datos.md](pantalla-a-datos.md).
 
 | Archivo | Qué es |
 |---|---|
-| `lib/main.dart` | `main()`: deja la pantalla de inicio hasta abrir Hive, las notificaciones, WorkManager y «Estoy esperando»; registra las licencias de las fuentes y de pixelarticons (`_registerFontLicenses`). `MiTransporteMVDApp`: `MaterialApp` con título «Timbre MVD», `HomePage.routeObserver` y `AppLock.routeGuard` en `navigatorObservers`, y `AppLock` en `builder`; recibe `deviceAuth` (`LocalDeviceAuth` por defecto, uno falso en las pruebas) |
-| `app_lock.dart` | `AppLock` y `AppLockState`: el bloqueo biométrico, encima del `Navigator`. Pide la autenticación, vuelve a bloquear después del segundo plano, escucha `ExternalApps.launches`, hace la preparación única del primer desbloqueo (`_setupAfterAuth`) y prende o apaga el bloqueo desde Info (`setEnabled`). `AppLock.of(context)` da `locked` y `enabled`; `routeGuard` no deja cerrar rutas mientras está bloqueada; `clock` lo adelantan las pruebas |
-| `home_page.dart` | `HomePage`: la navegación de abajo (Mis paradas, Mapa y Servicios, con los índices `_stopsTab` y `_mapaTab`), la apertura de Info (con `enabled` y `setEnabled` de `AppLock`) y de los sitios en el navegador. `routeObserver` avisa a Mis paradas y al Mapa cuando una página los tapa; con la app bloqueada, también les pasa `active: false`. El Mapa se arma la primera vez que se elige su pestaña (`_mapaOpened`), dentro de un `TickerMode` que lo deja sin animar fuera de la vista |
+| `lib/main.dart` | `main()`: deja la pantalla de inicio hasta abrir Hive, las notificaciones, WorkManager y «Estoy esperando»; registra las licencias de las fuentes y de pixelarticons (`_registerFontLicenses`). `MiTransporteMVDApp`: `MaterialApp` con título «Timbre MVD», `HomePage.routeObserver` y `AppLock.routeGuard` en `navigatorObservers`, y `AppLock` en `builder`; `home: WelcomeGate(child: HomePage())`; recibe `deviceAuth` (`LocalDeviceAuth` por defecto, uno falso en las pruebas) |
+| `app_lock.dart` | `AppLock` y `AppLockState`: el bloqueo, encima del `Navigator`. Elige entre el código, el bloqueo anterior o nada; abre el desbloqueo rápido y, con «¿Olvidaste el código?», el bloqueo del teléfono y el código nuevo; vuelve a bloquear después del segundo plano, escucha `ExternalApps.launches` y hace la preparación única del primer desbloqueo (`_setupAfterAuth`). `AppLock.of(context)` da `locked`, `enabled`, `hasCode`, `biometric`, `biometricKind`, `refreshBiometrics`, `setCode`, `checkCode`, `removeLock`, `setBiometric` y `confirmWithPhoneLock`, que usan la bienvenida e Info; `routeGuard` no deja cerrar rutas mientras está bloqueada; `clock` lo adelantan las pruebas |
+| `home_page.dart` | `HomePage`: la navegación de abajo (Mis paradas, Mapa y Servicios, con los índices `_stopsTab` y `_mapaTab`), la apertura de Info (`const InfoPage()`) y de los sitios en el navegador. `routeObserver` avisa a Mis paradas y al Mapa cuando una página los tapa; con la app bloqueada, también les pasa `active: false`. El Mapa se arma la primera vez que se elige su pestaña (`_mapaOpened`), dentro de un `TickerMode` que lo deja sin animar fuera de la vista |
 | `stops_page.dart` | `StopsPage`: las subpestañas Paradas, Rutas y Novedades; las tarjetas; `_refresh` (cada 30 s, `autoRefreshInterval`, solo con la pantalla a la vista); los datos viejos (`_staleFor` y `_liveFor`, desde `_BoardView.receivedAt` con el reloj `StopsPage.clock` que las pruebas adelantan; `_staleRowGrace`, en el reloj de la fuente); la hoja de «Estoy esperando» (`_showWaitSheet`); los diálogos `_AddStopDialog` y `_AddRouteDialog`; los ajustes de aviso (`_AlertSettingsSheet`); el aviso de GPS parcial |
 | `news_list.dart` | `NewsList`, `_NewsRow`, `_DateTile`, `_FailedBanner`; `showNewsDetail` y `openExternalLink` |
 | `schedule_page.dart` | `SchedulePage` (Horarios), `_HourHeader`, `_PassRow` |
 | `services_page.dart` | `ServicesPage`, `_SiteTile`, `_BrowserNote` |
-| `info_page.dart` | `InfoPage`, `_LinkRow` |
+| `info_page.dart` | `InfoPage`, que lee el bloqueo con `AppLock.of(context)` (la tarjeta del código, con sus filas `_LockRow`), y `_LinkRow` |
+| `code_pages.dart` | Las páginas «CÓDIGO» que abre Info: `NewCodePage` («CÓDIGO NUEVO») y `CodeCheckPage.change` / `CodeCheckPage.turnOff` («TU CÓDIGO», con «¿Olvidaste el código?»; para cambiarlo, después «CÓDIGO NUEVO» en la misma página). Cada una vuelve con `true` cuando terminó |
 | `privacy_policy_page.dart` | `PrivacyPolicyPage` (Privacidad): lee el asset `docs/privacy-policy.md` (declarado en `pubspec.yaml`) y lo muestra con `policyToBlocks` |
-| `lock_screen.dart` | `LockScreen`, con `LedLock` |
+| `lock_screen.dart` | `CodeLockScreen`, la pantalla del código (`LedBoard`, `LedLock`, `PasscodeEntry`, «¿Olvidaste el código?» y la nota de un teléfono sin bloqueo de pantalla); `NewCodeScreen`, el código nuevo después de olvidarlo (`PasscodeCreate` y «Ahora no»), y `LockScreen`, la del bloqueo anterior |
+| `welcome/` | `welcome_gate.dart`: `WelcomeGate(child)`, la bienvenida hasta que termina (`keyWelcomeDone`), después `child`. `welcome_page.dart`: `WelcomePage(onDone)` y sus pasos, privados (`_StepDots`, `_Sign`, `_Line`, `_Primary`) |
 
 Estados, datos y refresco de cada pantalla: [09-pantallas.md](09-pantallas.md).
 
@@ -129,7 +138,7 @@ armado en el teléfono ([contrato-v1.md](contrato-v1.md#en-la-app)).
 | Archivo | Qué tiene |
 |---|---|
 | `mvd_api_service.dart` | `MvdApiService`, la fachada. `proxyUrl` sale de `--dart-define=MVD_PROXY_URL`; `usesProxy` y `source` eligen `ProxySource` o `DirectSource`. Llamadas: `getBoard`, `getBoards` (cada parada una vez, en paralelo; cada tablero bueno queda en `latestBoards`, el más nuevo por parada, con la hora en que llegó al teléfono, que lee el Mapa: `ReceivedBoard`, con el reloj `MvdApiService.clock`; un tablero con `fetchedAt` más viejo no reemplaza al guardado mientras este haya llegado hace menos de un minuto (`_overtakenWithin`: una respuesta que se demoró detrás de otra, por la caché de borde o pedidos en paralelo), salvo que haya llegado «después de ahora», un reloj atrasado; pasado el minuto lo reemplaza, así tableros con dos relojes, el `Date` de la Intendencia y el del teléfono cuando falta, no dejan quieta la parada), `getStopDetails`, `healPlaceholderStops`, `getSchedule` (guardado 6 h), `getStopCatalog` (guardado un día; uno sin líneas, 15 min, y nunca encima de una copia con líneas), `searchStops`, `getNews`, `getGpsStatus`, `isValidStopId`, `montevideoClock`. Después de un 429 no pide nada hasta `retryAfter`. Quedan por compatibilidad `getNextArrivals`, `resolveStop` (con `StopNotFoundException`), `parseArrivals` y `parseSchedule` |
-| `cache_service.dart` | `CacheService`: las cajas de Hive `settings`, `stops` y `routes`, y la caja diferida `catalog` (el cuerpo del catálogo y `fetched_at_ms`). La migración `cache_schema` = 2 borra el catálogo viejo de `settings` |
+| `cache_service.dart` | `CacheService`: las cajas de Hive `settings`, `stops` y `routes`, y la caja diferida `catalog` (el cuerpo del catálogo y `fetched_at_ms`). La migración `cache_schema` = 2 borra el catálogo viejo de `settings`. Las claves del bloqueo: `keyLockCode` (el hash del código), `keyLockFailures`, `keyLockWaitFrom` y `keyLockBiometric`; `keyBiometricEnabled`, el bloqueo anterior; `keyWelcomeDone`, la bienvenida terminada |
 | `nearby_stops_service.dart` | `NearbyStopsService`: `findNearMe`, `nearbyFrom`, `radiusMeters` = 400, `boxHalfSideMeters` = 472, `openAppSettings` (con `ExternalApps.open`); `NearbyStopsError`. Sin proxy, `fetchStop` pide a geoserver una parada por su número (`buildStopUri`, `CQL_FILTER`, sin caja) |
 | `stop_locations_service.dart` | `StopLocationsService.fillMissing`: la ubicación de las paradas guardadas que no la tienen, para el Mapa. Con proxy, del catálogo del teléfono; sin proxy, de `NearbyStopsService.fetchStop`, una por vez. Cada parada se busca como mucho cada 10 min (`retryInterval`) y la ubicación se guarda en `BusStop` |
 | `transport_news_service.dart` | `TransportNewsService`: refresco cada 10 min, o 30 s si lo pedís; guarda hasta 30 novedades; `unreadCount`, `markRead` |
@@ -141,7 +150,8 @@ armado en el teléfono ([contrato-v1.md](contrato-v1.md#en-la-app)).
 | `bus_wait_task.dart` | `BusWaitTaskHandler`: la consulta cada 30 s dentro del servicio de Android |
 | `official_sites.dart` | `OfficialSite` (`miStm`, `recarga`, `comoIr`, `avisos`), `comoIrStop` y `SystemBrowser.open`: los sitios oficiales se abren en el navegador, nunca dentro de la app |
 | `external_apps.dart` | `ExternalApps`: la única salida a otra app. `launch` abre una URL (navegador, correo, enlace de una novedad) y `open`, una llamada de plugin (los ajustes del sistema); las dos avisan antes a `launches`, que escucha el bloqueo |
-| `device_auth.dart` | `DeviceAuth`, el pedido de autenticación del sistema, y `LocalDeviceAuth`, con `local_auth` (`stickyAuth`, `biometricOnly: false`) |
+| `device_auth.dart` | `DeviceAuth`, el pedido de autenticación del sistema: `isAvailable` (el teléfono tiene bloqueo de pantalla), `biometrics` (qué hay para el desbloqueo rápido: `BiometricKind`, con `label` y `phrase`) y `authenticate(reason, biometricOnly, sticky)`. `LocalDeviceAuth` lo hace con `local_auth`: `stickyAuth` solo si `sticky` (los pedidos que se abren desde la app abierta no lo son), sin los diálogos propios del plugin (`useErrorDialogs: false`; en iOS queda el aviso de Face ID bloqueado por muchos intentos, `lockOut`, con «Aceptar») y con los textos en español (`AndroidAuthMessages`, `IOSAuthMessages`) |
+| `app_passcode.dart` | `AppPasscode`: el código de 4 cifras (`length`), guardado como hash PBKDF2-HMAC-SHA256 con sal (`iterations` = 20 000, en un isolate); `set`, `check` (`CodeCheck.ok`, `wrong`, `wait`), `clear`, `isSet`, `waitUntil`, `isValid`; 5 códigos equivocados libres y después 30 s de espera (`freeTries`, `wait`). Las pruebas cambian `derive` y `clock`. `pbkdf2Sha256` (RFC 8018) |
 
 ## Modelos: `lib/models/`
 
@@ -168,11 +178,11 @@ no entiende los elementos de colección con `?` (`[?x]`): si los usás en
 
 | Grupo | Archivos |
 |---|---|
-| Diseño y marca | `design_tokens_test.dart` (`tokens.json` igual al código), `brand_assets_test.dart`, `cartel_test.dart`, `screens_test.dart`, `lock_screen_test.dart`, `info_page_test.dart`, `privacy_policy_test.dart`, `spoken_text_test.dart`, `safe_html_test.dart` |
-| Letra grande | `stops_layout_test.dart`, `stop_search_layout_test.dart`, `map/mapa_layout_test.dart` |
-| Pantallas y flujos | `widget_test.dart` (también: el Mapa no se arma hasta que se elige y pide solo a la vista), `app_lock_test.dart` (el bloqueo sobre la app entera, con un `DeviceAuth` falso; tampoco el Mapa pide nada bloqueado), `stops_page_test.dart`, `stops_board_test.dart`, `add_dialogs_test.dart`, `stop_search_test.dart`, `news_tab_test.dart`, `schedule_test.dart` |
+| Diseño y marca | `design_tokens_test.dart` (`tokens.json` igual al código), `brand_assets_test.dart`, `cartel_test.dart`, `screens_test.dart`, `lock_screen_test.dart`, `passcode_entry_test.dart`, `info_page_test.dart`, `privacy_policy_test.dart`, `spoken_text_test.dart`, `safe_html_test.dart` |
+| Letra grande | `stops_layout_test.dart`, `stop_search_layout_test.dart`, `map/mapa_layout_test.dart`, `passcode_layout_test.dart`, `welcome_layout_test.dart` |
+| Pantallas y flujos | `welcome_test.dart` (la bienvenida: cada paso, atrás, la huella, la bienvenida retomada, y que `HomePage` no se arme hasta «Empezar»), `widget_test.dart` (también: el Mapa no se arma hasta que se elige y pide solo a la vista), `app_lock_test.dart` (el bloqueo sobre la app entera, con un `DeviceAuth` falso: el código, la espera, el desbloqueo rápido, «¿Olvidaste el código?» y el bloqueo anterior; tampoco el Mapa pide nada bloqueado), `welcome_test.dart` (la bienvenida hasta `HomePage`), `stops_page_test.dart`, `stops_board_test.dart`, `add_dialogs_test.dart`, `stop_search_test.dart`, `news_tab_test.dart`, `schedule_test.dart` |
 | Mapa | `map/mapa_page_test.dart` (la pestaña con proxy y sin proxy, con un mapa base sin teselas), `map/mapa_camera_test.dart` (una parada ubicada con el mapa ya abierto entra en la cámara), `map/map_buses_test.dart`, `map/bus_layer_test.dart`, `map/basemap_test.dart` (la copia del archivo), `map/local_pmtiles_provider_test.dart`, `map/basemap_assets_test.dart` (los archivos de `assets/map/`: SHA-256, bordes y el estilo compilado, sin ámbar) |
-| Datos | `mvd_api_service_test.dart`, `cache_service_test.dart`, `nearby_stops_service_test.dart`, `stop_locations_service_test.dart`, `transport_news_service_test.dart`, `bus_status_service_test.dart`, `background_worker_test.dart`, `bus_wait_test.dart`, `route_alert_test.dart`, `alert_schedule_test.dart`, `stop_widgets_feed_test.dart` |
+| Datos | `mvd_api_service_test.dart`, `cache_service_test.dart`, `app_passcode_test.dart`, `nearby_stops_service_test.dart`, `stop_locations_service_test.dart`, `transport_news_service_test.dart`, `bus_status_service_test.dart`, `background_worker_test.dart`, `bus_wait_test.dart`, `route_alert_test.dart`, `alert_schedule_test.dart`, `stop_widgets_feed_test.dart` |
 | Privacidad | `proxy_privacy_test.dart` (cada servicio con proxy pide solo al proxy y nunca manda la posición), `proxy_bff_test.dart` (lo mismo, desde las pantallas) |
 | Contrato /v1 | `contract/contract_test.dart` (modo directo y modo proxy contra los goldens), `contract/rules_test.dart` (los vectores) |
 | Apoyo | `support/layout.dart` (`loadBundledFonts()`, `usePhoneScreen()`: 390 × 844), `support/contract_cases.dart` (lee `proxy/contract/v1`), `support/pmtiles_builder.dart` (archivos PMTiles chicos para las pruebas, copiado de `flutter_map_vector_tiles` con su licencia BSD-3) |
@@ -191,7 +201,16 @@ Qué tener en cuenta:
 - **Hive en pruebas de widgets.** En cada archivo, solo la primera prueba
   que espera una escritura en una caja puede esperarla; las siguientes no
   despiertan. Por eso algunos flujos tienen archivo propio (ver el
-  comentario al principio de `test/stop_search_test.dart`).
+  comentario al principio de `test/stop_search_test.dart`). Los ajustes del
+  bloqueo y de la bienvenida no esperan al disco, así que esos flujos se
+  prueban en cualquier orden
+  ([12-decisiones.md](12-decisiones.md#los-ajustes-del-bloqueo-no-esperan-al-disco)).
+- **El código en pruebas de widgets.** `AppPasscode.derive` calcula el hash
+  con `compute()` en un isolate, que dentro de `testWidgets` no termina sin
+  `runAsync`. Las pruebas lo cambian por uno rápido
+  (`pbkdf2Sha256(utf8.encode(code), salt, 1)`) y mueven `AppPasscode.clock`
+  para la espera. Las que arman la app entera ponen `keyWelcomeDone`, para no
+  ver la bienvenida.
 - **El Mapa en pruebas de widgets.** El estilo de verdad se compila en un
   isolate que no contesta dentro de una prueba de widgets. Las pruebas le
   pasan a `MapaPage` un `MapaBasemap` sin teselas (`basemapLoader`), y las
@@ -247,14 +266,14 @@ el porqué, en [contrato-v1.md](contrato-v1.md#11-el-triángulo-de-pruebas).
 |---|---|
 | `assets/` | El ícono y la pantalla de inicio (`app_icon*.png`, `splash_icon*.png`, `README.md`), las fuentes con sus licencias OFL (`fonts/`), la licencia MIT de pixelarticons (`licenses/`) y el mapa base (`map/`: `mvd-20261028.pmtiles`, `style_noche.json` y su `README.md`, que no viaja con la app) |
 | `tool/map/` | El generador del estilo «Timbre Noche» (`gen_style.mjs`, `flavor_noche.json` y un `package.json` con versiones fijas). Cómo se usa: [assets/map/README.md](../../assets/map/README.md) |
-| `pubspec.yaml` | Las familias de fuentes, los archivos que viajan con la app (las licencias, la política y los dos archivos del mapa base, nunca la carpeta entera) y la configuración de `flutter_launcher_icons` |
+| `pubspec.yaml` | Las familias de fuentes, los archivos que viajan con la app (las licencias, la política y los dos archivos del mapa base, nunca la carpeta entera) y la configuración de `flutter_launcher_icons`. Entre las dependencias directas, `crypto` (el hash del código), `local_auth_android` y `local_auth_darwin` (los textos del pedido del sistema) |
 | `flutter_native_splash.yaml` | La pantalla de inicio |
 | `android/app/src/main/res/` | Los widgets de parada (`layout/widget_stop_*.xml`, `xml/widget_stop_*_info.xml`, `drawable/widget_*`, `drawable-xxhdpi/widget_led_dot*.png`, `drawable-nodpi/widget_plate.png` y `widget_sin_paradas.png`), el ícono de notificación `drawable/ic_stat_timbre.xml`, `values/colors.xml`, `values/strings.xml` y los cuatro `styles.xml` |
 | `android/app/src/main/kotlin/com/liberontech/stmapp/TimbreStopWidget.kt` | Los widgets de parada: `TimbreProximoWidget`, `TimbreParadaWidget`, `TimbreMisParadasWidget`. Dibujan, cambian de parada al tocar el nombre, piden datos a la app y programan el redibujo |
 | `android/app/src/main/kotlin/com/liberontech/stmapp/StopWidgetData.kt` | Las reglas de los widgets de parada, sin Android: qué paradas, qué ómnibus, qué dice el pie y cuándo redibujar |
 | `android/app/src/main/res/layout/widget_stop_*.xml` | Los tres widgets de parada, su fila (`widget_stop_row.xml`) y sus vistas previas del selector (`*_preview.xml`, con las paradas 574 y 3140) |
 | `android/app/src/main/AndroidManifest.xml` | El nombre, el servicio en primer plano `dataSync` y el ícono del aviso fijo (`com.liberontech.stmapp.NOTIFICATION_ICON`) |
-| `ios/Runner/` | `Info.plist`, `Base.lproj/LaunchScreen.storyboard`, `AppDelegate.swift` |
+| `ios/Runner/` | `Info.plist` (con `CFBundleLocalizations` = `es`), `Base.lproj/LaunchScreen.storyboard`, `AppDelegate.swift` |
 
 Detalle de cada superficie: [10-superficies.md](10-superficies.md).
 

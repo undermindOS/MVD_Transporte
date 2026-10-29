@@ -7,8 +7,9 @@ incómodo).
 
 Las doce primeras vienen del diseño original de Timbre y están corregidas
 según el código. Las siguientes salieron de la reconstrucción del proxy como
-Backend-for-Frontend (`/v1`), de la revisión de diseño de la misma rama y de
-la pestaña Mapa. El contrato completo está en [contrato-v1.md](contrato-v1.md).
+Backend-for-Frontend (`/v1`), de la revisión de diseño de la misma rama, de
+la pestaña Mapa y de la bienvenida con el código propio de la app. El contrato
+completo está en [contrato-v1.md](contrato-v1.md).
 
 Índice:
 
@@ -31,6 +32,13 @@ la pestaña Mapa. El contrato completo está en [contrato-v1.md](contrato-v1.md)
   [El bloqueo va encima del `Navigator`](#el-bloqueo-va-encima-del-navigator) ·
   [El bloqueo vuelve solo después del segundo plano](#el-bloqueo-vuelve-solo-después-del-segundo-plano) ·
   [El mapa viene dentro de la app](#el-mapa-viene-dentro-de-la-app)
+- Bloqueo y bienvenida: [Un código propio](#un-código-propio-con-la-huella-de-atajo) ·
+  [Si olvidás el código](#si-olvidás-el-código-abre-el-bloqueo-del-teléfono) ·
+  [La bienvenida, antes que todo](#la-bienvenida-va-antes-que-todo-una-sola-vez) ·
+  [El bloqueo anterior, hasta la bienvenida](#el-bloqueo-anterior-sigue-hasta-la-bienvenida) ·
+  [Solo un «sí» abre](#solo-un-sí-abre) ·
+  [Android dice «huella»](#android-dice-huella) ·
+  [Los ajustes no esperan al disco](#los-ajustes-del-bloqueo-no-esperan-al-disco)
 - Backend: [Sin ruta por lotes](#sin-ruta-por-lotes) ·
   [Cercanas en el teléfono](#las-paradas-cercanas-se-calculan-en-el-teléfono) ·
   [Sin cambio automático al modo directo](#sin-cambio-automático-al-modo-directo) ·
@@ -82,10 +90,11 @@ pide una acción:
   el ómnibus que estás esperando, los ómnibus con GPS sobre el Mapa;
 - los carteles de la marca: «TIMBRE», el título de página, el candado de
   bloqueo, el cartel de una lista vacía;
-- las acciones: el relleno del botón principal y el texto de los botones de
-  contorno y de texto;
+- las acciones: el relleno del botón principal, el texto de los botones de
+  contorno y de texto, y la tecla que se presiona en el teclado del código;
 - lo elegido o encendido: chip y segmento elegidos, interruptor encendido,
-  pestaña elegida, campanita de un aviso activado;
+  pestaña elegida, campanita de un aviso activado, las cifras ya escritas del
+  código y el paso actual de la bienvenida;
 - el foco de un campo, el cursor y los indicadores de carga;
 - los contadores (ver [la excepción de «NUEVA»](#nueva-y-la-fecha-de-lo-no-leído-van-en-ámbar))
   y el ícono de los avisos sobre `avisoNoche`;
@@ -131,7 +140,7 @@ letra del sistema más chica no los achique.
 plantilla.
 
 **Decisión.** Íconos y letras comparten la misma grilla de puntos:
-`PixelGlyphs` (35 glifos de 12 × 12 en `lib/ui/widgets/pixel_glyphs.dart`),
+`PixelGlyphs` (38 glifos de 12 × 12 en `lib/ui/widgets/pixel_glyphs.dart`),
 dibujados por `PixelIcon`. En `lib/` no queda ningún `Icons.`.
 
 **Consecuencia.** Un ícono nuevo se dibuja en la grilla
@@ -402,6 +411,182 @@ GPS. Las etiquetas del mapa salen con la fuente del sistema, no con Fira
 toda la ciudad, y no solo los ómnibus que vienen a tus paradas, pide una ruta
 nueva del contrato (por ejemplo `/v1/buses`, con la flota que ya baja
 `ImGateway`), y espera a que el proxy esté desplegado.
+
+---
+
+## Bloqueo y bienvenida
+
+### Un código propio, con la huella de atajo
+
+**Contexto.** El bloqueo de antes era el del teléfono: el pedido del sistema
+aceptaba la huella, la cara, el PIN o el patrón. La app no tenía nada propio:
+la abría cualquiera que pudiera desbloquear el teléfono. Una contraseña de
+letras o una cuenta no van con una app sin cuentas que se usa en la calle, con
+una mano.
+
+**Decisión.** La app tiene su propio código de 4 cifras (`AppPasscode.length`),
+que se escribe en un teclado de LED (`LedKeypad`). La huella o Face ID la abren
+más rápido (`keyLockBiometric`) y el código queda de respaldo. No hay
+contraseñas de letras, ni códigos de 6 cifras, ni reglas de «código débil». El
+código se guarda como un hash PBKDF2-HMAC-SHA256 con una sal de 16 bytes y
+20 000 vueltas (`AppPasscode.iterations`), calculado en un isolate, fuera de la
+interfaz; cada hash guardado lleva su cantidad de vueltas. Cuatro cifras son
+10 000 códigos, y lo que las sostiene es la espera: cinco códigos equivocados
+seguidos no cuestan nada, y desde el quinto cada código equivocado hace esperar
+30 s antes del siguiente (`freeTries`, `wait`). Probar los 10 000 a mano son
+más de tres días de esperas.
+
+**Consecuencia.** El hash saca el código de los archivos de la app: quien mire
+la caja `settings` de Hive no lee las cifras. No impide que alguien que puede
+leer el almacenamiento del teléfono pruebe los 10 000 códigos contra el hash,
+fuera del teléfono y sin la espera: con 20 000 vueltas por código, una
+computadora los recorre en minutos. La espera tampoco es una barrera dura:
+confía en el reloj del teléfono, y adelantarlo la termina. El código protege de
+quien tiene el teléfono desbloqueado en la mano; no de quien puede leer sus
+archivos, ni de quien sabe el PIN del teléfono
+([la decisión que sigue](#si-olvidás-el-código-abre-el-bloqueo-del-teléfono)).
+Un valor guardado que no se lee como hash cuenta como código puesto: ningún
+código coincide, y el bloqueo del teléfono abre la app.
+
+### Si olvidás el código, abre el bloqueo del teléfono
+
+**Contexto.** Un código se olvida. Sin cuentas ni servidor no hay un mail de
+recuperación, y borrar la app para volver a entrar se lleva las paradas y las
+rutas guardadas.
+
+**Decisión.** «¿Olvidaste el código?» abre el pedido del sistema con el bloqueo
+del teléfono («Usá el bloqueo de tu teléfono para entrar a Timbre MVD», sin
+`biometricOnly`). Si responde que sí, la app pide un código nuevo («CÓDIGO
+NUEVO»); «Ahora no» la abre con el código de antes. Los datos quedan. La app
+solo se entera de sí o no: nunca ve el PIN, la huella ni la cara.
+
+**Consecuencia.** Quien sabe el PIN del teléfono también entra, por este
+camino. El pedido acepta además la huella y la cara del teléfono (no hay un
+modo solo con PIN): cualquiera que el teléfono reconozca puede elegir un código
+nuevo, aunque el desbloqueo rápido esté apagado. Un teléfono sin bloqueo de
+pantalla no puede confirmar quién es: la app lo dice y explica la única salida,
+borrar sus datos (Android) o reinstalarla (iOS), que se lleva las paradas y las
+rutas.
+
+### La bienvenida va antes que todo, una sola vez
+
+**Contexto.** La app no se presentaba. Había que decir, antes de usarla, que no
+hay cuentas ni registros, y ofrecer el código cuando tiene sentido, no
+escondido en Info.
+
+**Decisión.** `WelcomeGate` (`lib/ui/welcome/`) va en `home` de `MaterialApp`,
+debajo de `AppLock`. Al abrir, el orden es el bloqueo, si hay; la bienvenida,
+hasta que termina; y `HomePage`. Mientras la bienvenida no termina, `HomePage`
+no se arma: ni Mis paradas ni el Mapa existen, así que no consultan ni piden
+nada. Al tocar «Empezar», la app guarda `keyWelcomeDone` y no la vuelve a
+mostrar. Ningún camino de `lib/` abre una pantalla desde afuera (una
+notificación o el widget), así que nada saltea la bienvenida.
+
+**Consecuencia.** Quien actualiza la app también la ve una vez: `keyWelcomeDone`
+es nuevo. Si la app se cierra en el medio, la bienvenida vuelve a empezar; con
+un código ya guardado, saltea «Tu código». Las pruebas que arman la app entera
+ponen `keyWelcomeDone` antes de empezar. Una pantalla que algún día se abra
+desde una notificación o desde el widget tiene que pasar también por
+`WelcomeGate`.
+
+### El bloqueo anterior sigue hasta la bienvenida
+
+**Contexto.** Antes del código, Info encendía un bloqueo que era solo el pedido
+del sistema (`keyBiometricEnabled`). Quien lo tenía no podía quedar sin bloqueo
+al actualizar la app, ni ver la bienvenida sin desbloquear.
+
+**Decisión.** Mientras no hay código, ese bloqueo sigue: la app abre con la
+pantalla de antes (`LockScreen`, «Autenticate para acceder a Timbre MVD») y
+después muestra la bienvenida. En «Tu código», elegir un código lo reemplaza
+(`setCode` apaga el anterior) y «Ahora no» lo apaga (`removeLock`).
+
+**Consecuencia.** Para terminar la bienvenida hay que pasar por «Tu código», o
+tener ya un código, así que después de ella no queda el bloqueo anterior. Info
+ya no lo enciende. `LockScreen` y sus textos quedan solo para ese paso.
+
+### Solo un «sí» abre
+
+**Contexto.** El pedido del sistema termina de muchas maneras: sí, no,
+cancelado, «Usar código», atrás, tiempo agotado, o con un error
+(`UserCancelled`, `UserFallback`, `LockedOut`, `PermanentlyLockedOut`,
+`BiometricNotAvailable`, `NotEnrolled`, `NotAvailable`, `PasscodeNotSet`). El
+bloqueo anterior abría la app con los errores que parecían decir «este
+teléfono no tiene método de bloqueo» (`_authUnavailableCodes`), y en iOS
+`NotAvailable` llega también después de un intento fallido.
+
+**Decisión.** Solo `true` abre algo: el desbloqueo rápido, «¿Olvidaste el
+código?» y el bloqueo anterior. Cualquier otra respuesta deja el bloqueo como
+estaba. Un código de error nunca alcanza para decir que el teléfono no tiene
+método de bloqueo: la app lo vuelve a preguntar con `DeviceAuth.isAvailable()`.
+Si no tiene, el bloqueo anterior se abre (si no, quedarías encerrado) y
+«¿Olvidaste el código?» muestra la nota de un teléfono sin bloqueo de pantalla.
+
+**Consecuencia.** En iPhone el bloqueo anterior ya no se abre con un
+`NotAvailable` que era un intento fallido. Con el código, un error del pedido
+nunca abre: queda el teclado. `isAvailable()` es ahora solo
+`isDeviceSupported()`: un lector de huellas sin ninguna cargada no cuenta como
+método de bloqueo.
+
+### Android dice «huella»
+
+**Contexto.** Android no le dice a la app si el teléfono se desbloquea con una
+huella o con la cara: `getAvailableBiometrics` devuelve solo biometría «débil»
+o «fuerte». iOS sí distingue Face ID de Touch ID.
+
+**Decisión.** `DeviceAuth.biometrics()` devuelve `BiometricKind.fingerprint`
+en todo Android con biometría cargada, `faceId` o `touchId` en iOS, y `null` si
+no hay nada cargado. Cada uno trae dos textos: `label` va después de «con» en
+un rótulo («Desbloquear con huella») y `phrase`, en una frase («Abrí Timbre MVD
+con tu huella»).
+
+**Consecuencia.** Un Android que se desbloquea con la cara también dice
+«huella» y muestra el glifo `fingerprint`. El pedido del sistema, que dibuja
+Android, muestra igual lo que el teléfono usa.
+
+### Un pedido abierto desde la app no la deja abierta
+
+**Contexto.** Con el código puesto, tres pedidos del sistema se abren con la
+app abierta: encender la huella en Info o en la bienvenida, y «¿Olvidaste el
+código?» en la página del código de Info. Con `stickyAuth` el pedido sobrevive
+a un viaje al segundo plano y su respuesta espera, y mientras hay un pedido
+abierto la vuelta no bloquea (`_isAuthenticating`). Quien se iba con uno de
+esos pedidos a la vista encontraba la app abierta a la vuelta, con sus
+paradas, hasta el viaje siguiente. En Android, además, la pantalla del PIN del
+teléfono pausa la app mientras se escribe, así que una pausa sola no dice si
+la persona se fue.
+
+**Decisión.** Esos pedidos no son pegajosos (`sticky: false` en
+`DeviceAuth.authenticate`): salir de la app los cierra con un «no», y la vuelta
+bloquea como cualquier otra. Si al volver un pedido de esos sigue abierto (la
+respuesta llegó tarde, o era la pantalla del PIN), la app se bloquea cuando se
+cierra sin un «sí» (`_tripDuringPrompt`): un «sí» solo lo da quien tiene el
+teléfono. Los pedidos de la pantalla de bloqueo siguen pegajosos: la app está
+bloqueada mientras tanto. Y cada bloqueo empieza con el teclado vacío: las
+cifras escritas antes de irse no quedan.
+
+**Consecuencia.** Cancelar la pantalla del PIN de Android desde Info bloquea
+la app: hay que volver a entrar con el código o con «¿Olvidaste el código?».
+`test/app_lock_test.dart` prueba los dos pedidos con un viaje en el medio,
+con un «no» y con un «sí».
+
+### Los ajustes del bloqueo no esperan al disco
+
+**Contexto.** En las pruebas de widgets, solo la primera prueba de cada archivo
+puede esperar una escritura de Hive en una caja: las siguientes se quedan
+esperando para siempre, porque el futuro terminó en la zona `FakeAsync` de una
+prueba anterior. El código, el desbloqueo rápido y la bienvenida escriben
+varios ajustes seguidos, y hay que poder probarlos en cualquier orden.
+
+**Decisión.** Los ajustes del bloqueo y de la bienvenida se escriben sin
+esperar al disco: `unawaited(CacheService.set(…))` y
+`unawaited(CacheService.remove(…))`. Hive cambia su copia en memoria antes de
+su primer `await`, así que un `CacheService.get` justo después ya lee el valor
+nuevo, y el disco lo recibe enseguida, en orden. `AppPasscode` hace lo mismo.
+
+**Consecuencia.** En los caminos de la interfaz de esta parte no se espera
+ninguna escritura de ajustes, y cada flujo se prueba en cualquier archivo y en
+cualquier orden. Tampoco se usa `pumpAndSettle` mientras gira un indicador de
+progreso sin fin: no termina nunca.
 
 ---
 

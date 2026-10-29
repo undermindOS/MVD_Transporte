@@ -8,6 +8,10 @@ y «Servicios», con accesos rápidos a los sitios oficiales (Mi STM, recarga de
 Avisos), que se abren en el navegador del sistema (Custom Tabs / SFSafariViewController) y no en
 un WebView integrado.
 
+La primera vez, una bienvenida cuenta qué hace la app y que no tiene cuentas ni registros, y deja
+elegir un código propio de 4 cifras para abrirla, con la huella o Face ID como atajo. Si lo
+olvidás, el bloqueo de pantalla del teléfono abre la app y te deja elegir uno nuevo.
+
 No está afiliada a la Intendencia de Montevideo.
 
 ## Datos
@@ -88,7 +92,10 @@ después la app.
 - `lib/ui/map/`, `lib/services/map/`, `lib/services/stop_locations_service.dart` — la pestaña Mapa:
   los ómnibus y sus hojas, el mapa base dentro de la app y la ubicación de las paradas guardadas
 - `assets/map/`, `tool/map/` — el mapa base, su estilo y el generador del estilo
-- `lib/ui/app_lock.dart`, `lib/ui/lock_screen.dart` — bloqueo biométrico, encima de toda la app
+- `lib/ui/app_lock.dart`, `lib/ui/lock_screen.dart`, `lib/ui/passcode_entry.dart`,
+  `lib/services/app_passcode.dart` — el bloqueo, encima de toda la app: el código propio (guardado
+  como hash), la huella o Face ID y el bloqueo del teléfono si lo olvidás
+- `lib/ui/welcome/` — la bienvenida de la primera vez
 - `lib/ui/services_page.dart`, `lib/services/official_sites.dart` — sitios oficiales en el navegador del sistema
 - `lib/ui/theme/` — el sistema de diseño Timbre: colores, medidas y opacidades (`timbre_tokens.dart`),
   estilos de texto (`timbre_text.dart`) y tema (`timbre_theme.dart`); los componentes están en
