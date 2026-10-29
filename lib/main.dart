@@ -12,6 +12,7 @@ import 'services/notification_service.dart';
 import 'ui/app_lock.dart';
 import 'ui/home_page.dart';
 import 'ui/theme/timbre_theme.dart';
+import 'ui/welcome/welcome_gate.dart';
 
 void main() async {
   final binding = WidgetsFlutterBinding.ensureInitialized();
@@ -72,7 +73,8 @@ class MiTransporteMVDApp extends StatelessWidget {
       // The lock covers the Navigator: every page, sheet and dialog
       builder: (context, child) =>
           AppLock(deviceAuth: deviceAuth, child: child!),
-      home: const HomePage(),
+      // The welcome until «Empezar», under the lock; then the app
+      home: const WelcomeGate(child: HomePage()),
     );
   }
 }
