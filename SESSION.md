@@ -419,3 +419,24 @@
 - Один необъяснённый сбой в одном из полных прогонов у агента; следующие 4 прогона зелёные.
 ### Next steps
 - Владелец: открыть PR (куда), проверить на телефоне, убрать влитые рабочие копии.
+
+## 2026-10-29 — Виджеты остановок для Android (ветка `feat/widgets-paradas` от `feat/mapa`)
+### What was done
+- Макеты в дизайн-системе Timbre MVD: холст claude.ai «Timbre MVD - widgets» (Chico 2×2, Mediano 4×2, Grande 4×4, состояния). По решению владельца янтарь есть во всех размерах: номер линии (контур `ambarTenue`, цифры `ambar`), знак `stop`, кнопка ⟳ и LED-фон. Время — `papel` с «~» и часами, никогда не янтарь и не обратный отсчёт.
+- Android: `TimbreProximoWidget`, `TimbreParadaWidget`, `TimbreMisParadasWidget` (`TimbreStopWidget.kt`), правила без Android в `StopWidgetData.kt`, layouts `widget_stop_*` и превью для пикера (Android 12+), новые векторные иконки, глиф `refresh` в `PixelGlyphs`.
+- Данные: `StopWidgetsFeed` (`lib/services/stop_widgets_feed.dart`) пишет `stops_saved` и `stop_board_{id}` (до 6 ómnibus, `dueMs` в часах телефона); виджеты пишут `stops_shown` и `stop_widgets_placed`. Кнопка ⟳ запускает Dart в фоне (`home_widget` interactivity, `timbre://refresh`), без открытия app. Тап по имени остановки — следующая сохранённая. Ómnibus исчезает через минуту после своего времени по неточному будильнику, без сети.
+- `BackgroundWorker`: фоновая задача тянет остановки виджетов в любое время и не отключается, пока виджет на экране. Проверка виджетов в `sync()` не ждётся: на пути разблокировки платформенный вызов в тестах не завершается (сломал `app_lock_test`, исправлено, со счётчиком поколений против гонки).
+- Тесты: Flutter 646/646, analyze чисто; JVM 16/16 (`StopWidgetDataTest` + `StopWidgetRenderTest` на Robolectric: реальные RemoteViews, картинки в `build/widget-previews/`); `flutter build apk --debug` собирается.
+- Доки: 10-superficies (новый раздел), 02-color (исключение 3), 04-iconos (35 глифов), 12-decisiones, 13-en-el-codigo, README, CHANGELOG.
+### Current state
+- What works: всё выше в контейнере; рендер трёх виджетов проверен Robolectric-ом (эмулятора нет, KVM нет).
+- What's broken/pending:
+  - на телефоне не проверено: пикер, кнопка ⟳ (фоновый движок home_widget), будильник, ресайз;
+  - старый виджет маршрута (`MVDTransporteWidgetProvider`, 3×2) не тронут — 4 виджета в пикере;
+  - при включённом биометрическом замке виджет всё равно показывает остановки на домашнем экране;
+  - Maven Central через прокси контейнера отвечает 429: Gradle шёл через зеркало Google (init-скрипт в `~/.gradle/init.d/`, вне репо).
+### Next steps
+- Владелец: поставить APK, проверить три виджета на телефоне, решить судьбу виджета маршрута и поведение при замке.
+### Key decisions made
+- Остановка на виджете переключается тапом по имени, без экрана настройки: работает на всех launcher-ах и Android-версиях.
+- Шрифт виджетов — системный `sans-serif-condensed`, как у виджета маршрута; «SIN PARADAS» — картинка Doto.
