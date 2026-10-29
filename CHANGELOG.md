@@ -14,7 +14,8 @@ versiones: [SemVer](https://semver.org/lang/es/).
   el siguiente los ómnibus se deslizan a su posición nueva, salvo con «reducir movimiento». La pestaña se arma la
   primera vez que la abrís y pide los arribos cada 30 s solo mientras está a la vista, con los mismos tableros que
   «Mis paradas»: si «Mis paradas» los trajo hace menos de 30 s, no los vuelve a pedir. Después de un fallo, los
-  últimos ómnibus quedan sin encender hasta 5 minutos. «© OpenStreetMap» se ve siempre en una esquina y abre la
+  últimos ómnibus quedan sin encender hasta 5 minutos, contados desde que el tablero llegó al teléfono, como en
+  «Mis paradas». «© OpenStreetMap» se ve siempre en una esquina y abre la
   página de derechos de OpenStreetMap. Info nombra la posición de los ómnibus entre las fuentes de datos y suma
   «Mapa: © colaboradores de OpenStreetMap, con licencia ODbL. Viene dentro de la app.», con y sin proxy. Las
   paradas elegidas en «Buscar por calles» o en «Paradas cercanas» se guardan con su ubicación; a las demás se la
@@ -71,7 +72,9 @@ versiones: [SemVer](https://semver.org/lang/es/).
   y debajo quedan los últimos ómnibus como estimados («~20:01», nunca en ámbar) durante 5 minutos como máximo.
   Sin error, un tablero que no se renueva hace más de un minuto (al volver de Horarios o Info, o con el proxy
   saturado) tampoco muestra minutos en vivo: los ómnibus quedan como estimados, sin los que tenían que pasar hace
-  más de un minuto, y pasados 5 minutos la tarjeta espera el tablero nuevo.
+  más de un minuto, y pasados 5 minutos la tarjeta espera el tablero nuevo. El minuto y los 5 minutos se cuentan
+  desde que el tablero llegó al teléfono, con o sin error, y la hora de cada ómnibus se compara con el reloj del
+  servidor: un teléfono con la hora corrida no da minutos viejos por nuevos ni borra estimados antes de tiempo.
 - Si una parada guardada dejó de existir, la tarjeta dice «Esta parada ya no existe. Deslizá la tarjeta para
   borrarla.».
 - Una parada que agregás sin conexión queda como «Parada N» y toma su nombre y sus líneas la próxima vez que abrís

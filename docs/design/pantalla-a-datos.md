@@ -93,7 +93,7 @@ para uno de horario ([contrato-v1.md](contrato-v1.md), regla `arrival`).
 | Vivo | `state: "live"` | badge encendido, punto, minutos en Doto y «min» | `state`, `etaMinutes` (1 o más) |
 | Llegando | `etaMinutes` en 0 con GPS | badge encendido y LLEGANDO | `state`, `etaMinutes` |
 | Horario | `state: "scheduled"` | badge en contorno, reloj y `clockTime` | `state`, `clockTime` |
-| Estimado | el último pedido falló y el último tablero bueno tiene menos de 5 min; o no falló, pero ese tablero llegó al teléfono hace 1 min o más y menos de 5 | badge en contorno, reloj y «~`clockTime`»; nunca ámbar y no se puede tocar | `fetchedAt` del tablero (con fallo) o la hora en que llegó al teléfono (sin fallo), `expectedAt` (quedan las filas con `expectedAt` desde hace 1 min o después), `clockTime` |
+| Estimado | el último pedido falló y el último tablero bueno tiene menos de 5 min; o no falló, pero ese tablero llegó al teléfono hace 1 min o más y menos de 5 | badge en contorno, reloj y «~`clockTime`»; nunca ámbar y no se puede tocar | la hora en que el tablero llegó al teléfono (con fallo o sin él), `expectedAt` (quedan las filas con `expectedAt` desde hace 1 min o después, en el reloj de la fuente: `fetchedAt` más lo que el tablero lleva en el teléfono), `clockTime` |
 | Esperado | `BusWait.follows` da esta fila | además de vivo, llegando u horario: fila levantada en `tintaAlta` y campana ámbar | `tripId`; si no está, el mismo `variantId` (o la misma línea y destino) con el `expectedAt` más cercano, a menos de 10 min |
 
 Una fila estimada nunca se marca como esperada.
@@ -118,15 +118,16 @@ Línea {line} a {spokenName(destination)}, {cuándo}[, accesible][, aire acondic
 |---|---|---|---|
 | «No se pudo actualizar. Datos de las 19:52. Deslizá para reintentar.» | `MvdApiService.montevideoClock(ArrivalsBoard.fetchedAt)` | `fetchedAt` | el reloj del Worker cuando contestó transporteRest; modo directo: el reloj del teléfono cuando llegó la respuesta |
 | Filas estimadas debajo de esa nota | `BusArrival.expectedAt` desde hace 1 min o después | `arrivals[].expectedAt` | `time` (ms); si no viene, `fetchedAt` más los minutos |
-| Solo «No se pudo actualizar. Deslizá para reintentar» | no hay tablero bueno, o tiene 5 min o más contra el reloj del teléfono | `fetchedAt` | – |
+| Solo «No se pudo actualizar. Deslizá para reintentar» | no hay tablero bueno, o llegó al teléfono hace 5 min o más | – (la hora en que llegó al teléfono) | – |
 | Filas estimadas sin nota (no hubo fallo) | el tablero llegó hace 1 min o más (`_BoardView.receivedAt`); quedan las de `expectedAt` desde hace 1 min o después. Desde los 5 min, o sin filas, el indicador de carga | `arrivals[].expectedAt` | – |
 | «Esta parada ya no existe. Deslizá la tarjeta para borrarla.» | `ApiFailure.notFound` | 404 `stop_not_found` | transporteRest contestó un error que empieza con `No existe` |
 
 `fetchedAt` es la hora en que contestó la fuente, no la del pedido: desde la
 caché del proxy puede tener hasta 15 s más. Por eso «Datos de las…» dice de
-cuándo son los minutos. Sin fallo, la edad no sale de `fetchedAt` sino de la
-hora en que el tablero llegó, según el reloj del teléfono (`StopsPage.clock`):
-el reloj del servidor puede estar corrido.
+cuándo son los minutos. La edad, con fallo o sin él, no sale de `fetchedAt`
+sino de la hora en que el tablero llegó, según el reloj del teléfono
+(`StopsPage.clock`): el reloj del servidor puede estar corrido. `fetchedAt`
+solo da el «ahora» de la fuente para cortar las filas estimadas vencidas.
 
 ## Rutas: tarjeta de ruta
 
@@ -358,7 +359,7 @@ app.
 | `arrivals[].tripId` | seguir el viaje de «Estoy esperando» y marcar la fila esperada; en el Mapa, reconocer un ómnibus que va a dos paradas |
 | `arrivals[].variantId` | filtro de rutas (`preferredVariantIds`), seguimiento, chips HACIA de respaldo |
 | `arrivals[].expectedAt` | filas estimadas, seguimiento, recordatorio de iOS, caducidad del widget |
-| `fetchedAt` de los arribos | «Datos de las H:MM» y el límite de 5 min de las filas estimadas después de un fallo (sin fallo cuenta la hora en que el tablero llegó al teléfono). En el Mapa, tres cosas: cuál de dos tableros de una parada es el más nuevo, de qué tablero sale la posición de un ómnibus que va a dos paradas, y el «ahora» de la fuente para sacar estimados vencidos. Las edades del Mapa (encendido, 5 min, 30 s) se cuentan desde que el tablero llegó al teléfono |
+| `fetchedAt` de los arribos | «Datos de las H:MM» y, en Mis paradas y en el Mapa, el «ahora» de la fuente para sacar filas estimadas vencidas (las edades, 1 y 5 min, se cuentan desde que el tablero llegó al teléfono). En el Mapa, además: cuál de dos tableros de una parada es el más nuevo y de qué tablero sale la posición de un ómnibus que va a dos paradas; el «tablero de menos de 30 s» también se cuenta desde que llegó al teléfono |
 | `id` de la parada y de los arribos | ninguno: `V1Parser` usa el número pedido |
 | `directions[].variantIds` | se guardan en `RouteAlert.preferredVariantIds` |
 | `stops[].location` | la distancia en «Paradas cercanas»; se guarda en la parada elegida (`BusStop.latitude`, `longitude`) y, con proxy, completa la de una parada guardada sin ubicación: es su lugar en el Mapa |

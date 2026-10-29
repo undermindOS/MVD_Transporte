@@ -24,3 +24,13 @@ class ArrivalsBoard {
 /// [ArrivalsBoard.fetchedAt] is on the source's clock (the proxy's), and a
 /// phone a minute or more off would make every board look old, or new.
 typedef ReceivedBoard = ({ArrivalsBoard board, DateTime receivedAt});
+
+/// The source's clock, seen from the phone.
+extension ReceivedBoardClock on ReceivedBoard {
+  /// "Now" on the source's clock: [ArrivalsBoard.fetchedAt] plus how long
+  /// the board has been on the phone ([now] is the phone's clock). A due
+  /// time on the board (`expectedAt`) is on the source's clock: compared
+  /// with this, a phone clock that is off drops no row early or late.
+  DateTime sourceNow(DateTime now) =>
+      board.fetchedAt.add(now.difference(receivedAt));
+}

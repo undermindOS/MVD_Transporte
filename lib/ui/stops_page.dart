@@ -1011,20 +1011,28 @@ class _StopsPageState extends State<StopsPage>
     }
     List<BusArrival> accepted(ArrivalsBoard b) =>
         accepts == null ? b.arrivals : b.arrivals.where(accepts).toList();
-    final now = DateTime.now();
+    // Ages count from when the board reached the phone, on the phone's
+    // clock; due times are cut on the source's clock. A phone whose clock
+    // is off then shows neither old minutes as live nor drops rows early.
+    final now = StopsPage.clock();
+    final ReceivedBoard? received = board == null
+        ? null
+        : (board: board, receivedAt: view!.receivedAt ?? now);
+    bool overdue(BusArrival a) => a.expectedAt
+        .isBefore(received!.sourceNow(now).subtract(_staleRowGrace));
     if (failure != null) {
       // Offline must not look like "no buses are coming", and old minutes
       // must not look live
-      if (board == null || now.difference(board.fetchedAt) >= _staleFor) {
+      if (received == null ||
+          now.difference(received.receivedAt) >= _staleFor) {
         return const _BoardNote(
           icon: PixelGlyphs.warning,
           color: TimbreColors.rojoLed,
           text: 'No se pudo actualizar. Deslizá para reintentar',
         );
       }
-      final cutoff = now.subtract(_staleRowGrace);
-      final stale = accepted(board)
-          .where((a) => !a.expectedAt.isBefore(cutoff))
+      final stale = accepted(received.board)
+          .where((a) => !overdue(a))
           .toList();
       return Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1033,11 +1041,11 @@ class _StopsPageState extends State<StopsPage>
             icon: PixelGlyphs.warning,
             color: TimbreColors.rojoLed,
             text: 'No se pudo actualizar. Datos de las '
-                '${MvdApiService.montevideoClock(board.fetchedAt)}. '
+                '${MvdApiService.montevideoClock(received.board.fetchedAt)}. '
                 'Deslizá para reintentar.',
           ),
           if (stale.isNotEmpty)
-            _buildRows(key, stale, board.arrivals, stopId, stopName,
+            _buildRows(key, stale, received.board.arrivals, stopId, stopName,
                 stale: true),
         ],
       );
@@ -1045,17 +1053,11 @@ class _StopsPageState extends State<StopsPage>
     // No failure, but no new board for a while either: old minutes must
     // not look live. Estimates, then, past [_staleFor], a wait as before
     // the first board — busy says nothing, and a refresh may be on its way
-    final received = view!.receivedAt;
-    final age = received == null
-        ? Duration.zero
-        : StopsPage.clock().difference(received);
+    final age = now.difference(received!.receivedAt);
     if (age >= _liveFor) {
-      final cutoff = now.subtract(_staleRowGrace);
       final stale = age >= _staleFor
           ? const <BusArrival>[]
-          : accepted(board!)
-              .where((a) => !a.expectedAt.isBefore(cutoff))
-              .toList();
+          : accepted(board!).where((a) => !overdue(a)).toList();
       if (stale.isEmpty) return waiting;
       return _buildRows(key, stale, board!.arrivals, stopId, stopName,
           stale: true);

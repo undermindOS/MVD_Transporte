@@ -110,8 +110,7 @@ frena a las demás, tampoco sin proxy cuando su respuesta no se puede convertir.
 actualizar pide solo las paradas de su subpestaña: las paradas guardadas en Paradas, los orígenes
 en Rutas. Cada tablero que llega bien queda en `MvdApiService.latestBoards`, el más nuevo por
 parada, con la hora en que llegó al teléfono: el Mapa dibuja también los que pidió Mis paradas, y
-cuenta su edad desde esa hora, con o sin fallo, nunca desde `fetchedAt`. (Mis paradas la cuenta
-igual cuando no hubo fallo; después de un fallo, todavía desde `fetchedAt`.)
+cuenta su edad desde esa hora, con o sin fallo, nunca desde `fetchedAt`, igual que Mis paradas.
 
 ### Demasiados pedidos: `Retry-After`
 
@@ -181,10 +180,11 @@ la fila del aviso si está encendido, los próximos ómnibus y «Ver en Cómo Ir
 | Demasiados pedidos (`busy`) | nada cambia; si todavía no había tablero, sigue el indicador. El tablero que queda envejece: a 1 min pasa a estimados y a 5 min, al indicador |
 | GPS parcial | el panel `avisoNoche` arriba de la lista |
 
-Después de un fallo, la edad del tablero se mide con `ArrivalsBoard.fetchedAt` contra el reloj del
-teléfono. Sin fallo se mide desde que llegó al teléfono (`_BoardView.receivedAt`, con
-`StopsPage.clock`): `fetchedAt` es la hora del servidor, que puede estar corrida o venir de la
-caché del borde.
+Con fallo o sin él, la edad del tablero se mide desde que llegó al teléfono
+(`_BoardView.receivedAt`, con `StopsPage.clock`): `fetchedAt` es la hora del servidor, que puede
+estar corrida respecto de la del teléfono o venir de la caché del borde. Las filas estimadas se
+cortan con el reloj de la fuente (`ReceivedBoardClock.sourceNow`: `fetchedAt` más lo que el
+tablero lleva en el teléfono), porque su `expectedAt` está en ese reloj.
 
 | En pantalla | Modelo | De dónde sale |
 |---|---|---|

@@ -263,9 +263,10 @@ condiciones se revisan en este orden:
 | 7 | sin fallo, con filas | hasta 6 filas; se ven 3 y el resto con «Ver las 6»; «Ver menos» las vuelve a ocultar |
 
 Una respuesta `busy` no cambia nada: quedan el último tablero, su hora de llegada y el último
-fallo, así que con varios 429 seguidos el tablero también envejece (fila 5). Con fallo, la edad
-del tablero se mide con `fetchedAt` contra el reloj del teléfono; sin fallo, desde que llegó al
-teléfono (`_BoardView.receivedAt`, con `StopsPage.clock`).
+fallo, así que con varios 429 seguidos el tablero también envejece (fila 5). Con fallo o sin él,
+la edad del tablero se mide desde que llegó al teléfono (`_BoardView.receivedAt`, con
+`StopsPage.clock`), y una fila estimada se saca si su `expectedAt` pasó hace más de 1 min en el
+reloj de la fuente (`fetchedAt` más lo que el tablero lleva en el teléfono).
 
 ## Nota de error: `_BoardNote`
 

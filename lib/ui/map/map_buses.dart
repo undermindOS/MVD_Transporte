@@ -87,19 +87,15 @@ abstract final class MapBuses {
   }
 
   /// [arrival], an estimate from [received], was due longer than
-  /// [staleRowGrace] ago. Its times are on the source's clock, so "now"
-  /// there is the board's fetchedAt plus how long it has been on the
-  /// phone: a phone clock that is off drops nothing early or late.
+  /// [staleRowGrace] ago, on the source's clock
+  /// ([ReceivedBoardClock.sourceNow]).
   static bool overdue(
     BusArrival arrival,
     ReceivedBoard received, {
     required DateTime now,
-  }) {
-    final sourceNow = received.board.fetchedAt.add(
-      now.difference(received.receivedAt),
-    );
-    return arrival.expectedAt.isBefore(sourceNow.subtract(staleRowGrace));
-  }
+  }) => arrival.expectedAt.isBefore(
+    received.sourceNow(now).subtract(staleRowGrace),
+  );
 
   /// The buses with a location inside [bounds] on the boards of
   /// [stopIds], each board live or not by [liveness] (a stop in [failed]:

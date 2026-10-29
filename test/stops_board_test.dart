@@ -307,11 +307,41 @@ void main() {
 
   testWidgets('buses older than 5 min are not shown after a failure',
       (tester) async {
+    // 5 min after the board reached the phone, on the phone's clock
+    var later = Duration.zero;
+    StopsPage.clock = () => DateTime.now().add(later);
+    addTearDown(() => StopsPage.clock = DateTime.now);
     var failing = false;
     answer = (request) async {
       if (failing) throw http.ClientException('offline');
-      return boards(request,
-          fetchedAt: DateTime.now().subtract(const Duration(minutes: 6)));
+      return boards(request);
+    };
+
+    await http.runWithClient(() async {
+      await tester.pumpWidget(app());
+      await tester.pump();
+      expect(liveMinutes(9), findsOneWidget);
+
+      failing = true;
+      later = const Duration(minutes: 5);
+      await tester.pump(StopsPage.autoRefreshInterval);
+      await tester.pump();
+      expect(find.text('No se pudo actualizar. Deslizá para reintentar'),
+          findsNWidgets(2));
+      expect(find.textContaining('Datos de las'), findsNothing);
+      expect(find.text('~20:01'), findsNothing);
+      expect(find.text('116'), findsNothing);
+    }, () => client);
+  });
+
+  testWidgets('a phone clock 6 min ahead of the source: after a failure the '
+      'board that just arrived still shows its estimates', (tester) async {
+    var failing = false;
+    // The source stamped the boards 6 min before the phone's clock
+    final fetchedAt = DateTime.now().subtract(const Duration(minutes: 6));
+    answer = (request) async {
+      if (failing) throw http.ClientException('offline');
+      return boards(request, fetchedAt: fetchedAt);
     };
 
     await http.runWithClient(() async {
@@ -322,11 +352,33 @@ void main() {
       failing = true;
       await tester.pump(StopsPage.autoRefreshInterval);
       await tester.pump();
-      expect(find.text('No se pudo actualizar. Deslizá para reintentar'),
-          findsNWidgets(2));
-      expect(find.textContaining('Datos de las'), findsNothing);
-      expect(find.text('~20:01'), findsNothing);
-      expect(find.text('116'), findsNothing);
+      expect(find.textContaining('Datos de las'), findsNWidgets(2));
+      // Due 9 min after the source's stamp: still an estimate
+      expect(find.text('~20:01'), findsOneWidget);
+      // Due 2 min before it: gone, on the source's clock
+      expect(find.text('~19:50'), findsNothing);
+    }, () => client);
+  });
+
+  testWidgets('a phone clock 12 min ahead, no failure: a board 2 min on the '
+      'phone keeps the bus due 9 min after the source stamped it',
+      (tester) async {
+    var later = Duration.zero;
+    StopsPage.clock = () => DateTime.now().add(later);
+    addTearDown(() => StopsPage.clock = DateTime.now);
+    final fetchedAt = DateTime.now().subtract(const Duration(minutes: 12));
+    answer = (request) async => boards(request, fetchedAt: fetchedAt);
+
+    await http.runWithClient(() async {
+      await tester.pumpWidget(app());
+      await tester.pump();
+      expect(liveMinutes(9), findsOneWidget);
+
+      // Off screen for 2 min: nothing new, the rows turn to estimates
+      later = const Duration(minutes: 2);
+      await tester.pumpWidget(app(active: false));
+      expect(liveMinutes(9), findsNothing);
+      expect(find.text('~20:01'), findsOneWidget);
     }, () => client);
   });
 

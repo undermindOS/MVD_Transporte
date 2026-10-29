@@ -237,8 +237,8 @@ siguieran sirviendo. Pero mostrarlos tal cual haría pasar minutos viejos por
 datos en vivo.
 
 **Decisión.** Si la actualización falla y el último tablero bueno tiene menos
-de 5 min (`_staleFor` en `lib/ui/stops_page.dart`, comparando `fetchedAt` con
-el reloj del teléfono), la tarjeta muestra la nota en `rojoLed` «No se pudo
+de 5 min (`_staleFor` en `lib/ui/stops_page.dart`, contados desde que llegó
+al teléfono, con el reloj del teléfono), la tarjeta muestra la nota en `rojoLed` «No se pudo
 actualizar. Datos de las H:MM. Deslizá para reintentar.» y debajo los ómnibus
 de ese tablero cuya hora esperada no pasó hace más de 1 min
 (`_staleRowGrace`), como `ArrivalRow(stale: true)`: número en contorno, reloj
