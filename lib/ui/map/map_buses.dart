@@ -2,6 +2,7 @@ import 'package:flutter_map/flutter_map.dart' show LatLngBounds;
 import 'package:latlong2/latlong.dart' show LatLng;
 
 import '../../models/arrivals_board.dart';
+import '../../models/bus_arrival.dart';
 
 /// When a bus reaches one saved stop, from that stop's board. [live] as
 /// that board ([MapBuses.liveness]): a bus on a current board and on one
@@ -85,6 +86,21 @@ abstract final class MapBuses {
     return !failed && age < liveFor;
   }
 
+  /// [arrival], an estimate from [received], was due longer than
+  /// [staleRowGrace] ago. Its times are on the source's clock, so "now"
+  /// there is the board's fetchedAt plus how long it has been on the
+  /// phone: a phone clock that is off drops nothing early or late.
+  static bool overdue(
+    BusArrival arrival,
+    ReceivedBoard received, {
+    required DateTime now,
+  }) {
+    final sourceNow = received.board.fetchedAt.add(
+      now.difference(received.receivedAt),
+    );
+    return arrival.expectedAt.isBefore(sourceNow.subtract(staleRowGrace));
+  }
+
   /// The buses with a location inside [bounds] on the boards of
   /// [stopIds], each board live or not by [liveness] (a stop in [failed]:
   /// its latest refresh failed). A GPS bus on several boards is one bus,
@@ -97,7 +113,6 @@ abstract final class MapBuses {
     required DateTime now,
   }) {
     final buses = <String, _Bus>{};
-    final cutoff = now.subtract(staleRowGrace);
     for (final stopId in stopIds.toSet()) {
       final received = boards[stopId];
       final live = liveness(
@@ -113,7 +128,7 @@ abstract final class MapBuses {
         final position = LatLng(location.lat, location.lng);
         // Past the basemap there are no tiles to place it on
         if (!bounds.contains(position)) continue;
-        if (!live && arrival.expectedAt.isBefore(cutoff)) continue;
+        if (!live && overdue(arrival, received, now: now)) continue;
         // Only a GPS bus has an id shared across stops
         final key = arrival.tripId.startsWith('bus-')
             ? arrival.tripId

@@ -722,7 +722,7 @@ ningún pedido (`MvdApiService._call`).
 | `failed`, `timeout`, `offline` | tarjeta, sin un tablero de menos de 5 min | «No se pudo actualizar. Deslizá para reintentar» |
 | `failed`, `timeout`, `offline` | tarjeta, con un tablero de menos de 5 min | «No se pudo actualizar. Datos de las H:MM. Deslizá para reintentar.» y debajo las filas viejas como estimado («~H:MM») |
 | `busy` | tarjetas | nada: siguen igual, pero el tablero sigue envejeciendo (fila siguiente) |
-| `failed`, `timeout`, `offline` en todas las paradas guardadas | Mapa | panel `avisoNoche`: «No se pudo actualizar. Revisá la conexión.» y «Reintentar»; los últimos ómnibus quedan sin encender hasta 5 min después de su `fetchedAt` |
+| `failed`, `timeout`, `offline` en todas las paradas guardadas | Mapa | panel `avisoNoche`: «No se pudo actualizar. Revisá la conexión.» y «Reintentar»; los últimos ómnibus quedan sin encender hasta 5 min después de que su tablero llegó al teléfono |
 | `failed`, `timeout`, `offline` en alguna parada | Mapa | nada: los ómnibus de esa parada pasan a estimado; su hoja dice «No se pudo actualizar. Revisá la conexión.» si no le queda ninguna fila |
 | `busy`, `notFound` | Mapa | nada |
 | ningún fallo, pero el tablero llegó hace 1 min o más | tarjeta | ningún texto: las filas pasan a estimado («~H:MM»); desde los 5 min, o si no queda ninguna fila, el indicador de carga |

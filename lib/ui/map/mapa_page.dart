@@ -303,7 +303,7 @@ class _MapaPageState extends State<MapaPage> with WidgetsBindingObserver {
     if (mounted && widget.active) _changed(() {});
   }
 
-  /// Every saved stop has a board fetched within the refresh interval,
+  /// Every saved stop has a board received within the refresh interval,
   /// e.g. right after Mis paradas refreshed.
   bool _fresh(Set<int> ids) {
     final boards = MvdApiService.latestBoards.value;

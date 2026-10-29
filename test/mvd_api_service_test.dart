@@ -653,14 +653,55 @@ void main() {
           }, () => client);
         }
 
+        var phone = DateTime.utc(2026, 10, 19, 22, 52, 41);
+        MvdApiService.clock = () => phone;
+        addTearDown(() => MvdApiService.clock = DateTime.now);
         await fetch('2026-10-19T22:52:40.000Z');
-        // An edge-cached answer that came later
+        var notified = 0;
+        void listener() => notified++;
+        MvdApiService.latestBoards.addListener(listener);
+        addTearDown(() => MvdApiService.latestBoards.removeListener(listener));
+
+        // An edge-cached answer that came later: the kept board keeps its
+        // own arrival time, and nobody hears of it
+        phone = phone.add(const Duration(seconds: 20));
         await fetch('2026-10-19T22:52:10.000Z');
         expect(MvdApiService.latestBoards.value[574]!.board.fetchedAt,
             DateTime.utc(2026, 10, 19, 22, 52, 40));
+        expect(MvdApiService.latestBoards.value[574]!.receivedAt,
+            DateTime.utc(2026, 10, 19, 22, 52, 41));
+        expect(notified, 0);
         await fetch('2026-10-19T22:53:10.000Z');
         expect(MvdApiService.latestBoards.value[574]!.board.fetchedAt,
             DateTime.utc(2026, 10, 19, 22, 53, 10));
+        expect(notified, 1);
+      });
+
+      test('a phone clock put back: new boards are taken, not frozen out',
+          () async {
+        // Without the proxy fetchedAt is the phone's clock (here the boards
+        // are stamped as it would): put back 10 min, every new board looks
+        // older than the kept one
+        var phone = DateTime.utc(2026, 10, 19, 23, 2, 40);
+        MvdApiService.clock = () => phone;
+        addTearDown(() => MvdApiService.clock = DateTime.now);
+        Future<void> fetch(String fetchedAt) async {
+          pending.clear();
+          await http.runWithClient(() async {
+            final board = MvdApiService.getBoard(574);
+            await pumpEventQueue();
+            pending['/v1/stops/574/arrivals']!
+                .complete(_json(at(574, fetchedAt)));
+            await board;
+          }, () => client);
+        }
+
+        await fetch('2026-10-19T23:02:40.000Z');
+        phone = DateTime.utc(2026, 10, 19, 22, 52, 50);
+        await fetch('2026-10-19T22:52:50.000Z');
+        final kept = MvdApiService.latestBoards.value[574]!;
+        expect(kept.board.fetchedAt, DateTime.utc(2026, 10, 19, 22, 52, 50));
+        expect(kept.receivedAt, phone);
       });
     });
   });

@@ -110,7 +110,8 @@ frena a las demás, tampoco sin proxy cuando su respuesta no se puede convertir.
 actualizar pide solo las paradas de su subpestaña: las paradas guardadas en Paradas, los orígenes
 en Rutas. Cada tablero que llega bien queda en `MvdApiService.latestBoards`, el más nuevo por
 parada, con la hora en que llegó al teléfono: el Mapa dibuja también los que pidió Mis paradas, y
-cuenta su edad desde esa hora, como Mis paradas, no desde `fetchedAt`.
+cuenta su edad desde esa hora, con o sin fallo, nunca desde `fetchedAt`. (Mis paradas la cuenta
+igual cuando no hubo fallo; después de un fallo, todavía desde `fetchedAt`.)
 
 ### Demasiados pedidos: `Retry-After`
 
@@ -152,7 +153,8 @@ viejo que el pedido. Los tiempos de caché de cada ruta están en [contrato-v1.m
 - **Datos viejos.** Los marcan Mis paradas y el Mapa. Mis paradas, después de un fallo, deja hasta
   5 min las últimas filas como estimados «~H:MM», nunca en ámbar. Sin fallo, un tablero que llegó
   hace 1 min o más también pasa a estimados, y desde los 5 min la tarjeta vuelve al indicador de
-  carga. El Mapa deja sus ómnibus sin encender con las mismas edades y los saca a los 5 min.
+  carga. El Mapa deja sus ómnibus sin encender con las mismas edades, contadas siempre desde que
+  el tablero llegó al teléfono, y los saca a los 5 min.
   Novedades muestra lo guardado debajo del panel de error. Horarios, el catálogo y el estado del
   GPS usan su copia guardada sin decirlo.
 
@@ -507,7 +509,7 @@ Los datos:
 | No se pudo abrir el mapa base | ícono `warning` de 24 en `rojoLed`, «No se pudo abrir el mapa. Probá de nuevo.» y el botón «Reintentar»; nunca el texto del error |
 | Con datos | las paradas y los ómnibus encendidos |
 | Ningún ómnibus con GPS viene a tus paradas | la nota «Ahora ningún ómnibus con GPS viene a tus paradas.», solo con alguna parada ubicada y algún tablero de menos de 5 min |
-| No se pudo actualizar ninguna parada | el panel `avisoNoche` «No se pudo actualizar. Revisá la conexión.» con «Reintentar». Los ómnibus de la última vez quedan sin encender hasta 5 min después del `fetchedAt` de su tablero, y después desaparecen |
+| No se pudo actualizar ninguna parada | el panel `avisoNoche` «No se pudo actualizar. Revisá la conexión.» con «Reintentar». Los ómnibus de la última vez quedan sin encender hasta 5 min después de que su tablero llegó al teléfono, y después desaparecen. Un estimado que debía llegar hace más de 1 min se saca, medido con el reloj de la fuente: el `fetchedAt` del tablero más lo que lleva en el teléfono |
 | Falló solo alguna parada | sin panel: los ómnibus de esa parada, y sus minutos en las hojas, pasan a estimado |
 | Demasiados pedidos (`busy`) | nada: el Mapa saltea vueltas hasta que pasa `Retry-After` (60 s si no viene) |
 | Sin fallo, un tablero de 1 min o más | sus ómnibus quedan sin encender, sin nota; desde los 5 min desaparecen |

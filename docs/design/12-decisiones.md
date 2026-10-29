@@ -263,7 +263,8 @@ estimado». El mismo formato «~H:MM» es el del widget
 ([08-componentes.md](08-componentes.md), [07-textos.md](07-textos.md)). El
 Mapa sigue la misma regla con sus ómnibus: sin encender después de un fallo o
 con un tablero de 1 min o más, y fuera del mapa desde los 5 min. Ahí la edad
-se cuenta desde el `fetchedAt` del tablero
+se cuenta siempre desde que el tablero llegó al teléfono, con el reloj del
+teléfono, para que uno con la hora corrida no apague los ómnibus
 ([09-pantallas.md](09-pantallas.md#mapa)).
 
 ### «NUEVA» y la fecha de lo no leído van en ámbar

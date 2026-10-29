@@ -212,16 +212,12 @@ void main() {
   test('a phone clock off from the source: ages from the arrival', () {
     // The proxy stamped these boards 3 min before the phone's clock says
     // it got them, or 3 min after: both just arrived, both live
-    final behind = _board(
-      574,
-      [_arrival('bus-50-1')],
-      fetchedAt: _now.subtract(const Duration(minutes: 3)),
-    );
-    final ahead = _board(
-      3140,
-      [_arrival('bus-50-2')],
-      fetchedAt: _now.add(const Duration(minutes: 3)),
-    );
+    final behind = _board(574, [
+      _arrival('bus-50-1'),
+    ], fetchedAt: _now.subtract(const Duration(minutes: 3)));
+    final ahead = _board(3140, [
+      _arrival('bus-50-2'),
+    ], fetchedAt: _now.add(const Duration(minutes: 3)));
     final buses = _buses({574: behind, 3140: ahead});
     expect(buses.map((b) => (b.key, b.live)), [
       ('bus-50-1', true),
@@ -245,6 +241,42 @@ void main() {
       fetchedAt: _now,
     );
     expect(_buses({574: old}), isEmpty);
+  });
+
+  test('a bus on two boards: its position from the one the source stamped '
+      'later, whatever reached the phone first', () {
+    final buses = _buses({
+      // Stamped later by the proxy, but it reached the phone first
+      574: _board(
+        574,
+        [_arrival('bus-50-111', at: (lat: -34.9000, lng: -56.2000))],
+        age: const Duration(seconds: 20),
+        fetchedAt: _now.subtract(const Duration(seconds: 5)),
+      ),
+      3140: _board(
+        3140,
+        [_arrival('bus-50-111', at: (lat: -34.9100, lng: -56.2100))],
+        age: const Duration(seconds: 5),
+        fetchedAt: _now.subtract(const Duration(seconds: 15)),
+      ),
+    });
+    expect(buses.single.position, const LatLng(-34.9000, -56.2000));
+  });
+
+  test('estimates are dropped on the source clock: a phone 10 min ahead '
+      'keeps a bus due 5 min after the board', () {
+    // The proxy stamped the board 10 min before the phone's clock says it
+    // arrived (10 s ago); its refresh then failed
+    final fetched = _now.subtract(const Duration(minutes: 10));
+    final board = _board(574, [
+      _arrival('bus-50-1', expectedAt: fetched.add(const Duration(minutes: 5))),
+      _arrival(
+        'bus-50-2',
+        expectedAt: fetched.subtract(const Duration(minutes: 2)),
+      ),
+    ], fetchedAt: fetched);
+    final buses = _buses({574: board}, failed: {574});
+    expect(buses.map((b) => (b.key, b.live)), [('bus-50-1', false)]);
   });
 
   test('an estimate due more than a minute ago is dropped', () {

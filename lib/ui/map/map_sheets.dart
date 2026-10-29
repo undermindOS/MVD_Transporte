@@ -217,10 +217,11 @@ class StopSheet extends StatelessWidget {
       return [failed ? offline : waiting];
     }
     final live = !failed && age < MapBuses.liveFor;
-    final cutoff = now.subtract(MapBuses.staleRowGrace);
     final List<BusArrival> arrivals = live
         ? board.arrivals
-        : board.arrivals.where((a) => !a.expectedAt.isBefore(cutoff)).toList();
+        : board.arrivals
+              .where((a) => !MapBuses.overdue(a, received!, now: now))
+              .toList();
     if (arrivals.isEmpty) {
       if (!live) return [failed ? offline : waiting];
       return const [

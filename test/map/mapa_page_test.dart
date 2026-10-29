@@ -11,6 +11,7 @@
 // the IO finish in runAsync.
 
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/gestures.dart' show kDoubleTapTimeout;
@@ -93,7 +94,8 @@ void main() {
   var failingStops = <int>{};
   // siguientesParada bodies by stop
   var bodies = <int, String>{};
-  // MapaPage.clock is real time moved by this much
+  // The phone's clock (MapaPage.clock, and MvdApiService.clock that stamps
+  // when a board arrives) is real time moved by this much
   var later = Duration.zero;
 
   // The basemap: loads and closes counted, failing on demand, or held
@@ -216,6 +218,7 @@ void main() {
     bodies = {574: _arrivals574};
     later = Duration.zero;
     MapaPage.clock = () => DateTime.now().add(later);
+    MvdApiService.clock = MapaPage.clock;
     loads = 0;
     disposed = 0;
     loadError = null;
@@ -230,6 +233,7 @@ void main() {
     MvdApiService.resetLatestBoards();
     StopLocationsService.reset();
     MapaPage.clock = DateTime.now;
+    MvdApiService.clock = DateTime.now;
     for (final stop in CacheService.getAllStops()) {
       CacheService.deleteStop(stop.id);
     }
@@ -873,6 +877,78 @@ void main() {
       expect(busLayer(tester).buses.every((b) => b.live), isTrue);
       expect(requests.map((u) => u.host).toSet(), {'proxy.test'});
     }, () => proxy);
+  });
+
+  /// The proxy answers 574 with its golden, stamped days before the
+  /// phone's clock; [gps] false: the same board with no bus position.
+  MockClient skewedProxy({bool gps = true}) {
+    final golden =
+        jsonDecode(
+              File(
+                'proxy/contract/v1/responses/arrivals_574.json',
+              ).readAsStringSync(),
+            )
+            as Map<String, dynamic>;
+    final body = gps
+        ? golden
+        : {
+            ...golden,
+            'arrivals': [
+              for (final a in golden['arrivals'] as List)
+                {...a as Map<String, dynamic>, 'location': null},
+            ],
+          };
+    return MockClient((request) async {
+      requests.add(request.url);
+      return request.url.path == '/v1/stops/574/arrivals'
+          ? http.Response.bytes(
+              utf8.encode(jsonEncode(body)),
+              200,
+              headers: {'content-type': 'application/json'},
+            )
+          : http.Response('{"error":"not_found"}', 404);
+    });
+  }
+
+  testWidgets('a phone clock days ahead of the proxy: a board Mis paradas '
+      'just brought is fresh, and the stop sheet is lit', (tester) async {
+    MvdApiService.proxyUrl = 'https://proxy.test';
+    await save(tester, [_stop574()]);
+    await http.runWithClient(() async {
+      // Mis paradas refreshed a moment ago
+      await MvdApiService.getBoards([574]);
+      final asked = requests.length;
+      await open(tester);
+      expect(requests, hasLength(asked));
+      expect(busLayer(tester).buses, isNotEmpty);
+      expect(busLayer(tester).buses.every((b) => b.live), isTrue);
+
+      await tester.tap(find.bySemanticsLabel(RegExp(r'^Parada 574')));
+      await tester.pumpAndSettle();
+      final sheet = find.byType(BottomSheet);
+      expect(
+        find.descendant(of: sheet, matching: find.byType(ArrivalRow)),
+        findsWidgets,
+      );
+      expect(
+        find.descendant(of: sheet, matching: find.byType(MinutosEnVivo)),
+        findsWidgets,
+      );
+    }, skewedProxy);
+  });
+
+  testWidgets('a phone clock days ahead of the proxy: no GPS bus is still '
+      'said', (tester) async {
+    MvdApiService.proxyUrl = 'https://proxy.test';
+    await save(tester, [_stop574()]);
+    await http.runWithClient(() async {
+      await open(tester);
+      expect(busLayer(tester).buses, isEmpty);
+      expect(
+        find.text('Ahora ningún ómnibus con GPS viene a tus paradas.'),
+        findsOneWidget,
+      );
+    }, () => skewedProxy(gps: false));
   });
 }
 

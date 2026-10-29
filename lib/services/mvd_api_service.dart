@@ -100,12 +100,18 @@ class MvdApiService {
   static void _publish(int stopId, ArrivalsBoard board) {
     final boards = latestBoards.value;
     final known = boards[stopId];
-    if (known != null && known.board.fetchedAt.isAfter(board.fetchedAt)) {
+    final now = clock();
+    // A phone clock put back makes every new board look older (without
+    // the proxy, fetchedAt is the phone's clock): one received "later
+    // than now" gives way
+    if (known != null &&
+        known.board.fetchedAt.isAfter(board.fetchedAt) &&
+        !known.receivedAt.isAfter(now)) {
       return;
     }
     latestBoards.value = {
       ...boards,
-      stopId: (board: board, receivedAt: clock()),
+      stopId: (board: board, receivedAt: now),
     };
   }
 
