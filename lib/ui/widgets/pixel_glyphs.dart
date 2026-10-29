@@ -23,20 +23,21 @@ abstract final class PixelGlyphs {
   ]);
 
   /// Two streets crossing, a bus on its way: the Mapa tab. Not [map],
-  /// which opens Cómo Ir, and not a pin: a stop is always [stop].
+  /// which opens Cómo Ir, and not a pin: a stop is always [stop]. Inside
+  /// cols 1-10 and rows 1-10, the size of [bus] and [grid] in the nav.
   static const streets = PixelGlyph([
-    '...#....#...',
-    '...#....#...',
-    '...#....#...',
-    '####....####',
     '............',
-    '.###........',
-    '.###........',
+    '...#....#...',
+    '...#....#...',
+    '.###....###.',
     '............',
-    '####....####',
+    '..###.......',
+    '..###.......',
+    '............',
+    '.###....###.',
     '...#....#...',
     '...#....#...',
-    '...#....#...',
+    '............',
   ]);
 
   /// Info.
