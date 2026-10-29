@@ -238,10 +238,11 @@ datos en vivo.
 
 **Decisión.** Si la actualización falla y el último tablero bueno tiene menos
 de 5 min (`_staleFor` en `lib/ui/stops_page.dart`, contados desde que llegó
-al teléfono, con el reloj del teléfono), la tarjeta muestra la nota en `rojoLed` «No se pudo
-actualizar. Datos de las H:MM. Deslizá para reintentar.» y debajo los ómnibus
-de ese tablero cuya hora esperada no pasó hace más de 1 min
-(`_staleRowGrace`), como `ArrivalRow(stale: true)`: número en contorno, reloj
+al teléfono, con el reloj del teléfono), la tarjeta muestra la nota en
+`rojoLed` «No se pudo actualizar. Datos de las H:MM. Deslizá para
+reintentar.» y debajo los ómnibus de ese tablero cuya hora esperada no pasó
+hace más de 1 min (`_staleRowGrace`) en el reloj de la fuente (`fetchedAt`
+más lo que el tablero lleva en el teléfono), como `ArrivalRow(stale: true)`: número en contorno, reloj
 y «~20:01» en `TimbreText.scheduleTime`, sin `MinutosEnVivo` y sin ámbar,
 aunque antes tuvieran GPS. Con 5 min o más, solo la nota «No se pudo
 actualizar. Deslizá para reintentar».
@@ -262,9 +263,9 @@ teléfono (`_BoardView.receivedAt`, con `StopsPage.clock`), no desde
 estimado». El mismo formato «~H:MM» es el del widget
 ([08-componentes.md](08-componentes.md), [07-textos.md](07-textos.md)). El
 Mapa sigue la misma regla con sus ómnibus: sin encender después de un fallo o
-con un tablero de 1 min o más, y fuera del mapa desde los 5 min. Ahí la edad
-se cuenta siempre desde que el tablero llegó al teléfono, con el reloj del
-teléfono, para que uno con la hora corrida no apague los ómnibus
+con un tablero de 1 min o más, y fuera del mapa desde los 5 min. Como en Mis
+paradas, la edad se cuenta desde que el tablero llegó al teléfono, con el
+reloj del teléfono, para que uno con la hora corrida no apague los ómnibus
 ([09-pantallas.md](09-pantallas.md#mapa)).
 
 ### «NUEVA» y la fecha de lo no leído van en ámbar

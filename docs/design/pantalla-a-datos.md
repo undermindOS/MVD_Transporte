@@ -126,8 +126,9 @@ Línea {line} a {spokenName(destination)}, {cuándo}[, accesible][, aire acondic
 caché del proxy puede tener hasta 15 s más. Por eso «Datos de las…» dice de
 cuándo son los minutos. La edad, con fallo o sin él, no sale de `fetchedAt`
 sino de la hora en que el tablero llegó, según el reloj del teléfono
-(`StopsPage.clock`): el reloj del servidor puede estar corrido. `fetchedAt`
-solo da el «ahora» de la fuente para cortar las filas estimadas vencidas.
+(`StopsPage.clock`): el reloj del servidor puede estar corrido. Para la edad
+`fetchedAt` no cuenta; además de «Datos de las…», da el «ahora» de la fuente
+para cortar las filas estimadas vencidas.
 
 ## Rutas: tarjeta de ruta
 

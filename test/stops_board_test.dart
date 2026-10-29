@@ -336,6 +336,9 @@ void main() {
 
   testWidgets('a phone clock 6 min ahead of the source: after a failure the '
       'board that just arrived still shows its estimates', (tester) async {
+    var later = Duration.zero;
+    StopsPage.clock = () => DateTime.now().add(later);
+    addTearDown(() => StopsPage.clock = DateTime.now);
     var failing = false;
     // The source stamped the boards 6 min before the phone's clock
     final fetchedAt = DateTime.now().subtract(const Duration(minutes: 6));
@@ -352,11 +355,23 @@ void main() {
       failing = true;
       await tester.pump(StopsPage.autoRefreshInterval);
       await tester.pump();
-      expect(find.textContaining('Datos de las'), findsNWidgets(2));
+      expect(
+          find.text('No se pudo actualizar. Datos de las '
+              '${MvdApiService.montevideoClock(fetchedAt)}. '
+              'Deslizá para reintentar.'),
+          findsNWidgets(2));
       // Due 9 min after the source's stamp: still an estimate
       expect(find.text('~20:01'), findsOneWidget);
+      // Due 3 min after it: kept on the source's clock (gone on the phone's)
+      expect(find.text('~19:55'), findsOneWidget);
       // Due 2 min before it: gone, on the source's clock
       expect(find.text('~19:50'), findsNothing);
+      // 4.5 min on the phone: the bus due 3 min after the stamp is gone
+      later = const Duration(minutes: 4, seconds: 30);
+      await tester.pumpWidget(app(active: false));
+      expect(find.textContaining('Datos de las'), findsNWidgets(2));
+      expect(find.text('~19:55'), findsNothing);
+      expect(find.text('~20:01'), findsOneWidget);
     }, () => client);
   });
 

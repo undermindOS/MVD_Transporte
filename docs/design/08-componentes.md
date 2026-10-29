@@ -51,7 +51,7 @@ marcas de confort, a la derecha el tiempo. Alto mínimo 52, márgenes 14 × 6.
 | marca aire acondicionado | `airConditioning == true` | `arrivals[].airConditioning` (`null` sin proxy) |
 | marca cero emisiones | `zeroEmission == true` | `arrivals[].zeroEmission` (`null` sin proxy) |
 | fila esperada | `tripId`, `variantId`, `expectedAt` a través de `BusWait.follows` | `arrivals[].tripId`, `variantId`, `expectedAt` |
-| qué filas estimadas quedan | `expectedAt` ≥ ahora − 1 min | `arrivals[].expectedAt` |
+| qué filas estimadas quedan | `expectedAt` ≥ el «ahora» de la fuente − 1 min (`ReceivedBoardClock.sourceNow`) | `arrivals[].expectedAt` |
 | «Datos de las 19:52» (en la nota de arriba) | `ArrivalsBoard.fetchedAt` | `fetchedAt` |
 
 Sin proxy no hay datos de confort: la app solo muestra «accesible».
@@ -257,8 +257,8 @@ condiciones se revisan en este orden:
 | 1 | todavía no hay tablero, y no hay fallo o se está cargando con indicador | indicador de progreso de 18 px |
 | 2 | fallo `notFound` | nota roja «Esta parada ya no existe. Deslizá la tarjeta para borrarla.» |
 | 3 | otro fallo, sin tablero o con un tablero de 5 min o más | nota roja «No se pudo actualizar. Deslizá para reintentar» |
-| 4 | otro fallo, con un tablero de menos de 5 min | nota roja «No se pudo actualizar. Datos de las 19:52. Deslizá para reintentar.» y las filas estimadas con `expectedAt` ≥ ahora − 1 min |
-| 5 | sin fallo, con un tablero que llegó hace 1 min o más (`_liveFor`) | sin nota, las filas estimadas con `expectedAt` ≥ ahora − 1 min. Con 5 min o más, o si no queda ninguna, el indicador de 18 px, como antes del primer tablero |
+| 4 | otro fallo, con un tablero de menos de 5 min | nota roja «No se pudo actualizar. Datos de las 19:52. Deslizá para reintentar.» y las filas estimadas con `expectedAt` ≥ el «ahora» de la fuente − 1 min |
+| 5 | sin fallo, con un tablero que llegó hace 1 min o más (`_liveFor`) | sin nota, las filas estimadas con `expectedAt` ≥ el «ahora» de la fuente − 1 min. Con 5 min o más, o si no queda ninguna, el indicador de 18 px, como antes del primer tablero |
 | 6 | sin fallo, ninguna fila (o ninguna pasa el filtro) | nota «Sin ómnibus próximos» en `tenue` con el ícono `bus` |
 | 7 | sin fallo, con filas | hasta 6 filas; se ven 3 y el resto con «Ver las 6»; «Ver menos» las vuelve a ocultar |
 
