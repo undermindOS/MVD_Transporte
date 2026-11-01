@@ -17,8 +17,15 @@ typedef TripQuery = ({
   int maxWalkMinutes,
 });
 
-/// The trips the planner found, and the date of the timetable it used.
-typedef TripAnswer = ({List<Itinerary> options, DateTime sourceDate});
+/// The trips the planner found, the date of the timetable it used, and
+/// whether A or B has no stop within the walking limit (then no bus can
+/// help, whatever the hour).
+typedef TripAnswer = ({
+  List<Itinerary> options,
+  DateTime sourceDate,
+  bool noStopNearFrom,
+  bool noStopNearTo,
+});
 
 /// Plans trips on the phone, from the IM timetable bundled in the app
 /// (assets/rutas/horarios.bin): nothing about the trip leaves the phone.
@@ -101,7 +108,14 @@ class _Worker {
         // third bus to walk a little less is noise
         var options = plan(1);
         if (options.every((o) => o.walkOnly)) options = plan(2);
-        answer = (options: options, sourceDate: data.sourceDate);
+        final reach = query.maxWalkMinutes * TransitData.walkMetresPerMinute;
+        bool far(GeoPoint p) => data.stopsNear(p.lat, p.lon, reach).isEmpty;
+        answer = (
+          options: options,
+          sourceDate: data.sourceDate,
+          noStopNearFrom: far(query.from),
+          noStopNearTo: far(query.to),
+        );
       } catch (e) {
         answer = '${e.runtimeType}';
       }

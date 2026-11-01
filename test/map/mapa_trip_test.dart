@@ -96,6 +96,7 @@ void main() {
   final queries = <TripQuery>[];
   var answer = <Itinerary>[];
   Object? locateError;
+  var farFrom = false;
 
   final client = MockClient((request) async {
     if (request.url.path == '/transporteRest/siguientesParada/574') {
@@ -115,7 +116,12 @@ void main() {
     await CacheService.init(path: hiveDir.path);
     TripService.planner = (query) async {
       queries.add(query);
-      return (options: answer, sourceDate: DateTime(2026, 10, 31));
+      return (
+        options: answer,
+        sourceDate: DateTime(2026, 10, 31),
+        noStopNearFrom: farFrom,
+        noStopNearTo: false,
+      );
     };
     locateForTrip = () async {
       if (locateError case final error?) throw error;
@@ -132,6 +138,7 @@ void main() {
     queries.clear();
     answer = [_by121()];
     locateError = null;
+    farFrom = false;
     MvdApiService.resetLatestBoards();
     // No await: the notifier is what the screen reads
     PlacesService.save(
@@ -228,6 +235,21 @@ void main() {
     await tester.pumpAndSettle();
     expect(
       find.textContaining('No hay un viaje en ómnibus caminando hasta 10 min'),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('no stop near the phone: says so, not the hour', (tester) async {
+    answer = [];
+    farFrom = true;
+    await open(tester);
+    await tester.tap(find.text('Casa'));
+    await tester.pumpAndSettle();
+    expect(
+      find.text(
+        'No hay paradas de Montevideo a menos de 10 min caminando de tu '
+        'ubicación.',
+      ),
       findsOneWidget,
     );
   });

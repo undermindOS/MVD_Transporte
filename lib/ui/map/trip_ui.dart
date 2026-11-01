@@ -238,6 +238,17 @@ class _TripPlannerSheetState extends State<TripPlannerSheet> {
               color: TimbreColors.rojoLed,
               text: error,
             )
+          else if (answer != null &&
+              answer.options.isEmpty &&
+              (answer.noStopNearFrom || answer.noStopNearTo))
+            _Note(
+              glyph: PixelGlyphs.stop,
+              color: TimbreColors.tenue,
+              text:
+                  'No hay paradas de Montevideo a menos de $_walk min '
+                  'caminando de '
+                  '${answer.noStopNearFrom ? _from?.name ?? 'tu ubicación' : widget.to.name}.',
+            )
           else if (answer != null && answer.options.isEmpty)
             _Note(
               glyph: PixelGlyphs.bus,
