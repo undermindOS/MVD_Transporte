@@ -82,6 +82,8 @@ void main() {
       'TimbreMisParadasWidget',
       'TimbreAnchoWidget',
       'TimbreFlipWidget',
+      'TimbreRelojWidget',
+      'TimbreRelojAnchoWidget',
     ]);
 
     redrawn.clear();

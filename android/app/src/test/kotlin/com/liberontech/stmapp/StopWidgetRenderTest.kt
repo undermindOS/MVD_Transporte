@@ -6,14 +6,18 @@ import android.appwidget.AppWidgetProvider
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Canvas
+import android.graphics.Rect
 import android.view.View
 import android.view.ViewGroup
+import android.widget.FrameLayout
+import android.widget.TextClock
 import android.widget.TextView
 import androidx.work.WorkManager
 import androidx.work.Configuration
 import androidx.test.core.app.ApplicationProvider
 import es.antonborri.home_widget.HomeWidgetPlugin
 import java.io.File
+import java.util.Locale
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -162,6 +166,138 @@ class StopWidgetRenderTest {
 
     private data class RenderCase(val kind: Class<out AppWidgetProvider>, val layout: Int,
         val width: Int, val height: Int, val name: String)
+
+    /** Reloj and Reloj ancho at the size they take and at their smallest. */
+    private fun clockCases(name: String) = listOf(
+        RenderCase(TimbreRelojWidget::class.java, R.layout.widget_stop_clock, 170, 170, "reloj-$name"),
+        RenderCase(TimbreRelojWidget::class.java, R.layout.widget_stop_clock, 140, 140, "reloj-$name-140"),
+        RenderCase(TimbreRelojAnchoWidget::class.java, R.layout.widget_stop_clock_wide, 352, 170, "reloj-ancho-$name"),
+        RenderCase(TimbreRelojAnchoWidget::class.java, R.layout.widget_stop_clock_wide, 280, 140, "reloj-ancho-$name-140"),
+    )
+
+    @Test
+    fun relojShowsTheTimeFirstAndTheNextBusUnderIt() = inSpanish {
+        for ((kind, layout, width, height, name) in clockCases("con-omnibus")) {
+            val view = render(kind, layout, width, height, name)
+            assertClock(view)
+            val text = texts(view)
+            assertTrue(text.toString(), "121" in text && "~20:14" in text)
+            assertTrue(text.toString(), "SAN JOSE y ANDES" in text)
+            // Two saved stops: the stop part shows the other one
+            val stop = view.findViewById<View>(R.id.w_header)
+            assertTrue(stop.hasOnClickListeners())
+            assertEquals("Parada SAN JOSE y ANDES, 574. Tocá para ver otra parada", stop.contentDescription)
+            assertEquals("Línea 121 a PUNTA CARRETAS, alrededor de las 20:14, estimado, accesible",
+                view.findViewById<View>(R.id.w_next_bus).contentDescription)
+            assertEquals(View.GONE, view.findViewById<View>(R.id.w_message).visibility)
+            assertInside(view)
+        }
+    }
+
+    @Test
+    fun relojWithNoSavedStopsKeepsTheClock() = inSpanish {
+        save("stops_saved" to "[]")
+        for ((kind, layout, width, height, name) in clockCases("sin-paradas")) {
+            val view = render(kind, layout, width, height, name)
+            assertClock(view)
+            assertEquals(View.GONE, view.findViewById<View>(R.id.w_board).visibility)
+            val hint = view.findViewById<TextView>(R.id.w_empty)
+            assertEquals("Agregá una parada en Mis\u00A0paradas", hint.text.toString())
+            assertEquals(0, hint.layout.getEllipsisCount(hint.lineCount - 1))
+            assertInside(view)
+        }
+    }
+
+    @Test
+    fun relojEllipsizesALongStopNameOnItsOneLine() = inSpanish {
+        val name = "AV GRAL JOSE GARIBALDI y BV JOSE BATLLE Y ORDONEZ"
+        save(
+            "stops_saved" to """[{"id":574,"name":"$name"}]""",
+            "stop_board_574" to board(bus("121", "POCITOS", "11:09", 1)),
+        )
+        for ((kind, layout, width, height, file) in clockCases("nombre-largo")) {
+            val view = render(kind, layout, width, height, file)
+            assertClock(view)
+            val stop = view.findViewById<TextView>(R.id.w_stop_name)
+            assertEquals(1, stop.lineCount)
+            assertTrue("the name should ellipsize", stop.layout.getEllipsisCount(0) > 0)
+            val time = view.findViewById<TextView>(R.id.w_time)
+            assertEquals("~11:09", time.text.toString())
+            assertEquals(0, time.layout.getEllipsisCount(0))
+            assertInside(view)
+        }
+    }
+
+    @Test
+    fun relojWithNoBusSaysSoOnItsOneLine() = inSpanish {
+        save(
+            "stops_saved" to """[{"id":4018,"name":"AV 18 DE JULIO y CONVENCION"}]""",
+            "stop_board_4018" to board(),
+        )
+        for ((kind, layout, width, height, name) in clockCases("sin-omnibus")) {
+            val view = render(kind, layout, width, height, name)
+            assertClock(view)
+            assertEquals(View.GONE, view.findViewById<View>(R.id.w_next_bus).visibility)
+            val message = view.findViewById<TextView>(R.id.w_message)
+            assertEquals("Sin próximos ómnibus en esta parada", message.text.toString())
+            assertEquals(1, message.lineCount)
+            assertInside(view)
+        }
+    }
+
+    /** As on the owner's phone, where the label's day and month are longer. */
+    private fun inSpanish(block: () -> Unit) {
+        val before = Locale.getDefault()
+        Locale.setDefault(Locale.forLanguageTag("es-UY"))
+        try { block() } finally { Locale.setDefault(before) }
+    }
+
+    /**
+     * The time, lit LEDs over a full "88:88" in the same font and size, under
+     * the mask, with "AHORA" over it; its digits whole inside the box that
+     * clips the mask.
+     */
+    private fun assertClock(view: View) {
+        val clock = view.findViewById<TextClock>(R.id.w_clock)
+        assertEquals(View.VISIBLE, clock.visibility)
+        assertTrue(clock.text.toString(), Regex("""\d{1,2}:\d{2}""").matches(clock.text))
+        val frame = clock.parent as FrameLayout
+        assertTrue(frame.foreground != null)
+        val unlit = frame.getChildAt(0) as TextView
+        assertEquals("88:88", unlit.text.toString())
+        assertEquals(clock.typeface, unlit.typeface)
+        assertEquals(clock.textSize, unlit.textSize)
+        assertTrue("the time sits right", clock.right == unlit.right)
+        assertEquals(1, unlit.lineCount)
+        val label = view.findViewById<TextView>(R.id.w_clock_label)
+        assertTrue(label.text.toString(), label.text.startsWith("AHORA · "))
+        val box = frame.parent as View
+        val digits = Rect().also { unlit.paint.getTextBounds("88:88", 0, 5, it) }
+        val baseline = unlit.at(view)[1] + unlit.baseline
+        assertTrue("digits clipped above", baseline + digits.top >= box.at(view)[1])
+        assertTrue("digits clipped below", baseline + digits.bottom <= box.at(view)[1] + box.height)
+        assertTrue("the mask covers AHORA", label.at(view)[1] + label.height <= box.at(view)[1])
+    }
+
+    /** Every visible view inside the widget, and no text cut without "…". */
+    private fun assertInside(root: View) {
+        fun walk(v: View) {
+            // Not shown, or squeezed to no width (it draws nothing)
+            if (v.visibility != View.VISIBLE || v.width == 0) return
+            val (x, y) = v.at(root).let { it[0] to it[1] }
+            val what = (v as? TextView)?.text ?: v.toString()
+            assertTrue("$what outside: $x,$y ${v.width}×${v.height}",
+                x >= 0 && y >= 0 && x + v.width <= root.width && y + v.height <= root.height)
+            if (v is TextView && v.layout != null && v.text.isNotEmpty()) {
+                val room = v.width - v.totalPaddingLeft - v.totalPaddingRight
+                for (line in 0 until v.lineCount) {
+                    assertTrue("$what cut", v.layout.getLineMax(line) <= room + 1)
+                }
+            }
+            if (v is ViewGroup) (0 until v.childCount).forEach { walk(v.getChildAt(it)) }
+        }
+        walk(root)
+    }
 
     @Test
     fun longStopNamesWrapInFullAndLeaveTheRefreshButtonVisible() {

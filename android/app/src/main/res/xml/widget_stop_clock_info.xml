@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Clock widget (docs/design/10-superficies.md). The time keeps itself
+     current (TextClock); updatePeriodMillis only redraws the bus under it -->
+<appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
+    android:minWidth="140dp"
+    android:minHeight="140dp"
+    android:minResizeWidth="140dp"
+    android:minResizeHeight="140dp"
+    android:targetCellWidth="2"
+    android:targetCellHeight="2"
+    android:updatePeriodMillis="1800000"
+    android:initialLayout="@layout/widget_stop_clock"
+    android:previewLayout="@layout/widget_stop_clock_preview"
+    android:resizeMode="horizontal|vertical"
+    android:widgetCategory="home_screen"
+    android:description="@string/widget_reloj_description" />

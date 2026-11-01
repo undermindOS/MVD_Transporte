@@ -255,6 +255,8 @@ abstract class TimbreStopWidget : AppWidgetProvider() {
             TimbreMisParadasWidget::class.java to 2,
             TimbreAnchoWidget::class.java to 1,
             TimbreFlipWidget::class.java to 1,
+            TimbreRelojWidget::class.java to 1,
+            TimbreRelojAnchoWidget::class.java to 1,
         )
 
         private fun widgetPrefs(context: Context): SharedPreferences =
@@ -438,6 +440,43 @@ open class TimbreParadaWidget : TimbreStopWidget() {
 class TimbreAnchoWidget : TimbreProximoWidget() {
     override val layoutId = R.layout.widget_stop_wide
     override val compactWidth = false
+}
+
+/**
+ * Reloj (2 × 2): the time first, and one line under it with the next bus of
+ * one stop, as a helper. The time is a TextClock in the layout and keeps
+ * itself current; its LED look is a mask over the system font, since a
+ * widget cannot use the app's fonts. No refresh button and no footer.
+ */
+open class TimbreRelojWidget : TimbreStopWidget() {
+    override val layoutId = R.layout.widget_stop_clock
+    override val stopCount = 1
+
+    override fun fill(
+        context: Context, views: RemoteViews, widgetId: Int, saved: List<SavedStop>,
+        stops: List<SavedStop>, boards: List<WidgetBoard?>, footer: WidgetFooter, nowMs: Long,
+    ): List<WidgetArrival> {
+        // The name alone: the line also carries the bus
+        header(context, views, widgetId, saved, stops.first(), 0, R.id.w_header, R.id.w_stop_name,
+            withNumber = false)
+        val next = StopWidgetData.snapshot(boards[0]).firstOrNull()
+        if (next == null) {
+            views.setViewVisibility(R.id.w_next_bus, View.GONE)
+            message(context, views, R.id.w_message, boards[0], nowMs)
+        } else {
+            views.setViewVisibility(R.id.w_next_bus, View.VISIBLE)
+            views.setViewVisibility(R.id.w_message, View.GONE)
+            views.setTextViewText(R.id.w_line, next.line)
+            views.setTextViewText(R.id.w_time, "~${next.clock}")
+            views.setContentDescription(R.id.w_next_bus, spoken(next))
+        }
+        return listOfNotNull(next)
+    }
+}
+
+/** Reloj across the whole four-column grid, with a larger clock. */
+class TimbreRelojAnchoWidget : TimbreRelojWidget() {
+    override val layoutId = R.layout.widget_stop_clock_wide
 }
 
 /** Samsung Flex Window, registered separately for the cover-screen picker. */

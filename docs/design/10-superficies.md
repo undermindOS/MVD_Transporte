@@ -91,7 +91,8 @@ cualquiera de los cuatro archivos.
 ## Widgets de parada (Android)
 
 Cinco tableros con los próximos ómnibus de tus paradas guardadas, del mismo
-material que la tarjeta de Mis paradas. Existen solo en Android: en iOS no
+material que la tarjeta de Mis paradas, y dos relojes con el próximo ómnibus
+debajo, de ayuda ([El reloj](#el-reloj)). Existen solo en Android: en iOS no
 hay widget (ver [Plataformas](#plataformas)). Reemplazan al widget de ruta
 (3 × 2, la próxima ruta con aviso), que se quitó.
 
@@ -102,17 +103,22 @@ hay widget (ver [Plataformas](#plataformas)). Reemplazan al widget de ruta
 | Timbre · Flip5 | `TimbreFlipWidget` | Flex Window, 352 × 339 dp | Una parada y hasta seis ómnibus en la pantalla exterior; nombre completo, actualización y última consulta |
 | Timbre · Parada | `TimbreParadaWidget` | 4 × 2, 250 × 150 dp | Una parada y sus próximos tres ómnibus, en filas |
 | Timbre · Mis paradas | `TimbreMisParadasWidget` | 4 × 4, 250 × 320 dp | Dos paradas con tres ómnibus cada una, la placa TIMBRE MVD y los accesos a Mi STM y Recarga |
+| Timbre · Reloj | `TimbreRelojWidget` | 2 × 2, 140 × 140 dp | La hora primero, en LEDs, bajo «AHORA · DOM. 1 NOV.»; debajo, una línea con el próximo ómnibus de una parada («121 ~20:14 · SAN JOSE y ANDES») |
+| Timbre · Reloj ancho | `TimbreRelojAnchoWidget` | 4 × 2, 280 × 140 dp | Reloj a todo el ancho, con la hora más grande |
 
 Archivos:
 
 - `android/app/src/main/kotlin/com/liberontech/stmapp/TimbreStopWidget.kt`:
-  los cinco providers. Dibujan, cambian de parada, piden datos y programan
+  los siete providers. Dibujan, cambian de parada, piden datos y programan
   el redibujo.
 - `android/app/src/main/kotlin/com/liberontech/stmapp/StopWidgetData.kt`:
   las reglas, sin Android.
 - `res/layout/widget_stop_small.xml`, `widget_stop_medium.xml`,
-  `widget_stop_large.xml`, `widget_stop_wide.xml`, `widget_stop_cover.xml`, la fila `widget_stop_row.xml` y las vistas
+  `widget_stop_large.xml`, `widget_stop_wide.xml`, `widget_stop_cover.xml`, la fila `widget_stop_row.xml`, los relojes
+  `widget_stop_clock.xml` y `widget_stop_clock_wide.xml` y las vistas
   previas `*_preview.xml`; `res/xml/widget_stop_*_info.xml`.
+- `res/drawable/widget_clock_mask*.xml`: los LEDs del reloj
+  ([El reloj](#el-reloj)).
 - `lib/services/stop_widgets_feed.dart` (`StopWidgetsFeed`): escribe los
   datos y atiende el botón de actualizar.
 
@@ -170,15 +176,70 @@ abrir ni desbloquear la app. El área inferior deja 32 dp libres para el recorte
   (`drawable-nodpi/widget_sin_paradas.png`, 20 dp de alto) y «Agregá una
   parada en Mis paradas para verla acá.».
 - **Letra:** la del sistema (`sans-serif-condensed`), no las fuentes de la
-  app. «SIN PARADAS» es una imagen hecha con Doto.
-- **Ámbar:** la línea, el cartel de la parada, actualizar y los LEDs. La
-  hora nunca: es una estimación ([02-color.md](02-color.md#excepciones-documentadas),
+  app. «SIN PARADAS» es una imagen hecha con Doto. Las cifras del reloj
+  son LEDs por una máscara sobre esa letra ([El reloj](#el-reloj)).
+- **Ámbar:** la línea, el cartel de la parada, actualizar, los LEDs y las
+  cifras del reloj, que muestran la hora del teléfono, no una estimación. La
+  hora de un ómnibus nunca: es una estimación ([02-color.md](02-color.md#excepciones-documentadas),
   [12-decisiones.md](12-decisiones.md#los-widgets-de-parada-encienden-la-línea-no-la-hora)).
 - **Selector de widgets** (Android 12+): `previewLayout` con datos de
   muestra de las paradas 574 y 3140 (`test/fixtures`).
 - **TalkBack:** cada fila es una frase: «Línea 121 a PUNTA CARRETAS,
   alrededor de las 20:14, estimado, accesible». El encabezado dice
   «Parada SAN JOSE y ANDES, 574. Tocá para ver otra parada».
+
+### El reloj
+
+Reloj y Reloj ancho ponen la hora primero, para quien quiere un reloj y usa
+los ómnibus de ayuda; Próximo y Próximo ancho siguen siendo widgets de
+ómnibus. De arriba abajo, centrados:
+
+- **«AHORA · DOM. 1 NOV.»:** un `TextClock` en `etiqueta` 12 sp (13 sp en
+  Reloj ancho), en mayúsculas y con el idioma del teléfono. Dice que la hora
+  grande es la de ahora, no la de un ómnibus.
+- **La hora:** LEDs encendidos en `ambar` sobre «88:88» de LEDs apagados
+  (`reloj_apagado`, `ambar` al 12 %), con un brillo `reloj_brillo` (`ambar` al
+  45 %, radio 10 a 12). 53 sp en Reloj, lo más grande que entra en 140 dp de
+  ancho; 88 sp en Reloj ancho, lo más grande que entra en 140 dp de alto.
+- Una línea `linea_noche` de 1 dp.
+- **El ómnibus, de ayuda:** una sola línea con el primer ómnibus de la
+  parada, el mismo de Próximo: el número en el contorno `ambarTenue` (13 sp;
+  15 sp en Reloj ancho), el reloj `ambarTenue` y «~20:14» en `papel` (14 y
+  16 sp) y « · SAN JOSE y ANDES» en `etiqueta` (12 y 14 sp). Si no entra, el
+  nombre de la parada se corta con «…». Sin ómnibus, la línea dice los
+  mismos mensajes que los otros widgets («Sin próximos ómnibus en esta
+  parada», «Sin datos todavía. Tocá para actualizar»), con la parada al lado
+  si queda lugar. Sin paradas guardadas, la hora queda y la línea dice
+  «Agregá una parada en Mis paradas», en dos líneas si hace falta.
+- **Sin actualizar ni pie:** el ómnibus es una ayuda. La consulta de fondo
+  sigue mientras haya un widget puesto, y un mensaje de «Tocá para
+  actualizar» actualiza.
+
+Cómo se hace:
+
+- **Se mantiene sola:** la hora es un `TextClock`. Android la actualiza cada
+  minuto sin que la app haga nada, sin alarmas ni consultas, y sigue a la
+  vista aunque no haya paradas guardadas.
+- **Los LEDs:** las cifras son `sans-serif-condensed` en negrita, con una
+  máscara encima (`android:foreground` del `FrameLayout`): la tinta del
+  tablero con un agujero redondo por LED (`widget_clock_mask.xml`, paso de
+  3 dp, en Reloj; `widget_clock_mask_large.xml`, 4 dp, en Reloj ancho; las
+  baldosas están en `drawable-xxhdpi/widget_clock_mask_cell*.png`). Los
+  márgenes negativos recortan el aire que la letra deja arriba y abajo de
+  las cifras, y otro `FrameLayout` alrededor recorta la máscara a ese alto,
+  para que no tape «AHORA».
+- **Por qué no una fuente propia:** un widget no puede usar las fuentes de
+  la app. El launcher arma las `RemoteViews` en un contexto restringido, y
+  `TextView` no carga fuentes en ese contexto (`TextView.java`,
+  `TextAppearance_fontFamily`). Unas cifras de siete segmentos exigirían
+  que la app dibujara una imagen cada minuto: la hora se atrasaría al
+  prender la pantalla y gastaría batería.
+- **Formato:** «H:mm» con el reloj de 24 horas y «h:mm» con el de 12, sin
+  a. m./p. m. La hora se alinea a la derecha: en «9:05» la primera cifra queda
+  apagada, como en un reloj de verdad. Las cifras de Roboto tienen todas el
+  mismo ancho, así que «88:88» queda justo debajo.
+- **TalkBack** lee «AHORA» con la fecha, la hora y el ómnibus como una
+  frase, igual que una fila; «88:88» no se lee.
 
 ### Qué se toca
 

@@ -25,6 +25,8 @@ abstract final class StopWidgetsFeed {
     'TimbreMisParadasWidget',
     'TimbreAnchoWidget',
     'TimbreFlipWidget',
+    'TimbreRelojWidget',
+    'TimbreRelojAnchoWidget',
   ];
 
   /// Saved stops in the order of Mis paradas (String: a JSON list of

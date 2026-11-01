@@ -12,6 +12,12 @@
     <string name="widget_ancho_description">El próximo ómnibus, a todo el ancho y con la misma altura de Próximo</string>
     <string name="widget_flip_label">Timbre · Flip5</string>
     <string name="widget_flip_description">Tus próximos ómnibus en la pantalla exterior del Galaxy Z Flip5</string>
+    <string name="widget_reloj_label">Timbre · Reloj</string>
+    <string name="widget_reloj_description">La hora grande, y abajo el próximo ómnibus de una parada</string>
+    <string name="widget_reloj_ancho_label">Timbre · Reloj ancho</string>
+    <string name="widget_reloj_ancho_description">La hora a todo el ancho, y abajo el próximo ómnibus de una parada</string>
     <!-- Every LED of a clock, drawn dim under the time -->
     <string name="widget_clock_unlit" translatable="false">88:88</string>
+    <!-- Over a clock widget's time: the big time is now, not a bus's -->
+    <string name="widget_clock_now" translatable="false">\'AHORA · \'EEE d MMM</string>
 </resources>
