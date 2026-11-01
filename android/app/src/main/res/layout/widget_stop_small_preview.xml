@@ -1,12 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Stop widget Próximo (2 × 2): the clock, one stop and its next buses. Picker preview with sample data. -->
+<!-- Stop widget Próximo (2 × 2): one stop, its next bus large and the two after it. Picker preview with sample data. -->
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@drawable/widget_background"
     android:clipToOutline="true">
 
-    <!-- Unlit LEDs behind the clock, as on the app bar -->
+    <!-- Unlit LEDs behind the header, as on the app bar -->
     <ImageView
         android:layout_width="match_parent"
         android:layout_height="50dp"
@@ -26,105 +26,44 @@
         android:paddingEnd="12dp"
         android:paddingBottom="10dp">
 
+        <!-- Small: the name takes the whole width, refresh sits below -->
         <LinearLayout
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
+            android:layout_height="24dp"
             android:gravity="center_vertical"
             android:orientation="horizontal">
 
-            <FrameLayout
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="-6dp"
-                android:layout_marginBottom="-9dp"
-                android:foreground="@drawable/widget_clock_mask"
-                android:foregroundGravity="fill">
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:fontFamily="sans-serif-condensed"
-                    android:importantForAccessibility="no"
-                    android:includeFontPadding="false"
-                    android:text="@string/widget_clock_unlit"
-                    android:textColor="@color/reloj_apagado"
-                    android:textSize="42sp"
-                    android:textStyle="bold" />
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_gravity="end"
-                    android:fontFamily="sans-serif-condensed"
-                    android:includeFontPadding="false"
-                    android:shadowColor="@color/reloj_brillo"
-                    android:shadowRadius="10"
-                    android:text="20:13"
-                    android:textColor="@color/ambar"
-                    android:textSize="42sp"
-                    android:textStyle="bold" />
-
-            </FrameLayout>
-
             <LinearLayout
                 android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="6dp"
+                android:layout_height="24dp"
                 android:layout_weight="1"
-                android:gravity="end"
-                android:orientation="vertical">
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
 
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:fontFamily="sans-serif-condensed"
-                    android:includeFontPadding="false"
-                    android:text="SÁB."
-                    android:textColor="@color/etiqueta"
-                    android:textSize="11sp"
-                    android:textStyle="bold" />
+                <ImageView
+                    android:layout_width="14dp"
+                    android:layout_height="14dp"
+                    android:importantForAccessibility="no"
+                    android:src="@drawable/widget_ic_stop" />
 
+                <!-- Name and, smaller, " · 574" (spans) -->
                 <TextView
-                    android:layout_width="wrap_content"
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
+                    android:layout_marginStart="6dp"
+                    android:ellipsize="end"
                     android:fontFamily="sans-serif-condensed"
-                    android:includeFontPadding="false"
-                    android:text="31"
+                    android:maxLines="1"
+                    android:text="SAN JOSE y ANDES"
                     android:textColor="@color/papel"
-                    android:textSize="18sp"
+                    android:textSize="14sp"
                     android:textStyle="bold" />
 
             </LinearLayout>
 
         </LinearLayout>
 
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="4dp"
-            android:gravity="center_vertical"
-            android:orientation="horizontal">
-
-            <ImageView
-                android:layout_width="14dp"
-                android:layout_height="14dp"
-                android:importantForAccessibility="no"
-                android:src="@drawable/widget_ic_stop" />
-
-            <TextView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="6dp"
-                android:ellipsize="end"
-                android:fontFamily="sans-serif-condensed"
-                android:maxLines="1"
-                android:text="SAN JOSE y ANDES"
-                android:textColor="@color/papel"
-                android:textSize="14sp"
-                android:textStyle="bold" />
-
-        </LinearLayout>
-
+        <!-- The next bus -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -134,7 +73,7 @@
 
             <TextView
                 android:layout_width="wrap_content"
-                android:layout_height="24dp"
+                android:layout_height="26dp"
                 android:background="@drawable/widget_badge_lit_bg"
                 android:fontFamily="sans-serif-condensed"
                 android:gravity="center"
@@ -144,18 +83,20 @@
                 android:paddingEnd="6dp"
                 android:text="121"
                 android:textColor="@color/ambar"
-                android:textSize="16sp"
+                android:textSize="17sp"
                 android:textStyle="bold" />
 
             <TextView
-                android:layout_width="wrap_content"
+                android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_marginStart="8dp"
+                android:layout_weight="1"
+                android:ellipsize="end"
                 android:fontFamily="sans-serif-condensed"
-                android:includeFontPadding="false"
-                android:text="~20:14"
+                android:maxLines="2"
+                android:text="PUNTA CARRETAS"
                 android:textColor="@color/papel"
-                android:textSize="20sp"
+                android:textSize="14sp"
                 android:textStyle="bold" />
 
             <ImageView
@@ -167,17 +108,33 @@
 
         </LinearLayout>
 
-        <TextView
+        <!-- Its time, large: an estimate, clock and "~", not amber -->
+        <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:ellipsize="end"
-            android:fontFamily="sans-serif-condensed"
-            android:maxLines="1"
-            android:text="PUNTA CARRETAS"
-            android:textColor="@color/papel"
-            android:textSize="13sp"
-            android:textStyle="bold" />
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
 
+            <ImageView
+                android:layout_width="18dp"
+                android:layout_height="18dp"
+                android:importantForAccessibility="no"
+                android:src="@drawable/widget_ic_clock_dim" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="6dp"
+                android:fontFamily="sans-serif-condensed"
+                android:includeFontPadding="false"
+                android:text="~20:14"
+                android:textColor="@color/papel"
+                android:textSize="34sp"
+                android:textStyle="bold" />
+
+        </LinearLayout>
+
+        <!-- The two after it: "538 ~20:16 · 144 ~20:17", lines in amber -->
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -200,10 +157,18 @@
             android:gravity="center_vertical"
             android:orientation="horizontal">
 
+            <ImageView
+                android:layout_width="13dp"
+                android:layout_height="13dp"
+                android:layout_marginEnd="6dp"
+                android:importantForAccessibility="no"
+                android:src="@drawable/widget_ic_warning"
+                android:visibility="gone" />
+
             <TextView
                 android:layout_width="0dp"
-                android:layout_height="wrap_content"
                 android:layout_weight="1"
+                android:layout_height="wrap_content"
                 android:ellipsize="end"
                 android:maxLines="2"
                 android:text="Datos de las 20:13"

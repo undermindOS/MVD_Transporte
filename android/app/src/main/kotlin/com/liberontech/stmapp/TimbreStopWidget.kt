@@ -51,9 +51,6 @@ abstract class TimbreStopWidget : AppWidgetProvider() {
         nowMs: Long,
     ): List<WidgetArrival>
 
-    /** No saved stops: what else to hide besides the board (w_empty shows). */
-    protected open fun drawNoStops(views: RemoteViews) {}
-
     override fun onUpdate(context: Context, manager: AppWidgetManager, ids: IntArray) {
         drawAll(context)
     }
@@ -101,7 +98,6 @@ abstract class TimbreStopWidget : AppWidgetProvider() {
             if (saved.isEmpty()) {
                 views.setViewVisibility(R.id.w_board, View.GONE)
                 views.setViewVisibility(R.id.w_empty, View.VISIBLE)
-                drawNoStops(views)
                 manager.updateAppWidget(id, views)
                 continue
             }
@@ -361,11 +357,7 @@ abstract class TimbreStopWidget : AppWidgetProvider() {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
 }
 
-/**
- * Próximo (2 × 2): a clock, then one stop, its next bus and the two after it.
- * The clock is a TextClock in the layout and keeps itself current. Its LED
- * look is a mask over the system font: a widget cannot use the app's fonts.
- */
+/** Próximo (2 × 2): one stop, its next bus large and the two after it. */
 open class TimbreProximoWidget : TimbreStopWidget() {
     override val layoutId = R.layout.widget_stop_small
     override val stopCount = 1
@@ -376,15 +368,14 @@ open class TimbreProximoWidget : TimbreStopWidget() {
         stops: List<SavedStop>, boards: List<WidgetBoard?>, footer: WidgetFooter, nowMs: Long,
     ): List<WidgetArrival> {
         val stop = stops.first()
-        views.setViewVisibility(R.id.w_header, View.VISIBLE)
         // Small: the name alone, the number would push it out
         header(context, views, widgetId, saved, stop, 0, R.id.w_header, R.id.w_stop_name,
-            withNumber = !compactWidth)
+            withNumber = false)
         val buses = StopWidgetData.snapshot(boards[0]).take(
             // Give a long full stop name room in a compact 2 x 2 widget.
             if (compactWidth && stop.name.length > 42) 1 else 3)
         val next = buses.firstOrNull()
-        val busViews = listOf(R.id.w_next_bus, R.id.w_after)
+        val busViews = listOf(R.id.w_next_bus, R.id.w_hero, R.id.w_after)
         if (next == null) {
             busViews.forEach { views.setViewVisibility(it, View.GONE) }
             views.setViewVisibility(R.id.w_spacer, View.GONE)
@@ -398,6 +389,7 @@ open class TimbreProximoWidget : TimbreStopWidget() {
             views.setViewVisibility(R.id.w_acc, if (next.accessible) View.VISIBLE else View.GONE)
             views.setTextViewText(R.id.w_time, "~${next.clock}")
             views.setContentDescription(R.id.w_next_bus, spoken(next))
+            views.setContentDescription(R.id.w_hero, spoken(next))
             val after = SpannableStringBuilder()
             buses.drop(1).forEachIndexed { i, bus ->
                 if (i > 0) after.append(" · ")
@@ -442,17 +434,10 @@ open class TimbreParadaWidget : TimbreStopWidget() {
     }
 }
 
-/**
- * Próximo across the whole four-column grid: a larger clock, with the day
- * and the stop beside it, so the stop's header sits outside the board.
- */
+/** Same two home-screen rows as Próximo, spanning the whole four-column grid. */
 class TimbreAnchoWidget : TimbreProximoWidget() {
     override val layoutId = R.layout.widget_stop_wide
     override val compactWidth = false
-
-    override fun drawNoStops(views: RemoteViews) {
-        views.setViewVisibility(R.id.w_header, View.GONE)
-    }
 }
 
 /** Samsung Flex Window, registered separately for the cover-screen picker. */
