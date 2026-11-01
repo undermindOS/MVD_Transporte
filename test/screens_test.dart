@@ -20,6 +20,7 @@ import 'package:stm_app/ui/app_lock.dart';
 import 'package:stm_app/ui/info_page.dart';
 import 'package:stm_app/ui/news_list.dart';
 import 'package:stm_app/ui/privacy_policy_page.dart';
+import 'package:stm_app/ui/project_about_page.dart';
 import 'package:stm_app/ui/schedule_page.dart';
 import 'package:stm_app/ui/services_page.dart';
 import 'package:stm_app/ui/theme/timbre_theme.dart';
@@ -342,6 +343,22 @@ void main() {
     });
   });
 
+  for (final entry in [('Info', _info()), ('Servicios', _services([]))]) {
+    testWidgets('${entry.$1} opens the bundled About page from its brand footer', (tester) async {
+      usePhoneScreen(tester);
+      await tester.pumpWidget(_app(entry.$2));
+      await tester.pumpAndSettle();
+      final about = find.text('Acerca de Timbre MVD');
+      await tester.scrollUntilVisible(about, 250);
+      await tester.tap(about);
+      await tester.pumpAndSettle();
+      expect(find.byType(ProjectAboutPage), findsOneWidget);
+      expect(find.text('Timbre MVD'), findsOneWidget);
+      await tester.scrollUntilVisible(find.text('Khrestenkov & Co'), 250);
+      expect(find.textContaining('Una casa de software independiente'), findsOneWidget);
+    });
+  }
+
   group('Info', () {
     testWidgets('unofficial notice and links', (tester) async {
       usePhoneScreen(tester);
@@ -350,6 +367,7 @@ void main() {
       expect(find.text('NO OFICIAL'), findsOneWidget);
       expect(find.textContaining('No está afiliada con la Intendencia'),
           findsOneWidget);
+      await tester.scrollUntilVisible(find.text('Política de privacidad'), 250);
       expect(find.text('Política de privacidad'), findsOneWidget);
       expect(find.text('Código fuente'), findsOneWidget);
       expect(find.text('Contacto'), findsOneWidget);
@@ -368,7 +386,7 @@ void main() {
         'Contacto, daniil@khrestenkov.com, se abre en tu app de correo',
       ]) {
         final finder = find.bySemanticsLabel(link);
-        await tester.ensureVisible(finder);
+        await tester.scrollUntilVisible(finder, 200);
         expect(tester.getSemantics(finder),
             isSemantics(isButton: true, hasTapAction: true),
             reason: link);
@@ -381,7 +399,7 @@ void main() {
       await tester.pumpWidget(_app(_info()));
 
       final row = find.text('Política de privacidad');
-      await tester.ensureVisible(row);
+      await tester.scrollUntilVisible(row, 250);
       // A page of the app: a chevron, not the "opens outside" arrow
       expect(
           find.descendant(

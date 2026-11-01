@@ -90,7 +90,7 @@ cualquiera de los cuatro archivos.
 
 ## Widgets de parada (Android)
 
-Tres tableros con los próximos ómnibus de tus paradas guardadas, del mismo
+Cinco tableros con los próximos ómnibus de tus paradas guardadas, del mismo
 material que la tarjeta de Mis paradas. Existen solo en Android: en iOS no
 hay widget (ver [Plataformas](#plataformas)). Reemplazan al widget de ruta
 (3 × 2, la próxima ruta con aviso), que se quitó.
@@ -98,21 +98,34 @@ hay widget (ver [Plataformas](#plataformas)). Reemplazan al widget de ruta
 | Widget (selector) | Clase | Celdas, mínimo | Qué muestra |
 |---|---|---|---|
 | Timbre · Próximo | `TimbreProximoWidget` | 2 × 2, 140 × 140 dp | Una parada: el próximo ómnibus grande («~20:14») y los dos siguientes en una línea («538 ~20:16 · 144 ~20:17») |
+| Timbre · Próximo ancho | `TimbreAnchoWidget` | 4 × 2, 280 × 140 dp | La misma altura de Próximo, a todo el ancho: línea y destino junto a la hora grande y dos siguientes debajo |
+| Timbre · Flip5 | `TimbreFlipWidget` | Flex Window, 352 × 339 dp | Una parada y hasta seis ómnibus en la pantalla exterior; nombre completo, actualización y última consulta |
 | Timbre · Parada | `TimbreParadaWidget` | 4 × 2, 250 × 150 dp | Una parada y sus próximos tres ómnibus, en filas |
 | Timbre · Mis paradas | `TimbreMisParadasWidget` | 4 × 4, 250 × 320 dp | Dos paradas con tres ómnibus cada una, la placa TIMBRE MVD y los accesos a Mi STM y Recarga |
 
 Archivos:
 
 - `android/app/src/main/kotlin/com/liberontech/stmapp/TimbreStopWidget.kt`:
-  los tres providers. Dibujan, cambian de parada, piden datos y programan
+  los cinco providers. Dibujan, cambian de parada, piden datos y programan
   el redibujo.
 - `android/app/src/main/kotlin/com/liberontech/stmapp/StopWidgetData.kt`:
   las reglas, sin Android.
 - `res/layout/widget_stop_small.xml`, `widget_stop_medium.xml`,
-  `widget_stop_large.xml`, la fila `widget_stop_row.xml` y las vistas
+  `widget_stop_large.xml`, `widget_stop_wide.xml`, `widget_stop_cover.xml`, la fila `widget_stop_row.xml` y las vistas
   previas `*_preview.xml`; `res/xml/widget_stop_*_info.xml`.
 - `lib/services/stop_widgets_feed.dart` (`StopWidgetsFeed`): escribe los
   datos y atiende el botón de actualizar.
+
+### Pantalla exterior del Flip5
+
+`TimbreFlipWidget` se registra aparte: categoría Android `keyguard` y metadato
+`com.samsung.android.appwidget.provider` que apunta a
+`widget_stop_cover_samsung.xml` (`display="sub_screen"`). Sigue la
+[guía de Flex Window de Samsung](https://developer.samsung.com/galaxy-z/flex_window.html).
+No aparece entre los widgets normales del escritorio: se agrega desde los
+widgets de Pantalla de cubierta. Comparte las paradas guardadas, caché y frecuencia
+con los demás providers; tocar actualizar ejecuta el mismo trabajo nativo sin
+abrir ni desbloquear la app. El área inferior deja 32 dp libres para el recorte.
 
 ### Cómo se ven
 
@@ -144,8 +157,10 @@ Archivos:
     (Parada suma « · horas estimadas»);
   - «Actualizando…» hasta 30 s después de tocar actualizar, o hasta que
     llegan los datos;
-  - si la última consulta falló: `warning` y «No se pudo actualizar. Datos
-    de las 19:58.» en `rojoLed`;
+  - si hay una consulta correcta anterior y la nueva falla o envejece:
+    conserva los ómnibus y muestra «Últimos datos» con fecha y hora en `tenue`;
+  - el error «No se pudo actualizar» se reserva para cuando todavía no hay
+    una instantánea correcta;
   - sin datos todavía: «Tocá para actualizar».
 - **Sin ómnibus:** «Sin próximos ómnibus en esta parada» en `etiqueta`
   14 sp. Si el tablero tiene más de 10 min, «Sin datos recientes. Tocá para
@@ -185,10 +200,11 @@ nombres están en constantes de
 
 | Clave | La escribe | Valor |
 |---|---|---|
-| `stops_saved` | La app (`StopWidgetsFeed.saveStops`): al cargar Mis paradas y en cada consulta de fondo con un widget puesto | JSON `[{"id", "name"}]`, en el orden de Mis paradas |
-| `stop_board_{id}` | La app (`StopWidgetsFeed.updateBoards`): después de cada actualización de Mis paradas, en la consulta de fondo y al tocar actualizar | JSON `{"checkedAtMs", "failedAtMs", "arrivals"}` con hasta 6 ómnibus `{"line", "dest", "clock", "dueMs", "acc"}`. `dueMs` es `expectedAt` pasado al reloj del teléfono (más la hora del teléfono al consultar, menos el `fetchedAt` del tablero; sin proxy, `fetchedAt` es el encabezado `Date` de transporteRest), así un teléfono con la hora corrida no saca un ómnibus antes ni después de tiempo; un `destination` vacío se escribe «Línea 121»; `failedAtMs` aparece cuando una consulta falla, y los ómnibus quedan |
+| `stops_saved` | La app (`StopWidgetsFeed.saveStops`): al cargar o modificar Mis paradas | JSON `[{"id", "name"}]`, en el orden de Mis paradas |
+| `stop_board_{id}` | La app (`StopWidgetsFeed.updateBoards`): después de cada actualización de Mis paradas, en la consulta de fondo y al tocar actualizar | JSON `{"checkedAtMs", "failedAtMs", "arrivals"}` con hasta 6 ómnibus `{"line", "dest", "clock", "dueMs", "acc"}`. `dueMs` es `expectedAt` pasado al reloj del teléfono (más la hora del teléfono al consultar, menos el `fetchedAt` del tablero; sin proxy, `fetchedAt` es el encabezado `Date` de transporteRest), para ordenar los ómnibus del último tablero; un `destination` vacío se escribe «Línea 121»; `failedAtMs` aparece cuando una consulta falla, y los ómnibus quedan |
 | `stops_shown` | El widget | Los ids de las paradas que muestran los widgets puestos, separados por comas |
 | `stop_widgets_placed` | El widget | Cuántos widgets de parada hay en la pantalla de inicio |
+| `widget_refresh_minutes` | Bienvenida e Info | `15` (predeterminado), `30`, `60` o `0` (Manual); compartido con `StopWidgetWork` |
 
 La parada que eligió cada widget y las horas de actualizar viven aparte, en
 las preferencias `timbre_stop_widgets` (`widget_{id}_stops`,
@@ -198,27 +214,36 @@ las preferencias `timbre_stop_widgets` (`widget_{id}_stops`,
 
 - **Qué paradas:** las que eligió el widget y siguen guardadas; si no, las
   primeras de Mis paradas. Nunca la misma dos veces.
-- **Qué ómnibus:** los del tablero hasta 1 min después de su `dueMs`
-  (`EXPIRED_AFTER_MS`, como Mis paradas), por hora. Sin conexión, cada uno
-  se va solo a su hora.
+- **Nombres completos:** los títulos crecen y se dividen en líneas, sin
+  puntos suspensivos. En Próximo un nombre de más de 42 caracteres deja
+  espacio para el nombre completo y el botón mostrando solo el primer ómnibus.
+- **Qué ómnibus:** el último tablero recibido con éxito, ordenado por
+  `dueMs`. El paso del tiempo y los errores no borran sus filas. Una respuesta
+  exitosa sin ómnibus sí reemplaza el tablero anterior.
+- **Antigüedad:** se muestra la hora de consulta. Después de 10 min, o si
+  falla una consulta posterior, dice «Últimos datos» con fecha y hora, sin
+  reemplazar los horarios por un mensaje de error. El pie también actualiza.
 - **Redibujo:** una alarma no exacta (`AlarmManager.set`, RTC: no despierta
-  el teléfono) a la hora en que se va el primer ómnibus a la vista, cuando
-  termina «Actualizando…» o cuando un tablero cumple 10 min. Además,
-  `updatePeriodMillis` = 30 min.
+  el teléfono) termina «Actualizando…» y etiqueta un tablero de más de 10 min.
+  `updatePeriodMillis` = 30 min solo redibuja; no solicita datos por sí mismo.
 - **Datos nuevos:**
   - la app, después de cada actualización de Mis paradas (cada 30 s con la
     pantalla a la vista);
-  - la consulta de fondo (`BackgroundWorker.checkAlerts`), al menos cada
-    15 min y a cualquier hora, para las paradas de `stops_shown`. Con un
-    widget de parada puesto, `BackgroundWorker.sync` mantiene la tarea
-    aunque no haya avisos;
-  - actualizar: el botón manda `ACTION_REFRESH` al widget, que anota la
-    hora y le pide datos a la app (`HomeWidgetBackgroundReceiver`,
-    `timbre://refresh`). La app corre `stopWidgetsCallback` en segundo
-    plano: pide los tableros de `stops_shown`, los escribe, redibuja y
-    registra la tarea de fondo si hay widgets. El widget también pide datos
-    solo cuando muestra una parada sin tablero (recién puesto, o al cambiar
-    de parada). Como mucho un pedido cada 15 s (`REFRESH_GAP_MS`).
+  - `StopWidgetWork` programa `stop-widget-periodic` con WorkManager según
+    la frecuencia elegida en Bienvenida o Info: 15, 30, 60 min o Manual.
+    Android puede demorar una ejecución para ahorrar batería. El trabajo
+    requiere red, no exige batería alta y no depende del bloqueo de la app.
+    `UPDATE` aplica cambios a una tarea existente; Manual y eliminar el
+    último widget cancelan solo esta tarea. Los avisos conservan su tarea
+    independiente de 15 min;
+  - el botón manda `ACTION_REFRESH` y encola `stop-widget-manual`: el worker
+    Dart del plugin `workmanager_android` ejecuta `stopWidgetRefresh`, espera
+    la respuesta y guarda los datos antes de terminar. En Android 12+ usa
+    trabajo acelerado con alternativa normal si no queda cuota. No abre la
+    actividad ni Hive. Como mucho un pedido cada 15 s (`REFRESH_GAP_MS`).
+    Al colocar un widget o cambiar a una parada nunca consultada también se
+    solicita una primera consulta, incluso en Manual.
+  - `stopWidgetsCallback` se conserva para botones pendientes de APK viejos.
 - **Un 429** no cambia nada: ni datos ni error.
 - **Con el bloqueo biométrico activado** el widget muestra igual las
   paradas y los horarios: están en la pantalla de inicio, fuera de la app.
@@ -230,7 +255,11 @@ las preferencias `timbre_stop_widgets` (`widget_{id}_stops`,
 - `test/brand_assets_test.dart`: los recursos (cada vista que llena el
   provider existe, blancos de 44 dp, ninguna vista que RemoteViews no
   admita, la hora en `papel`).
+- `test/widget_refresh_settings_test.dart`: persistencia, selección, Manual y
+  error de escritura.
 - `android/app/src/test/.../StopWidgetDataTest.kt`: las reglas, en la JVM.
+- `android/app/src/test/.../StopWidgetWorkTest.kt`: cambios de intervalo en
+  una tarea existente, una sola tarea para varios widgets y cancelación.
 - `android/app/src/test/.../StopWidgetRenderTest.kt` (Robolectric): pone
   los tres widgets, los llena el provider de verdad y Android infla sus
   RemoteViews, así una vista no admitida falla acá y no en el teléfono.

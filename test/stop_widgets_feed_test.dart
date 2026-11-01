@@ -22,17 +22,16 @@ BusArrival _bus(
   int minutes, {
   String destination = 'POCITOS',
   bool accessible = false,
-}) =>
-    BusArrival(
-      tripId: 'bus-50-$line',
-      line: line,
-      destination: destination,
-      state: ArrivalState.live,
-      etaMinutes: minutes,
-      expectedAt: _fetchedAt.add(Duration(minutes: minutes)),
-      clockTime: '19:${52 + minutes}',
-      accessible: accessible,
-    );
+}) => BusArrival(
+  tripId: 'bus-50-$line',
+  line: line,
+  destination: destination,
+  state: ArrivalState.live,
+  etaMinutes: minutes,
+  expectedAt: _fetchedAt.add(Duration(minutes: minutes)),
+  clockTime: '19:${52 + minutes}',
+  accessible: accessible,
+);
 
 ArrivalsBoard _board(List<BusArrival> arrivals) =>
     ArrivalsBoard(stopId: 574, fetchedAt: _fetchedAt, arrivals: arrivals);
@@ -81,6 +80,8 @@ void main() {
       'TimbreProximoWidget',
       'TimbreParadaWidget',
       'TimbreMisParadasWidget',
+      'TimbreAnchoWidget',
+      'TimbreFlipWidget',
     ]);
 
     redrawn.clear();
@@ -103,8 +104,9 @@ void main() {
           'line': '121',
           'dest': 'POCITOS',
           'clock': '19:53',
-          'dueMs':
-              _fetchedAt.add(const Duration(minutes: 3)).millisecondsSinceEpoch,
+          'dueMs': _fetchedAt
+              .add(const Duration(minutes: 3))
+              .millisecondsSinceEpoch,
           'acc': true,
         },
       ],

@@ -303,7 +303,7 @@ void main() {
       shown.clear();
       requests.clear();
       await http.runWithClient(
-          () => BackgroundWorker.checkAlerts(now), () => proxy);
+          () => StopWidgetsFeed.refreshShown(now: now), () => proxy);
       return [...shown];
     }
 
@@ -340,9 +340,6 @@ void main() {
 
       expect(await checkAt(_t0), isEmpty);
       expect(requests, ['/v1/stops/574/arrivals']);
-      expect(jsonDecode(widget[StopWidgetsFeed.keySavedStops] as String), [
-        {'id': 574, 'name': 'SAN JOSE y ANDES'},
-      ]);
       expect(board()['checkedAtMs'], _t0.millisecondsSinceEpoch);
       expect((board()['arrivals'] as List).first, {
         'line': '116',
@@ -405,7 +402,7 @@ void main() {
           headers: {'date': HttpDate.format(imAt)}));
       final phone = imAt.add(const Duration(minutes: 6));
       await http.runWithClient(
-          () => BackgroundWorker.checkAlerts(phone), () => im);
+          () => StopWidgetsFeed.refreshShown(now: phone), () => im);
 
       // Due 4 min after IM's stamp: 10 min after imAt on the phone's clock
       final first = (board()['arrivals'] as List).first as Map;

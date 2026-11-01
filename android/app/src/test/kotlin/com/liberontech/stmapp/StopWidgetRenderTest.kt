@@ -8,6 +8,8 @@ import android.graphics.Canvas
 import android.view.View
 import android.view.ViewGroup
 import android.widget.TextView
+import androidx.work.WorkManager
+import androidx.work.Configuration
 import androidx.test.core.app.ApplicationProvider
 import es.antonborri.home_widget.HomeWidgetPlugin
 import java.io.File
@@ -49,7 +51,14 @@ class StopWidgetRenderTest {
     }
 
     @Before
-    fun twoSavedStops() = save(
+    fun twoSavedStops() {
+        try {
+            WorkManager.getInstance(context)
+        } catch (_: IllegalStateException) {
+            // Robolectric does not run AndroidX Startup providers.
+            WorkManager.initialize(context, Configuration.Builder().build())
+        }
+        save(
         "stops_saved" to """[{"id":574,"name":"SAN JOSE y ANDES"},""" +
             """{"id":3140,"name":"AV RAMON ANADOR y TIBURCIO GOMEZ"}]""",
         "stop_board_574" to board(
@@ -61,7 +70,8 @@ class StopWidgetRenderTest {
             bus("145", "BV ARTIGAS Y BV ESPAÑA", "20:18", 5, acc = true),
             bus("494", "DELTA DEL TIGRE (POR COMPEN)", "20:23", 10),
             bus("143", "CIUDADELA", "20:31", 18)),
-    )
+        )
+    }
 
     @Test
     fun proximo() {
@@ -107,11 +117,11 @@ class StopWidgetRenderTest {
         val view = render(TimbreParadaWidget::class.java, R.layout.widget_stop_medium, 364, 170, "sin-omnibus-sin-conexion")
         val texts = texts(view)
         assertTrue(texts.toString(), "Sin próximos ómnibus en esta parada" in texts)
-        assertTrue(texts.any { it.startsWith("No se pudo actualizar. Datos de las ") })
+        assertTrue(texts.any { it.startsWith("Últimos datos\n") })
     }
 
     @Test
-    fun aBusThatPassedIsGone() {
+    fun aBusThatPassedStaysInTheLastSuccessfulSnapshot() {
         save(
             "stops_saved" to """[{"id":574,"name":"SAN JOSE y ANDES"}]""",
             "stop_board_574" to board(
@@ -120,8 +130,124 @@ class StopWidgetRenderTest {
         )
         val view = render(TimbreProximoWidget::class.java, R.layout.widget_stop_small, 170, 170, "paso-uno")
         val texts = texts(view)
-        assertTrue(texts.toString(), "121" in texts)
-        assertTrue("117" !in texts)
+        assertTrue(texts.toString(), texts.any { "121" in it })
+        assertTrue(texts.toString(), "117" in texts)
+    }
+
+    @Test
+    fun yesterdayWithNoConnectionStillShowsRowsAndARefreshButton() {
+        val yesterday = System.currentTimeMillis() - 24 * 60 * min
+        save(
+            "stops_saved" to """[{"id":574,"name":"BUENOS AIRES y GUAYAQUI"}]""",
+            "stop_board_574" to """{"checkedAtMs":$yesterday,"failedAtMs":${System.currentTimeMillis()},"arrivals":[{"line":"121","dest":"POCITOS","clock":"10:47","dueMs":$yesterday,"acc":false}]}""",
+        )
+        for ((kind, layout, width, height, name) in listOf(
+            RenderCase(TimbreProximoWidget::class.java, R.layout.widget_stop_small, 176, 221, "retained-proximo"),
+            RenderCase(TimbreParadaWidget::class.java, R.layout.widget_stop_medium, 364, 170, "retained-parada"),
+            RenderCase(TimbreMisParadasWidget::class.java, R.layout.widget_stop_large, 364, 382, "retained-mis-paradas"),
+            RenderCase(TimbreAnchoWidget::class.java, R.layout.widget_stop_wide, 352, 221, "retained-ancho"),
+            RenderCase(TimbreFlipWidget::class.java, R.layout.widget_stop_cover, 352, 339, "retained-flip5"),
+        )) {
+            val view = render(kind, layout, width, height, name)
+            val text = texts(view)
+            assertTrue(text.toString(), "121" in text)
+            assertTrue(text.toString(), "~10:47" in text)
+            assertTrue(text.any { it.startsWith("Últimos datos\n") })
+            assertTrue(view.findViewById<View>(R.id.w_refresh).hasOnClickListeners())
+            assertEquals(View.GONE, view.findViewById<View>(R.id.w_footer_icon).visibility)
+        }
+    }
+
+    private data class RenderCase(val kind: Class<out AppWidgetProvider>, val layout: Int,
+        val width: Int, val height: Int, val name: String)
+
+    @Test
+    fun longStopNamesWrapInFullAndLeaveTheRefreshButtonVisible() {
+        val name = "AV GRAL JOSE GARIBALDI y BV JOSE BATLLE Y ORDONEZ"
+        save(
+            "stops_saved" to """[{"id":574,"name":"$name"}]""",
+            "stop_board_574" to board(bus("121", "POCITOS", "11:09", 1)),
+        )
+        for ((kind, layout, width, height, file) in listOf(
+            RenderCase(TimbreProximoWidget::class.java, R.layout.widget_stop_small, 176, 221, "full-name-proximo"),
+            RenderCase(TimbreParadaWidget::class.java, R.layout.widget_stop_medium, 364, 170, "full-name-parada"),
+            RenderCase(TimbreMisParadasWidget::class.java, R.layout.widget_stop_large, 364, 382, "full-name-mis-paradas"),
+        )) {
+            val view = render(kind, layout, width, height, file)
+            val nameId = if (kind == TimbreMisParadasWidget::class.java) R.id.w_stop_name_1 else R.id.w_stop_name
+            val title = view.findViewById<TextView>(nameId)
+            assertTrue(title.text.toString(), title.text.startsWith(name))
+            assertTrue("name should wrap", title.lineCount > 1)
+            for (line in 0 until title.lineCount) assertEquals(0, title.layout.getEllipsisCount(line))
+            assertEquals(title.text.length, title.layout.getLineEnd(title.lineCount - 1))
+            val refresh = view.findViewById<View>(R.id.w_refresh)
+            val position = IntArray(2); refresh.getLocationInWindow(position)
+            assertTrue("refresh clipped", position[1] + refresh.height <= view.height)
+        }
+    }
+
+    @Test
+    fun wideKeepsTwoRowsAndShowsTheSameSnapshot() {
+        val view = render(TimbreAnchoWidget::class.java, R.layout.widget_stop_wide,
+            352, 221, "proximo-ancho")
+        val text = texts(view)
+        assertTrue(text.toString(), "SAN JOSE y ANDES" in text)
+        assertTrue("121" in text && "~20:14" in text)
+        assertTrue(text.any { it.startsWith("538 ~20:16 · 144") })
+        assertTrue(view.findViewById<View>(R.id.w_line).width >= 54 * context.resources.displayMetrics.density)
+        assertTrue(view.findViewById<View>(R.id.w_dest).width >= 50 * context.resources.displayMetrics.density)
+        assertButtonInside(view)
+    }
+
+    @Test
+    fun coverFitsSixRowsAndTheFullStopNameInBothCoverOrientations() {
+        val name = "AV GRAL JOSE GARIBALDI y BV JOSE BATLLE Y ORDONEZ"
+        save(
+            "stops_saved" to """[{"id":574,"name":"$name"}]""",
+            "stop_board_574" to board(*listOf("121", "538", "144", "116", "145", "494")
+                .mapIndexed { i, line -> bus(line, "PUNTA CARRETAS", "20:${14 + i}", i + 1) }.toTypedArray()),
+        )
+        for ((w, h) in listOf(352 to 339, 339 to 352)) {
+            val view = render(TimbreFlipWidget::class.java, R.layout.widget_stop_cover,
+                w, h, "flip5-${w}x$h")
+            val text = texts(view)
+            assertTrue(text.toString(), text.any { it.startsWith(name) })
+            assertEquals(6, text.count { it in setOf("121", "538", "144", "116", "145", "494") })
+            val title = view.findViewById<TextView>(R.id.w_stop_name)
+            for (line in 0 until title.lineCount) assertEquals(0, title.layout.getEllipsisCount(line))
+            val footer = view.findViewById<View>(R.id.w_footer)
+            val at = IntArray(2); footer.getLocationInWindow(at)
+            assertTrue("footer clipped", at[1] + footer.height <= view.height - 24 * context.resources.displayMetrics.density)
+            assertButtonInside(view)
+        }
+    }
+
+    @Test
+    fun coverIsRegisteredForTheSamsungSubScreenPicker() {
+        val component = android.content.ComponentName(context, TimbreFlipWidget::class.java)
+        val info = context.packageManager.getReceiverInfo(component, android.content.pm.PackageManager.GET_META_DATA)
+        assertEquals("Timbre · Flip5", info.loadLabel(context.packageManager).toString())
+        val samsung = info.loadXmlMetaData(context.packageManager, "com.samsung.android.appwidget.provider")
+        assertTrue("missing Samsung metadata", samsung != null)
+        samsung!!.use { parser ->
+            while (parser.eventType != org.xmlpull.v1.XmlPullParser.START_TAG) parser.next()
+            assertEquals("samsung-appwidget-provider", parser.name)
+            assertEquals("sub_screen", parser.getAttributeValue(null, "display"))
+        }
+        val standard = info.loadXmlMetaData(context.packageManager, "android.appwidget.provider")!!
+        standard.use { parser ->
+            while (parser.eventType != org.xmlpull.v1.XmlPullParser.START_TAG) parser.next()
+            assertEquals(android.appwidget.AppWidgetProviderInfo.WIDGET_CATEGORY_KEYGUARD,
+                parser.getAttributeIntValue("http://schemas.android.com/apk/res/android", "widgetCategory", 0))
+        }
+    }
+
+    private fun assertButtonInside(view: View) {
+        val refresh = view.findViewById<View>(R.id.w_refresh)
+        val at = IntArray(2); refresh.getLocationInWindow(at)
+        assertTrue("refresh clipped horizontally", at[0] >= 0 && at[0] + refresh.width <= view.width)
+        assertTrue("refresh clipped vertically", at[1] >= 0 && at[1] + refresh.height <= view.height)
+        assertTrue(refresh.hasOnClickListeners())
     }
 
     /** Places the widget, lets its provider fill it and draws it at w × h dp. */

@@ -82,6 +82,7 @@ dependencies:
   # (lib/services/app_passcode.dart); test/map/basemap_assets_test.dart
   # checks the SHA-256 of the bundled basemap
   crypto: ^3.0.7
+  flutter_svg: ^2.3.2
 
 dev_dependencies:
   flutter_test:
@@ -118,6 +119,8 @@ flutter:
   # Licenses of bundled fonts (SIL OFL 1.1) and pixel icons (MIT), shown
   # in the app's license page
   assets:
+    - assets/brands/liberon-tech-white.svg
+    - assets/brands/khrestenkov-co-white.svg
     - assets/fonts/OFL-FiraSans.txt
     - assets/fonts/OFL-FiraSansExtraCondensed.txt
     - assets/fonts/OFL-Doto.txt

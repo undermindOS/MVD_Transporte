@@ -51,6 +51,9 @@ flutter {
 }
 
 dependencies {
+    // 2.11.2 fixes blocked background network access on Android 15+.
+    // The pinned Flutter plugin still supplies the Dart worker entry point.
+    implementation("androidx.work:work-runtime:2.11.2")
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
 
     // StopWidgetDataTest: the stop widgets' rules on the JVM. org.json is a

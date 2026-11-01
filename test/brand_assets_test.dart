@@ -83,12 +83,12 @@ void main() {
     expect(service, isNot(contains('TimbreColors.ambar')));
   });
 
-  test('the stop widgets are night boards in three sizes', () {
+  test('the stop widgets are night boards on every surface', () {
     const kotlin = 'android/app/src/main/kotlin/com/liberontech/stmapp';
     final provider = _read('$kotlin/TimbreStopWidget.kt');
     final manifest = _read('android/app/src/main/AndroidManifest.xml');
     final layouts = {
-      for (final size in ['small', 'medium', 'large'])
+      for (final size in ['small', 'medium', 'large', 'wide', 'cover'])
         size: _read('$res/layout/widget_stop_$size.xml'),
     };
     final row = _read('$res/layout/widget_stop_row.xml');
@@ -97,10 +97,12 @@ void main() {
       ('small', 'TimbreProximoWidget'),
       ('medium', 'TimbreParadaWidget'),
       ('large', 'TimbreMisParadasWidget'),
+      ('wide', 'TimbreAnchoWidget'),
+      ('cover', 'TimbreFlipWidget'),
     ]) {
       // The app redraws each provider by its class name
       expect(StopWidgetsFeed.providers, contains(kind));
-      expect(provider, contains('class $kind : TimbreStopWidget()'));
+      expect(provider, contains('class $kind :'));
       expect(manifest, contains('android:name=".$kind"'));
       expect(manifest, contains('@xml/widget_stop_${size}_info'));
       final info = _read('$res/xml/widget_stop_${size}_info.xml');

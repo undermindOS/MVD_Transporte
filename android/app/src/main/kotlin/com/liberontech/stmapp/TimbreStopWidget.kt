@@ -15,7 +15,6 @@ import android.text.style.ForegroundColorSpan
 import android.text.style.RelativeSizeSpan
 import android.view.View
 import android.widget.RemoteViews
-import es.antonborri.home_widget.HomeWidgetBackgroundReceiver
 import es.antonborri.home_widget.HomeWidgetPlugin
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -27,10 +26,9 @@ import java.util.Locale
  * (lib/services/stop_widgets_feed.dart); the rules live in StopWidgetData.
  *
  * - Tapping the stop name shows the next saved stop, per widget.
- * - The refresh button asks the app's Dart code, in the background, for new
- *   boards (home_widget's interactivity callback, `timbre://refresh`).
- * - A bus drops out a minute after it was due, with no network: an alarm
- *   redraws the widget then.
+ * - The refresh button enqueues a WorkManager task, without opening the app.
+ * - Last successful arrivals stay visible with their original clock times.
+ * - WorkManager updates them at the interval selected in the app.
  */
 abstract class TimbreStopWidget : AppWidgetProvider() {
 
@@ -111,10 +109,10 @@ abstract class TimbreStopWidget : AppWidgetProvider() {
             val boards = stops.map { boardOf(data, it.id) }
             if (boards.any { it == null }) missingBoard = true
             val footer = StopWidgetData.footer(boards, tap, now)
-            val shown = fill(context, views, id, saved, stops, boards, footer, now)
+            fill(context, views, id, saved, stops, boards, footer, now)
             manager.updateAppWidget(id, views)
 
-            StopWidgetData.nextRedrawMs(shown, boards, tap, now)?.let {
+            StopWidgetData.nextRedrawMs(boards, tap, now)?.let {
                 nextRedraw = minOf(nextRedraw ?: it, it)
             }
         }
@@ -205,7 +203,8 @@ abstract class TimbreStopWidget : AppWidgetProvider() {
     protected fun message(context: Context, views: RemoteViews, messageId: Int, board: WidgetBoard?, nowMs: Long) {
         views.setViewVisibility(messageId, View.VISIBLE)
         if (StopWidgetData.isStale(board, nowMs)) {
-            views.setTextViewText(messageId, "Sin datos recientes. Tocá para actualizar")
+            views.setTextViewText(messageId, if (board?.checkedAtMs == null) "Sin datos todavía. Tocá para actualizar"
+                else "Sin ómnibus en la última consulta. Tocá para actualizar")
             views.setOnClickPendingIntent(messageId, refreshIntent(context))
         } else {
             views.setTextViewText(messageId, "Sin próximos ómnibus en esta parada")
@@ -216,6 +215,7 @@ abstract class TimbreStopWidget : AppWidgetProvider() {
     protected fun footer(context: Context, views: RemoteViews, footer: WidgetFooter, suffix: String = "") {
         val (text, failed) = when (footer) {
             is WidgetFooter.Checked -> "Datos de las ${clock(footer.atMs)}$suffix" to false
+            is WidgetFooter.Saved -> "Últimos datos\n${snapshotClock(footer.atMs)}" to false
             is WidgetFooter.Failed -> (footer.atMs?.let {
                 "No se pudo actualizar. Datos de las ${clock(it)}."
             } ?: "No se pudo actualizar.") to true
@@ -223,6 +223,8 @@ abstract class TimbreStopWidget : AppWidgetProvider() {
             WidgetFooter.NoData -> "Tocá para actualizar" to false
         }
         views.setTextViewText(R.id.w_footer, text)
+        views.setOnClickPendingIntent(R.id.w_footer, refreshIntent(context))
+        views.setContentDescription(R.id.w_footer, "$text. Tocá para actualizar")
         views.setTextColor(R.id.w_footer,
             context.getColor(if (failed) R.color.rojo_led else R.color.tenue))
         views.setViewVisibility(R.id.w_footer_icon, if (failed) View.VISIBLE else View.GONE)
@@ -231,7 +233,6 @@ abstract class TimbreStopWidget : AppWidgetProvider() {
     companion object {
         private const val ACTION_NEXT_STOP = "com.liberontech.stmapp.widget.NEXT_STOP"
         private const val ACTION_REFRESH = "com.liberontech.stmapp.widget.REFRESH"
-        private const val HOME_WIDGET_BACKGROUND = "es.antonborri.home_widget.action.BACKGROUND"
         private const val REQUEST_REDRAW = 1
 
         // Written by the app (StopWidgetsFeed in lib/services/stop_widgets_feed.dart)
@@ -252,6 +253,8 @@ abstract class TimbreStopWidget : AppWidgetProvider() {
             TimbreProximoWidget::class.java to 1,
             TimbreParadaWidget::class.java to 1,
             TimbreMisParadasWidget::class.java to 2,
+            TimbreAnchoWidget::class.java to 1,
+            TimbreFlipWidget::class.java to 1,
         )
 
         private fun widgetPrefs(context: Context): SharedPreferences =
@@ -279,6 +282,7 @@ abstract class TimbreStopWidget : AppWidgetProvider() {
                     StopWidgetData.pickStops(saved, chose, count).mapTo(shown) { it.id }
                 }
             }
+            StopWidgetWork.sync(context, placed)
             val shownText = shown.joinToString(",")
             if (data.getString(KEY_SHOWN_STOPS, null) != shownText ||
                 data.getString(KEY_PLACED, null) != placed.toString()
@@ -300,10 +304,7 @@ abstract class TimbreStopWidget : AppWidgetProvider() {
             val last = prefs.getLong(KEY_REFRESH_ASKED, 0L)
             if (now - last in 0 until StopWidgetData.REFRESH_GAP_MS) return
             prefs.edit().putLong(KEY_REFRESH_ASKED, now).apply()
-            context.sendBroadcast(
-                Intent(context, HomeWidgetBackgroundReceiver::class.java)
-                    .setAction(HOME_WIDGET_BACKGROUND)
-                    .setData(Uri.parse("timbre://refresh")))
+            StopWidgetWork.refresh(context)
         }
 
         private fun redrawEveryWidget(context: Context) {
@@ -327,6 +328,8 @@ abstract class TimbreStopWidget : AppWidgetProvider() {
 
         /** A time on the phone's clock, "H:MM" as in the app. */
         fun clock(ms: Long): String = SimpleDateFormat("H:mm", Locale.US).format(Date(ms))
+        private fun snapshotClock(ms: Long): String =
+            SimpleDateFormat("dd/MM H:mm", Locale.US).format(Date(ms))
 
         /** TalkBack reads a row as one sentence. */
         fun spoken(bus: WidgetArrival): String =
@@ -355,9 +358,10 @@ abstract class TimbreStopWidget : AppWidgetProvider() {
 }
 
 /** Próximo (2 × 2): one stop, its next bus large and the two after it. */
-class TimbreProximoWidget : TimbreStopWidget() {
+open class TimbreProximoWidget : TimbreStopWidget() {
     override val layoutId = R.layout.widget_stop_small
     override val stopCount = 1
+    protected open val compactWidth = true
 
     override fun fill(
         context: Context, views: RemoteViews, widgetId: Int, saved: List<SavedStop>,
@@ -367,7 +371,9 @@ class TimbreProximoWidget : TimbreStopWidget() {
         // Small: the name alone, the number would push it out
         header(context, views, widgetId, saved, stop, 0, R.id.w_header, R.id.w_stop_name,
             withNumber = false)
-        val buses = StopWidgetData.upcoming(boards[0], nowMs).take(3)
+        val buses = StopWidgetData.snapshot(boards[0]).take(
+            // Give a long full stop name room in a compact 2 x 2 widget.
+            if (compactWidth && stop.name.length > 42) 1 else 3)
         val next = buses.firstOrNull()
         val busViews = listOf(R.id.w_next_bus, R.id.w_hero, R.id.w_after)
         if (next == null) {
@@ -394,6 +400,7 @@ class TimbreProximoWidget : TimbreStopWidget() {
                 after.append(" ~${bus.clock}")
             }
             views.setTextViewText(R.id.w_after, after)
+            views.setViewVisibility(R.id.w_after, if (after.isEmpty()) View.GONE else View.VISIBLE)
             views.setContentDescription(R.id.w_after,
                 buses.drop(1).joinToString(". ") { spoken(it) })
         }
@@ -403,16 +410,17 @@ class TimbreProximoWidget : TimbreStopWidget() {
 }
 
 /** Parada (4 × 2): one stop and its next three buses. */
-class TimbreParadaWidget : TimbreStopWidget() {
+open class TimbreParadaWidget : TimbreStopWidget() {
     override val layoutId = R.layout.widget_stop_medium
     override val stopCount = 1
+    protected open val rowCount = 3
 
     override fun fill(
         context: Context, views: RemoteViews, widgetId: Int, saved: List<SavedStop>,
         stops: List<SavedStop>, boards: List<WidgetBoard?>, footer: WidgetFooter, nowMs: Long,
     ): List<WidgetArrival> {
         header(context, views, widgetId, saved, stops.first(), 0, R.id.w_header, R.id.w_stop_name)
-        val buses = StopWidgetData.upcoming(boards[0], nowMs).take(3)
+        val buses = StopWidgetData.snapshot(boards[0]).take(rowCount)
         rows(context, views, R.id.w_rows, buses)
         if (buses.isEmpty()) {
             views.setViewVisibility(R.id.w_spacer, View.GONE)
@@ -424,6 +432,18 @@ class TimbreParadaWidget : TimbreStopWidget() {
         footer(context, views, footer, " · horas estimadas")
         return buses
     }
+}
+
+/** Same two home-screen rows as Próximo, spanning the whole four-column grid. */
+class TimbreAnchoWidget : TimbreProximoWidget() {
+    override val layoutId = R.layout.widget_stop_wide
+    override val compactWidth = false
+}
+
+/** Samsung Flex Window, registered separately for the cover-screen picker. */
+class TimbreFlipWidget : TimbreParadaWidget() {
+    override val layoutId = R.layout.widget_stop_cover
+    override val rowCount = 6
 }
 
 /** Mis paradas (4 × 4): two stops, three buses each, Mi STM and Recarga. */
@@ -457,7 +477,7 @@ class TimbreMisParadasWidget : TimbreStopWidget() {
             views.setViewVisibility(section.root, View.VISIBLE)
             if (slot == 1) views.setViewVisibility(R.id.w_divider, View.VISIBLE)
             header(context, views, widgetId, saved, stop, slot, section.header, section.name)
-            val buses = StopWidgetData.upcoming(boards[slot], nowMs).take(3)
+            val buses = StopWidgetData.snapshot(boards[slot]).take(3)
             rows(context, views, section.rows, buses)
             if (buses.isEmpty()) message(context, views, section.message, boards[slot], nowMs)
             else views.setViewVisibility(section.message, View.GONE)

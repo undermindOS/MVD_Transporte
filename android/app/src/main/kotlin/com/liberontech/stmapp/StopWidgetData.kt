@@ -36,6 +36,9 @@ sealed class WidgetFooter {
     /** "No se pudo actualizar. Datos de las 19:58." ([atMs] null: never). */
     data class Failed(val atMs: Long?) : WidgetFooter()
 
+    /** A retained snapshot, with a visible date and time. */
+    data class Saved(val atMs: Long) : WidgetFooter()
+
     /** "Actualizando…": the refresh button was tapped. */
     object Refreshing : WidgetFooter()
 
@@ -45,13 +48,10 @@ sealed class WidgetFooter {
 
 /**
  * The rules of the stop widgets, without Android: which stops a widget
- * shows, which buses are still to come, what the footer says and when to
+ * shows, the last successful arrivals, what the footer says and when to
  * redraw. TimbreStopWidget draws the result.
  */
 object StopWidgetData {
-    /** A bus stays this long after it was due, as in Mis paradas. */
-    const val EXPIRED_AFTER_MS = 60 * 1000L
-
     /** An empty board older than this asks for a refresh instead of
      *  saying no bus is coming: its buses may just have passed. */
     const val STALE_AFTER_MS = 10 * 60 * 1000L
@@ -140,12 +140,9 @@ object StopWidgetData {
         return shown
     }
 
-    /** The buses still to come at [nowMs], soonest first. */
-    fun upcoming(board: WidgetBoard?, nowMs: Long): List<WidgetArrival> =
-        board?.arrivals
-            ?.filter { nowMs <= it.dueMs + EXPIRED_AFTER_MS }
-            ?.sortedBy { it.dueMs }
-            .orEmpty()
+    /** Last successful snapshot. Time passing or a network error never empties it. */
+    fun snapshot(board: WidgetBoard?): List<WidgetArrival> =
+        board?.arrivals?.sortedBy { it.dueMs }.orEmpty()
 
     /** True if an empty board should ask for a refresh, not say "no buses". */
     fun isStale(board: WidgetBoard?, nowMs: Long): Boolean {
@@ -167,24 +164,25 @@ object StopWidgetData {
             return WidgetFooter.Refreshing
         }
         val known = checked.filterNotNull()
-        if (boards.any { it?.failed == true }) return WidgetFooter.Failed(known.minOrNull())
+        if (boards.any { it?.failed == true }) {
+            return known.minOrNull()?.let { WidgetFooter.Saved(it) } ?: WidgetFooter.Failed(null)
+        }
         if (known.isEmpty()) return WidgetFooter.NoData
-        return WidgetFooter.Checked(known.min())
+        val oldest = known.min()
+        if (boards.any { isStale(it, nowMs) }) return WidgetFooter.Saved(oldest)
+        return WidgetFooter.Checked(oldest)
     }
 
     /**
-     * When the widget has to be drawn again with no new data: the next bus
-     * to drop out of [shown], the end of "Actualizando…", or an empty board
-     * turning stale. Null if nothing changes on its own.
+     * Redraw only to finish "Actualizando…" or label an old snapshot.
+     * Arrival rows themselves remain until the next successful fetch.
      */
     fun nextRedrawMs(
-        shown: List<WidgetArrival>,
         boards: List<WidgetBoard?>,
         refreshTapMs: Long?,
         nowMs: Long,
     ): Long? {
         val times = mutableListOf<Long>()
-        shown.mapTo(times) { it.dueMs + EXPIRED_AFTER_MS + 1 }
         if (refreshTapMs != null) times += refreshTapMs + REFRESHING_FOR_MS + 1
         boards.forEach { board -> board?.checkedAtMs?.let { times += it + STALE_AFTER_MS + 1 } }
         return times.filter { it > nowMs }.minOrNull()

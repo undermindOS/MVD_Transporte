@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:ui' as ui;
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../../services/device_auth.dart';
@@ -13,6 +14,7 @@ import '../widgets/led_board.dart';
 import '../widgets/led_lock.dart';
 import '../widgets/pixel_icon.dart';
 import '../widgets/timbre_bus.dart';
+import '../widgets/widget_refresh_options.dart';
 
 /// The welcome of the first launch, each step a [LedBoard] with its dot on
 /// top: «Hola» (what the app does), «Sin cuentas ni registros», «Tu código»
@@ -345,7 +347,11 @@ class _WelcomePageState extends State<WelcomePage> {
         _gap,
         const _Line(PixelGlyphs.info,
             text: 'Podés cambiarlo cuando quieras en Info.'),
-        const SizedBox(height: 32),
+        if (defaultTargetPlatform == TargetPlatform.android) ...[
+          const SizedBox(height: 24),
+          const WidgetRefreshOptions(),
+        ],
+        const SizedBox(height: 24),
         _Primary('Empezar', onPressed: widget.onDone),
       ],
     );

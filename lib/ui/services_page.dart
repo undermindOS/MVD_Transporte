@@ -5,6 +5,7 @@ import 'theme/timbre_text.dart';
 import 'theme/timbre_tokens.dart';
 import 'widgets/led_matrix.dart';
 import 'widgets/pixel_icon.dart';
+import 'widgets/project_about_link.dart';
 
 typedef _Site = ({
   OfficialSite site,
@@ -80,6 +81,12 @@ class ServicesPage extends StatelessWidget {
           _grid(_travel),
           const SizedBox(height: 24),
           const _BrowserNote(),
+          const Divider(
+            height: 40,
+            thickness: 1,
+            color: TimbreColors.lineaNoche,
+          ),
+          const ProjectAboutLink(compact: true),
         ],
       ),
     );

@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -17,6 +18,8 @@ import 'widgets/led_matrix.dart';
 import 'widgets/pixel_icon.dart';
 import 'widgets/timbre_app_bar.dart';
 import 'widgets/timbre_bus.dart';
+import 'widgets/widget_refresh_options.dart';
+import 'widgets/project_about_link.dart';
 
 /// About the app, and its lock: the app's code and the quick unlock. The
 /// lock is read with `AppLock.of`, above the Navigator, so the card follows
@@ -242,6 +245,13 @@ class _InfoPageState extends State<InfoPage> {
           const SizedBox(height: 12),
           _lockCard(AppLock.of(context)),
           const SizedBox(height: 12),
+          if (defaultTargetPlatform == TargetPlatform.android) ...[
+            _card(
+              padding: const EdgeInsets.all(16),
+              child: const WidgetRefreshOptions(),
+            ),
+            const SizedBox(height: 12),
+          ],
           // Data source. Live ETAs come from the Cómo Ir online service, not
           // from an open dataset — if open datasets (e.g. GTFS) are added,
           // the "Licencia de Datos Abiertos – Uruguay" origin note must
@@ -323,19 +333,7 @@ class _InfoPageState extends State<InfoPage> {
             ]),
           ),
           const SizedBox(height: 16),
-          const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 8),
-            child: Text(
-              'Desarrollada por Liberon Tech, de Khrestenkov & Co, con gratitud '
-              'hacia Uruguay.',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                  fontSize: 13,
-                  height: 1.45,
-                  fontStyle: FontStyle.italic,
-                  color: TimbreColors.tenue),
-            ),
-          ),
+          const ProjectAboutLink(),
         ],
       ),
     );

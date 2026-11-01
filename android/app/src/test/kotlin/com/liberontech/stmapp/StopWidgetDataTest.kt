@@ -85,11 +85,14 @@ class StopWidgetDataTest {
     }
 
     @Test
-    fun aBusStaysAMinuteAfterItWasDue() {
-        val board = WidgetBoard(t0, null, listOf(bus("116", t0 + 5 * min), bus("121", t0)))
-        assertEquals(listOf("121", "116"), StopWidgetData.upcoming(board, t0 + min).map { it.line })
-        assertEquals(listOf("116"), StopWidgetData.upcoming(board, t0 + min + 1).map { it.line })
-        assertEquals(emptyList<String>(), StopWidgetData.upcoming(null, t0).map { it.line })
+    fun theLastSuccessfulSnapshotSurvivesPassedBusesAndFailures() {
+        val buses = listOf(bus("116", t0 + 5 * min), bus("121", t0))
+        val board = WidgetBoard(t0, t0 + 24 * 60 * min, buses)
+        assertEquals(listOf("121", "116"), StopWidgetData.snapshot(board).map { it.line })
+        assertEquals(WidgetFooter.Saved(t0), StopWidgetData.footer(listOf(board), null, t0 + 24 * 60 * min))
+        assertEquals(emptyList<String>(), StopWidgetData.snapshot(null).map { it.line })
+        // A successful empty response is a new snapshot, not an error.
+        assertTrue(StopWidgetData.snapshot(WidgetBoard(t0, null, emptyList())).isEmpty())
     }
 
     @Test
@@ -108,7 +111,7 @@ class StopWidgetDataTest {
         assertEquals(WidgetFooter.Checked(t0 - min), StopWidgetData.footer(listOf(a, b), null, t0))
         assertEquals(WidgetFooter.NoData, StopWidgetData.footer(listOf(null), null, t0))
         val failed = WidgetBoard(t0 - min, t0, emptyList())
-        assertEquals(WidgetFooter.Failed(t0 - min), StopWidgetData.footer(listOf(a, failed), null, t0))
+        assertEquals(WidgetFooter.Saved(t0 - min), StopWidgetData.footer(listOf(a, failed), null, t0))
         assertEquals(WidgetFooter.Failed(null), StopWidgetData.footer(listOf(WidgetBoard(null, t0, emptyList())), null, t0))
     }
 
@@ -122,21 +125,19 @@ class StopWidgetDataTest {
         assertEquals(WidgetFooter.Checked(t0 + 2_000), StopWidgetData.footer(listOf(fresh), tap, t0 + 3_000))
         // The fetch failed after the tap
         val failed = WidgetBoard(t0 - min, t0 + 2_000, emptyList())
-        assertEquals(WidgetFooter.Failed(t0 - min), StopWidgetData.footer(listOf(failed), tap, t0 + 3_000))
+        assertEquals(WidgetFooter.Saved(t0 - min), StopWidgetData.footer(listOf(failed), tap, t0 + 3_000))
         // Nothing came: after 30 s the footer goes back to the old time
         assertEquals(WidgetFooter.Checked(t0 - min), StopWidgetData.footer(listOf(old), tap, t0 + 30_000))
     }
 
     @Test
-    fun theWidgetIsRedrawnWhenSomethingChangesOnItsOwn() {
-        val board = WidgetBoard(t0, null, listOf(bus("121", t0 + 2 * min), bus("116", t0 + 5 * min)))
-        val shown = StopWidgetData.upcoming(board, t0)
-        // The first bus to drop out
-        assertEquals(t0 + 3 * min + 1, StopWidgetData.nextRedrawMs(shown, listOf(board), null, t0))
-        // "Actualizando…" ends first
-        assertEquals(t0 + 30_001, StopWidgetData.nextRedrawMs(shown, listOf(board), t0, t0))
-        // Nothing shown: the board turning stale
-        assertEquals(t0 + 10 * min + 1, StopWidgetData.nextRedrawMs(emptyList(), listOf(board), null, t0))
-        assertNull(StopWidgetData.nextRedrawMs(emptyList(), listOf(null), null, t0))
+    fun redrawsOnlyLabelTheSnapshotAndFinishTheRefreshIndicator() {
+        val board = WidgetBoard(t0, null, listOf(bus("121", t0 + 2 * min)))
+        assertEquals(t0 + 10 * min + 1, StopWidgetData.nextRedrawMs(listOf(board), null, t0))
+        assertEquals(t0 + 30_001, StopWidgetData.nextRedrawMs(listOf(board), t0, t0))
+        assertNull(StopWidgetData.nextRedrawMs(listOf(null), null, t0))
+        // A day later there is no timer that deletes saved rows.
+        assertNull(StopWidgetData.nextRedrawMs(listOf(board), null, t0 + 24 * 60 * min))
+        assertEquals(WidgetFooter.Saved(t0), StopWidgetData.footer(listOf(board), null, t0 + 24 * 60 * min))
     }
 }

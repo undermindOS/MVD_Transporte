@@ -75,6 +75,32 @@
                 android:resource="@xml/widget_stop_large_info"/>
         </receiver>
 
+        <receiver
+            android:name=".TimbreAnchoWidget"
+            android:label="@string/widget_ancho_label"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE"/>
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_stop_wide_info"/>
+        </receiver>
+        <receiver
+            android:name=".TimbreFlipWidget"
+            android:label="@string/widget_flip_label"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE"/>
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_stop_cover_info"/>
+            <meta-data
+                android:name="com.samsung.android.appwidget.provider"
+                android:resource="@xml/widget_stop_cover_samsung"/>
+        </receiver>
+
         <!-- The refresh button of the stop widgets runs the app's Dart code in
              the background (home_widget's interactivity callback). Only the
              widgets send it: not exported -->

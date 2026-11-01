@@ -8,4 +8,8 @@
     <string name="widget_parada_description">Los próximos ómnibus de una parada</string>
     <string name="widget_mis_paradas_label">Timbre · Mis paradas</string>
     <string name="widget_mis_paradas_description">Dos paradas, y accesos a Mi STM y Recarga</string>
+    <string name="widget_ancho_label">Timbre · Próximo ancho</string>
+    <string name="widget_ancho_description">El próximo ómnibus, a todo el ancho y con la misma altura de Próximo</string>
+    <string name="widget_flip_label">Timbre · Flip5</string>
+    <string name="widget_flip_description">Tus próximos ómnibus en la pantalla exterior del Galaxy Z Flip5</string>
 </resources>

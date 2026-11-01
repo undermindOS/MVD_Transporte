@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Samsung's documented full-size Flex Window dimensions and category. -->
+<appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
+    android:minWidth="352dp"
+    android:minHeight="339dp"
+    android:updatePeriodMillis="1800000"
+    android:initialLayout="@layout/widget_stop_cover"
+    android:previewLayout="@layout/widget_stop_cover_preview"
+    android:resizeMode="horizontal|vertical"
+    android:widgetCategory="keyguard"
+    android:description="@string/widget_flip_description" />

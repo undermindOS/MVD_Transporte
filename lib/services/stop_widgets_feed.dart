@@ -6,7 +6,6 @@ import 'package:home_widget/home_widget.dart';
 import '../models/arrivals_board.dart';
 import '../models/bus_stop.dart';
 import 'api/api_result.dart';
-import 'background_worker.dart';
 import 'mvd_api_service.dart';
 
 /// The stop widgets of Android: Próximo (2 × 2), Parada (4 × 2) and Mis
@@ -16,14 +15,16 @@ import 'mvd_api_service.dart';
 /// The app writes the saved stops and every board it fetches; the widgets
 /// choose which stops to show and write their ids back ([keyShownStops]),
 /// so the background check and the refresh button fetch only those.
-/// Arrivals keep their due time on the phone's clock: the widget drops a
-/// bus a minute after it, with no network.
+/// The last successful snapshot stays visible, even after its buses passed;
+/// its original time is shown until a new successful fetch replaces it.
 abstract final class StopWidgetsFeed {
   /// The providers, in `com.liberontech.stmapp`.
   static const providers = [
     'TimbreProximoWidget',
     'TimbreParadaWidget',
     'TimbreMisParadasWidget',
+    'TimbreAnchoWidget',
+    'TimbreFlipWidget',
   ];
 
   /// Saved stops in the order of Mis paradas (String: a JSON list of
@@ -104,8 +105,7 @@ abstract final class StopWidgetsFeed {
     try {
       final shown = await HomeWidget.getWidgetData<String>(keyShownStops);
       return {
-        for (final part in (shown ?? '').split(','))
-          ?int.tryParse(part.trim()),
+        for (final part in (shown ?? '').split(',')) ?int.tryParse(part.trim()),
       };
     } catch (e) {
       debugPrint('⚠️ Stop widgets data error: $e');
@@ -127,11 +127,18 @@ abstract final class StopWidgetsFeed {
 
   /// Fetches the stops the widgets show and writes them: the refresh
   /// button, and a widget showing a stop it has no board for.
-  static Future<void> refreshShown() async {
+  static Future<void> refreshShown({DateTime? now}) async {
     final ids = await shownStopIds();
     if (ids.isEmpty) return;
     final results = await MvdApiService.getBoards(ids);
-    await updateBoards(results, now: DateTime.now());
+    for (final entry in results.entries) {
+      final status = switch (entry.value) {
+        ApiOk(:final value) => '${value.arrivals.length} arrivals',
+        ApiError(:final failure) => failure.name,
+      };
+      debugPrint('Widget refresh ${entry.key}: $status');
+    }
+    await updateBoards(results, now: now ?? DateTime.now());
   }
 
   static Map<String, Object?> _boardJson(ArrivalsBoard board, DateTime now) {
@@ -142,8 +149,9 @@ abstract final class StopWidgetsFeed {
         for (final bus in board.arrivals.take(maxArrivals))
           {
             'line': bus.line,
-            'dest':
-                bus.destination.isEmpty ? 'Línea ${bus.line}' : bus.destination,
+            'dest': bus.destination.isEmpty
+                ? 'Línea ${bus.line}'
+                : bus.destination,
             'clock': bus.clockTime,
             // expectedAt is on the source's clock; the widget compares
             // with the phone's
@@ -153,6 +161,8 @@ abstract final class StopWidgetsFeed {
       ],
     };
   }
+
+  static Future<void> redraw() => _redraw();
 
   static Future<void> _redraw() async {
     for (final provider in providers) {
@@ -171,23 +181,19 @@ Future<void> initStopWidgets() async {
   if (defaultTargetPlatform != TargetPlatform.android) return;
   try {
     await HomeWidget.registerInteractivityCallback(stopWidgetsCallback);
+    // Also migrates already placed widgets to the independent native schedule,
+    // before the app lock is shown.
+    await StopWidgetsFeed.redraw();
   } catch (e) {
     debugPrint('⚠️ Widget callback error: $e');
   }
 }
 
 /// Runs in a background isolate when a widget asks for data
-/// (`timbre://refresh`): fetches its stops and keeps the background check
-/// running while widgets are placed.
+/// (`timbre://refresh`). Kept for pending buttons from older APKs; new buttons
+/// use the same refresh through a WorkManager task.
 @pragma('vm:entry-point')
 Future<void> stopWidgetsCallback(Uri? uri) async {
   if (uri?.host != 'refresh') return;
   await StopWidgetsFeed.refreshShown();
-  if (await StopWidgetsFeed.hasPlacedWidgets()) {
-    try {
-      await BackgroundWorker.registerPeriodicTask();
-    } catch (e) {
-      debugPrint('⚠️ WorkManager register error: $e');
-    }
-  }
 }
