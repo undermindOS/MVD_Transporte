@@ -594,3 +594,17 @@
 
 ### Key decisions made
 - Вариант A лучше B, только если A выезжает не раньше B, приезжает не позже и не хуже по пересадкам и ходьбе.
+
+## 2026-11-01 — PR #7 и установка на телефон владельца
+
+### What was done
+- Ветка `feat/reloj-rutas` запушена, открыт PR #7 в `main`: https://github.com/undermindOS/MVD_Transporte/pull/7
+  - базу владелец не назвал; выбрана `main`, как у #6;
+  - в описании стек #5 → #6 → #7 и 22 своих коммита (онбординг, виджеты Codex, часы, места, маршруты);
+  - CI-проверок в репозитории нет.
+- Release arm64 с `--build-number 2011` (versionCode 2011 > 2010 от Codex) поставлен на Galaxy Z Flip5 владельца по беспроводному adb: `install -r`, подпись совпала, данные сохранены.
+- На телефоне стоят виджеты TimbreProximoWidget (id 68) и TimbreFlipWidget (id 70).
+- `am broadcast APPWIDGET_UPDATE` с adb на телефоне запрещён (SecurityException), поэтому виджеты перерисуются сами или при открытии приложения.
+
+### Next steps
+- Владелец смотрит на телефоне: часы Próximo, места и маршрут в Mapa.
