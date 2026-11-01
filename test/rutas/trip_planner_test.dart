@@ -48,9 +48,13 @@ void main() {
       data,
     ).plan(from: a, to: b, departAt: _wed(7, 55));
 
-    // The 08:10 and 08:20 buses arrive later with the same walking
-    expect(options, hasLength(1));
-    final trip = options.single;
+    // The 08:10 and 08:20 buses too: they leave later, for whoever misses
+    // the first one
+    expect(
+      options.map((o) => o.rideLegs.single.departure),
+      [_wed(8, 0), _wed(8, 10), _wed(8, 20)],
+    );
+    final trip = options.first;
     expect(trip.rides, 1);
     expect(trip.walkOnly, isFalse);
     expect(trip.legs, hasLength(3));

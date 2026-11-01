@@ -30,8 +30,9 @@ class TripPlanner {
   /// the first bus at least a minute after the first boarding of the
   /// fastest trip just found, until there are `maxOptions`, a search brings
   /// nothing new, or `3 × maxOptions` searches. Options another one beats
-  /// (arrives no later, with no more rides and no more walking) are
-  /// dropped.
+  /// (leaves no earlier and arrives no later, with no more rides and no
+  /// more walking) are dropped: the next bus of the same line stays, for
+  /// whoever misses the first.
   List<Itinerary> plan({
     required ({double lat, double lon}) from,
     required ({double lat, double lon}) to,
@@ -118,17 +119,21 @@ class TripPlanner {
     return a.walkMetres.compareTo(b.walkMetres);
   }
 
-  /// Drops every option another one beats: arrives no later, with no more
-  /// rides and no more walking, and is better in at least one of them.
+  /// Drops every option another one beats: leaves no earlier and arrives
+  /// no later, with no more rides and no more walking, and is better in at
+  /// least one of them. Leaving later is never worse: a later bus is what
+  /// someone who missed the first one needs.
   static List<Itinerary> _undominated(List<Itinerary> options) => [
     for (final b in options)
       if (!options.any(
         (a) =>
             !identical(a, b) &&
+            !a.start.isBefore(b.start) &&
             !a.end.isAfter(b.end) &&
             a.rides <= b.rides &&
             a.walkMetres <= b.walkMetres &&
-            (a.end.isBefore(b.end) ||
+            (a.start.isAfter(b.start) ||
+                a.end.isBefore(b.end) ||
                 a.rides < b.rides ||
                 a.walkMetres < b.walkMetres),
       ))
