@@ -12,10 +12,11 @@ versiones: [SemVer](https://semver.org/lang/es/).
   parada pasa a la siguiente. Las horas son estimadas («~20:14», nunca un conteo) y cada ómnibus desaparece un
   minuto después de su hora, sin conexión. El botón de actualizar pide los arribos sin abrir la app; con un widget
   puesto, la consulta de fondo sigue cada 15 min aunque no tengas avisos. Glifo nuevo: `refresh`.
-- «Timbre · Próximo» y «Timbre · Próximo ancho» (4 × 2) son ahora relojes: arriba, la hora en LEDs ámbar sobre
-  «88:88» de LEDs apagados, como el tablero, con el día al lado; debajo, la parada, el próximo ómnibus y los dos
-  siguientes. El reloj se mantiene solo (`TextClock`), sin consultas ni alarmas, y sigue a la vista sin paradas
-  guardadas.
+- Widgets de reloj «Timbre · Reloj» (2 × 2) y «Timbre · Reloj ancho» (4 × 2), para quien quiere la hora primero:
+  «AHORA · SÁB 1 NOV.» arriba, la hora grande y centrada en LEDs ámbar sobre «88:88» de LEDs apagados, como el
+  tablero, y debajo una línea con el próximo ómnibus y la parada. La hora se mantiene sola (`TextClock`), sin
+  consultas ni alarmas, y sigue a la vista sin paradas guardadas. «Próximo» y «Próximo ancho» siguen con los
+  ómnibus primero.
 - Lugares en el Mapa: manteniendo apretado el mapa marcás tu Casa, tu Trabajo y lugares favoritos con nombre. Se
   ven en el mapa con su glifo (casa, portafolio, estrella) y en una barra de chips arriba; se cambian de nombre o se
   olvidan desde su hoja. Quedan en el teléfono. Glifos nuevos: `home`, `work`, `star` y `walk`.
