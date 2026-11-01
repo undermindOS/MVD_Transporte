@@ -12,6 +12,10 @@ versiones: [SemVer](https://semver.org/lang/es/).
   parada pasa a la siguiente. Las horas son estimadas («~20:14», nunca un conteo) y cada ómnibus desaparece un
   minuto después de su hora, sin conexión. El botón de actualizar pide los arribos sin abrir la app; con un widget
   puesto, la consulta de fondo sigue cada 15 min aunque no tengas avisos. Glifo nuevo: `refresh`.
+- «Timbre · Próximo» y «Timbre · Próximo ancho» (4 × 2) son ahora relojes: arriba, la hora en LEDs ámbar sobre
+  «88:88» de LEDs apagados, como el tablero, con el día al lado; debajo, la parada, el próximo ómnibus y los dos
+  siguientes. El reloj se mantiene solo (`TextClock`), sin consultas ni alarmas, y sigue a la vista sin paradas
+  guardadas.
 
 - Bienvenida la primera vez que abrís la app, en el mismo tablero de LED: cuatro pasos cuentan qué hace (Mis
   paradas, Mapa, «Estoy esperando»), que no hay cuentas ni registros («Lo que guardás queda en tu teléfono, no en

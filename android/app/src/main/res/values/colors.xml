@@ -13,4 +13,8 @@
     <!-- Stop widgets: footer text, and errors -->
     <color name="tenue">#7F8FB3</color>
     <color name="rojo_led">#FF6B57</color>
+    <!-- Clock widgets: the unlit LEDs under the time (ambar at 12 %), and
+         the glow around the lit ones -->
+    <color name="reloj_apagado">#1FFFB21E</color>
+    <color name="reloj_brillo">#73FFB21E</color>
 </resources>

@@ -3,13 +3,15 @@
     <string name="app_name">Timbre MVD</string>
     <!-- Stop widgets: name and description in the widget picker -->
     <string name="widget_proximo_label">Timbre · Próximo</string>
-    <string name="widget_proximo_description">El próximo ómnibus de una parada, grande</string>
+    <string name="widget_proximo_description">Un reloj, y abajo el próximo ómnibus de una parada</string>
     <string name="widget_parada_label">Timbre · Parada</string>
     <string name="widget_parada_description">Los próximos ómnibus de una parada</string>
     <string name="widget_mis_paradas_label">Timbre · Mis paradas</string>
     <string name="widget_mis_paradas_description">Dos paradas, y accesos a Mi STM y Recarga</string>
     <string name="widget_ancho_label">Timbre · Próximo ancho</string>
-    <string name="widget_ancho_description">El próximo ómnibus, a todo el ancho y con la misma altura de Próximo</string>
+    <string name="widget_ancho_description">El reloj de Próximo a todo el ancho, con la fecha y la parada al lado</string>
     <string name="widget_flip_label">Timbre · Flip5</string>
     <string name="widget_flip_description">Tus próximos ómnibus en la pantalla exterior del Galaxy Z Flip5</string>
+    <!-- Every LED of a clock, drawn dim under the time -->
+    <string name="widget_clock_unlit" translatable="false">88:88</string>
 </resources>

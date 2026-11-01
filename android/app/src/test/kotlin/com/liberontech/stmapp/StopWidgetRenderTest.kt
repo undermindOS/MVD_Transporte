@@ -1,5 +1,6 @@
 package com.liberontech.stmapp
 
+import android.app.Activity
 import android.appwidget.AppWidgetManager
 import android.appwidget.AppWidgetProvider
 import android.content.Context
@@ -7,6 +8,8 @@ import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.view.View
 import android.view.ViewGroup
+import android.widget.FrameLayout
+import android.widget.TextClock
 import android.widget.TextView
 import androidx.work.WorkManager
 import androidx.work.Configuration
@@ -18,6 +21,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.robolectric.Robolectric
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
@@ -158,6 +162,47 @@ class StopWidgetRenderTest {
         }
     }
 
+    @Test
+    fun theClockWidgetsShowTheTimeInLedsOverUnlitOnes() {
+        for ((kind, layout, width, height, name) in listOf(
+            RenderCase(TimbreProximoWidget::class.java, R.layout.widget_stop_small, 170, 170, "reloj-proximo"),
+            RenderCase(TimbreAnchoWidget::class.java, R.layout.widget_stop_wide, 352, 170, "reloj-ancho"),
+        )) {
+            val view = render(kind, layout, width, height, name)
+            val clock = view.findViewById<TextClock>(R.id.w_clock)
+            assertEquals(View.VISIBLE, clock.visibility)
+            assertTrue(clock.text.toString(), Regex("""\d{1,2}:\d{2}""").matches(clock.text))
+            // The unlit LEDs: a full "88:88" in the same font and size, under it
+            val frame = clock.parent as FrameLayout
+            val unlit = frame.getChildAt(0) as TextView
+            assertEquals("88:88", unlit.text.toString())
+            assertEquals(clock.typeface, unlit.typeface)
+            assertEquals(clock.textSize, unlit.textSize)
+            assertTrue("the time sits right", clock.right == unlit.right)
+            // The LED mask covers both
+            assertTrue(frame.foreground != null)
+            assertTrue("the next bus", "~20:14" in texts(view))
+            assertButtonInside(view)
+        }
+    }
+
+    @Test
+    fun withNoSavedStopsTheClockStays() {
+        save("stops_saved" to "[]")
+        for ((kind, layout, width, height, name) in listOf(
+            RenderCase(TimbreProximoWidget::class.java, R.layout.widget_stop_small, 170, 170, "reloj-sin-paradas"),
+            RenderCase(TimbreAnchoWidget::class.java, R.layout.widget_stop_wide, 352, 170, "reloj-ancho-sin-paradas"),
+        )) {
+            val view = render(kind, layout, width, height, name)
+            assertEquals(View.VISIBLE, view.findViewById<View>(R.id.w_clock).visibility)
+            assertEquals(View.VISIBLE, view.findViewById<View>(R.id.w_empty).visibility)
+            assertEquals(View.GONE, view.findViewById<View>(R.id.w_board).visibility)
+            assertEquals(View.GONE, view.findViewById<View>(R.id.w_header).visibility.let {
+                if (kind == TimbreProximoWidget::class.java) View.GONE else it })
+            assertTrue(texts(view).contains("Agregá una parada en Mis paradas para verla acá."))
+        }
+    }
+
     private data class RenderCase(val kind: Class<out AppWidgetProvider>, val layout: Int,
         val width: Int, val height: Int, val name: String)
 
@@ -181,7 +226,7 @@ class StopWidgetRenderTest {
             for (line in 0 until title.lineCount) assertEquals(0, title.layout.getEllipsisCount(line))
             assertEquals(title.text.length, title.layout.getLineEnd(title.lineCount - 1))
             val refresh = view.findViewById<View>(R.id.w_refresh)
-            val position = IntArray(2); refresh.getLocationInWindow(position)
+            val position = refresh.at(view)
             assertTrue("refresh clipped", position[1] + refresh.height <= view.height)
         }
     }
@@ -191,7 +236,7 @@ class StopWidgetRenderTest {
         val view = render(TimbreAnchoWidget::class.java, R.layout.widget_stop_wide,
             352, 221, "proximo-ancho")
         val text = texts(view)
-        assertTrue(text.toString(), "SAN JOSE y ANDES" in text)
+        assertTrue(text.toString(), "SAN JOSE y ANDES · 574" in text)
         assertTrue("121" in text && "~20:14" in text)
         assertTrue(text.any { it.startsWith("538 ~20:16 · 144") })
         assertTrue(view.findViewById<View>(R.id.w_line).width >= 54 * context.resources.displayMetrics.density)
@@ -216,7 +261,7 @@ class StopWidgetRenderTest {
             val title = view.findViewById<TextView>(R.id.w_stop_name)
             for (line in 0 until title.lineCount) assertEquals(0, title.layout.getEllipsisCount(line))
             val footer = view.findViewById<View>(R.id.w_footer)
-            val at = IntArray(2); footer.getLocationInWindow(at)
+            val at = footer.at(view)
             assertTrue("footer clipped", at[1] + footer.height <= view.height - 24 * context.resources.displayMetrics.density)
             assertButtonInside(view)
         }
@@ -244,10 +289,17 @@ class StopWidgetRenderTest {
 
     private fun assertButtonInside(view: View) {
         val refresh = view.findViewById<View>(R.id.w_refresh)
-        val at = IntArray(2); refresh.getLocationInWindow(at)
+        val at = refresh.at(view)
         assertTrue("refresh clipped horizontally", at[0] >= 0 && at[0] + refresh.width <= view.width)
         assertTrue("refresh clipped vertically", at[1] >= 0 && at[1] + refresh.height <= view.height)
         assertTrue(refresh.hasOnClickListeners())
+    }
+
+    /** Where this view is inside [root], whose window may not start at 0, 0. */
+    private fun View.at(root: View): IntArray {
+        val mine = IntArray(2); getLocationInWindow(mine)
+        val its = IntArray(2); root.getLocationInWindow(its)
+        return intArrayOf(mine[0] - its[0], mine[1] - its[1])
     }
 
     /** Places the widget, lets its provider fill it and draws it at w × h dp. */
@@ -255,6 +307,11 @@ class StopWidgetRenderTest {
         val manager = shadowOf(AppWidgetManager.getInstance(context))
         val id = manager.createWidget(kind, layout)
         val view = manager.getViewFor(id)
+        // In a window, as on a home screen: a TextClock shows the time only
+        // once attached
+        Robolectric.buildActivity(Activity::class.java).setup().get()
+            .setContentView(view, ViewGroup.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT))
         val density = context.resources.displayMetrics.density
         val w = (wDp * density).toInt()
         val h = (hDp * density).toInt()

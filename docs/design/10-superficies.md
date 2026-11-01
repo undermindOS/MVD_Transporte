@@ -97,8 +97,8 @@ hay widget (ver [Plataformas](#plataformas)). Reemplazan al widget de ruta
 
 | Widget (selector) | Clase | Celdas, mínimo | Qué muestra |
 |---|---|---|---|
-| Timbre · Próximo | `TimbreProximoWidget` | 2 × 2, 140 × 140 dp | Una parada: el próximo ómnibus grande («~20:14») y los dos siguientes en una línea («538 ~20:16 · 144 ~20:17») |
-| Timbre · Próximo ancho | `TimbreAnchoWidget` | 4 × 2, 280 × 140 dp | La misma altura de Próximo, a todo el ancho: línea y destino junto a la hora grande y dos siguientes debajo |
+| Timbre · Próximo | `TimbreProximoWidget` | 2 × 2, 140 × 140 dp | Un reloj de LED con el día; debajo, una parada, el próximo ómnibus («121 ~20:14» y su destino) y los dos siguientes en una línea («538 ~20:16 · 144 ~20:17») |
+| Timbre · Próximo ancho | `TimbreAnchoWidget` | 4 × 2, 280 × 140 dp | El reloj de Próximo más grande, con la fecha y la parada al lado; debajo, línea, destino y hora del próximo ómnibus y los dos siguientes |
 | Timbre · Flip5 | `TimbreFlipWidget` | Flex Window, 352 × 339 dp | Una parada y hasta seis ómnibus en la pantalla exterior; nombre completo, actualización y última consulta |
 | Timbre · Parada | `TimbreParadaWidget` | 4 × 2, 250 × 150 dp | Una parada y sus próximos tres ómnibus, en filas |
 | Timbre · Mis paradas | `TimbreMisParadasWidget` | 4 × 4, 250 × 320 dp | Dos paradas con tres ómnibus cada una, la placa TIMBRE MVD y los accesos a Mi STM y Recarga |
@@ -113,6 +113,8 @@ Archivos:
 - `res/layout/widget_stop_small.xml`, `widget_stop_medium.xml`,
   `widget_stop_large.xml`, `widget_stop_wide.xml`, `widget_stop_cover.xml`, la fila `widget_stop_row.xml` y las vistas
   previas `*_preview.xml`; `res/xml/widget_stop_*_info.xml`.
+- `res/drawable/widget_clock_mask*.xml`: los LEDs del reloj
+  ([El reloj](#el-reloj)).
 - `lib/services/stop_widgets_feed.dart` (`StopWidgetsFeed`): escribe los
   datos y atiende el botón de actualizar.
 
@@ -147,8 +149,10 @@ abrir ni desbloquear la app. El área inferior deja 32 dp libres para el recorte
   - reloj `ambarTenue` de 13 dp y la hora «~20:14» en `papel` 18 sp.
 
   Entre filas, una línea `linea_noche` de 1 dp. En Próximo el próximo
-  ómnibus va aparte: número de 17 sp, destino en hasta dos líneas y la hora
-  en 34 sp; los dos siguientes, con sus números en `ambar`.
+  ómnibus va aparte, debajo del reloj: número de 16 sp y la hora «~20:14»
+  en 20 sp en la misma línea, y el destino abajo en 13 sp. En Próximo ancho
+  van en una línea: número de 20 sp, destino y la hora en 24 sp. Los dos
+  siguientes, en una línea, con sus números en `ambar`.
 - **Actualizar:** `refresh` en `ambar`, 18 dp dentro de un blanco táctil de
   44 dp. En Parada y Mis paradas va arriba a la derecha; en Próximo, abajo,
   para que el nombre de la parada use todo el ancho.
@@ -170,15 +174,49 @@ abrir ni desbloquear la app. El área inferior deja 32 dp libres para el recorte
   (`drawable-nodpi/widget_sin_paradas.png`, 20 dp de alto) y «Agregá una
   parada en Mis paradas para verla acá.».
 - **Letra:** la del sistema (`sans-serif-condensed`), no las fuentes de la
-  app. «SIN PARADAS» es una imagen hecha con Doto.
-- **Ámbar:** la línea, el cartel de la parada, actualizar y los LEDs. La
-  hora nunca: es una estimación ([02-color.md](02-color.md#excepciones-documentadas),
+  app. «SIN PARADAS» es una imagen hecha con Doto. Las cifras del reloj
+  son LEDs por una máscara sobre esa letra ([El reloj](#el-reloj)).
+- **Ámbar:** la línea, el cartel de la parada, actualizar, los LEDs y las
+  cifras del reloj, que muestran la hora del teléfono, no una estimación. La
+  hora de un ómnibus nunca: es una estimación ([02-color.md](02-color.md#excepciones-documentadas),
   [12-decisiones.md](12-decisiones.md#los-widgets-de-parada-encienden-la-línea-no-la-hora)).
 - **Selector de widgets** (Android 12+): `previewLayout` con datos de
   muestra de las paradas 574 y 3140 (`test/fixtures`).
 - **TalkBack:** cada fila es una frase: «Línea 121 a PUNTA CARRETAS,
   alrededor de las 20:14, estimado, accesible». El encabezado dice
   «Parada SAN JOSE y ANDES, 574. Tocá para ver otra parada».
+
+### El reloj
+
+Próximo y Próximo ancho llevan arriba un reloj de LED, como el tablero: la
+hora con LEDs encendidos en `ambar` sobre «88:88» de LEDs apagados
+(`reloj_apagado`, `ambar` al 12 %), con un brillo `reloj_brillo` (`ambar` al
+45 %, radio 10 a 12).
+
+- **Se mantiene solo:** es un `TextClock`. Android lo actualiza cada minuto
+  sin que la app haga nada, sin alarmas ni consultas, y sigue a la vista
+  aunque no haya paradas guardadas.
+- **Los LEDs:** las cifras son `sans-serif-condensed` en negrita, con una
+  máscara encima (`android:foreground` del `FrameLayout`): la tinta del
+  tablero con un agujero redondo por LED (`widget_clock_mask.xml`, paso de
+  3 dp; `widget_clock_mask_large.xml`, 4 dp; las baldosas están en
+  `drawable-xxhdpi/widget_clock_mask_cell*.png`). Los márgenes negativos
+  recortan el aire que la letra deja arriba y abajo de las cifras.
+- **Por qué no una fuente propia:** un widget no puede usar las fuentes de
+  la app. El launcher arma las `RemoteViews` en un contexto restringido, y
+  `TextView` no carga fuentes en ese contexto (`TextView.java`,
+  `TextAppearance_fontFamily`). Unas cifras de siete segmentos exigirían
+  que la app dibujara una imagen cada minuto: la hora se atrasaría al
+  prender la pantalla y gastaría batería.
+- **Formato:** «H:mm» con el reloj de 24 horas y «h:mm» con el de 12, sin
+  a. m./p. m. La hora se alinea a la derecha: en «9:05» la primera cifra queda
+  apagada, como en un reloj de verdad. Las cifras de Roboto tienen todas el
+  mismo ancho, así que «88:88» queda justo debajo.
+- **Fecha:** al lado, con el idioma del teléfono. En Próximo, el día de la
+  semana en `etiqueta` 11 sp y el número en `papel` 18 sp; en Próximo ancho,
+  «SÁBADO 31 OCT.» en `etiqueta` 12 sp, sobre la parada.
+- **Tamaño:** 42 sp en Próximo y 64 sp en Próximo ancho.
+- **TalkBack** lee la hora; «88:88» no se lee.
 
 ### Qué se toca
 

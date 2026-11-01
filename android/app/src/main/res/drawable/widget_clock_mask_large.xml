@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Laid over a clock widget's TextClock: the board's ink with a hole per
+     LED, so the time shows as lit dots, like the app's LED board. A widget
+     cannot draw its text in the app's own fonts (RemoteViews inflate in a
+     restricted context, which TextView never loads fonts in) -->
+<bitmap xmlns:android="http://schemas.android.com/apk/res/android"
+    android:src="@drawable/widget_clock_mask_cell_large"
+    android:tileMode="repeat" />
