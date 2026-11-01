@@ -541,23 +541,49 @@ Las hojas se actualizan con cada tablero mientras están abiertas:
   parada falló, «No se pudo actualizar. Revisá la conexión.» en `rojoLed`; sin ómnibus, «Sin
   ómnibus próximos».
 
+### Buscar
+
+Código: `lib/ui/place_search_page.dart` (`PlaceSearchPage`) y `lib/services/place_search.dart`
+(`PlaceSearch`).
+
+- **«Buscar una dirección o un lugar»**, una píldora `tinta` arriba del mapa, abre la búsqueda
+  como en una app de mapas. Sin escribir, ofrece tus lugares y un ejemplo: «Escribí una dirección
+  («18 de Julio 1453»), una esquina («Bulevar Artigas y Rivera») o el nombre de un lugar.».
+- **Mientras escribís** (desde 3 letras, 400 ms después de la última) llegan sugerencias de dos
+  fuentes: la Intendencia (números de puerta, esquinas, calles y lugares de interés, primero) y
+  OpenStreetMap (comercios y otros lugares). Una calle sola completa la caja con su nombre para
+  que sigas con el número o la esquina. La tecla de buscar pregunta una vez más, también a
+  Nominatim.
+- **Lo elegido** cae en el mapa con un `pin` encendido y una tarjeta abajo: el nombre, la
+  dirección, «Cómo llegar» y «Casa», «Trabajo», «Favorito» para guardarlo. Mantener apretado el
+  mapa hace lo mismo con «Punto en el mapa». Abrir un viaje cierra la tarjeta.
+- Al pie de los resultados: «Direcciones: Intendencia de Montevideo. Lugares: © OpenStreetMap.».
+
+| Estado | Qué se ve |
+|---|---|
+| Buscando | una barra de progreso fina arriba de la lista |
+| Sin resultados | «Sin resultados. Probá con la calle y el número, o una esquina.» |
+| Sin conexión o las dos fuentes caídas | «No se pudo buscar. Revisá la conexión.» |
+| Un lugar que ya no se encuentra | snack bar «No se pudo ubicar ese lugar. Probá con otro.» |
+
 ### Lugares
 
 Código: `lib/models/place.dart` (`Place`), `lib/services/places_service.dart`
 (`PlacesService`) y `lib/ui/map/places_ui.dart`.
 
-- **Mantener apretado el mapa** abre la hoja «Este punto»: «Cómo llegar acá», «Marcar como Casa»
-  (o «Mover Casa acá» si ya está), lo mismo con Trabajo, y «Guardar como favorito», que pide un
-  nombre de hasta 40 letras («Nombre del lugar», «Por ejemplo, Facultad»).
+- **Guardar** desde la tarjeta de un punto (ver «Buscar»): «Casa» y «Trabajo» reemplazan al que
+  había; «Favorito» pide un nombre de hasta 40 letras («Nombre del lugar»), con el nombre del
+  lugar ya escrito si salió de la búsqueda. Un snack bar confirma: «Casa guardada.».
 - **Una Casa y un Trabajo**, y los favoritos que quieras. Sobre el mapa, cada lugar es su glifo
   (`home`, `work`, `star`) de 16 en `ambar` sobre una baldosa `tinta` con borde `ambarTenue`, en
   un área táctil de 44; no es el cartel de parada. Tocarlo abre su hoja: «Cómo llegar», «Cambiar
   el nombre» (solo favoritos) y «Olvidar este lugar».
 - **La barra de lugares**, arriba del mapa y antes de las notas: un chip por lugar, Casa y Trabajo
   primero. Tocarlo busca el viaje hasta ahí. Casa o Trabajo sin marcar quedan apagados (`tenue`,
-  se leen «Casa, sin marcar») y al tocarlos un snack bar dice cómo marcarlos: «Mantené apretado
-  el mapa donde está tu casa y elegí «Marcar como Casa».».
-- **Se guardan en el teléfono**, en la caja de ajustes como JSON (`places`), y no salen de él.
+  se leen «Casa, sin marcar») y al tocarlos se abre la búsqueda («¿Dónde está tu casa?»): lo
+  elegido queda guardado.
+- **Se guardan en el teléfono**, en la caja de ajustes como JSON (`places`), con su dirección si
+  salieron de la búsqueda, y no salen de él. También se ven y se editan en Ajustes, «Mis lugares».
 
 ### Viajes
 
@@ -603,15 +629,22 @@ que la app no ve tu usuario ni tu saldo y que Timbre MVD no es oficial.
   pudo abrir el navegador. Revisá que tengas uno activado.»
 - Mientras Servicios está elegido, ni Mis paradas ni el Mapa se refrescan.
 
-## Info
+## Ajustes
 
-Código: `lib/ui/info_page.dart`.
+Código: `lib/ui/info_page.dart` (`InfoPage`) y `lib/ui/widgets/places_settings.dart`.
 
-Se abre con el botón «Info» de la barra. Tarjetas de arriba a abajo:
+Se abre con la rueda dentada (`gear`) de la barra, «Ajustes». Antes se llamaba Info. Tarjetas de
+arriba a abajo:
 
 1. El ícono de la app, el nombre «Timbre MVD» y el aviso «NO OFICIAL» sobre el tablero, con «No
    está afiliada con la Intendencia de Montevideo, el STM ni ninguna empresa de transporte.».
-2. El bloqueo: «Código de acceso» con su llave y, con un código, «Cambiar código» y «Desbloquear
+2. «MIS LUGARES» (`PlacesSettings`): Casa, Trabajo y los favoritos, cada uno con su dirección (o
+   «Marcado en el mapa»). Casa o Trabajo sin marcar dicen «Sin marcar · tocá para buscar la
+   dirección» y abren la búsqueda («¿Dónde está tu casa?»). Tocar un lugar marcado abre «Cambiar
+   la dirección», «Cambiar el nombre» (favoritos) y «Olvidar este lugar». «Agregar un lugar»
+   busca y después pide el nombre, con el del lugar escrito. Abajo, «CAMINAR HASTA LA PARADA»: 5,
+   10 o 15 min, lo mismo que elige el planificador.
+3. El bloqueo: «Código de acceso» con su llave y, con un código, «Cambiar código» y «Desbloquear
    con huella» con su llave (ver abajo).
 3. «FUENTE DE DATOS»: de dónde salen los tiempos de arribo, los horarios, las novedades, el
    estado del GPS y la posición de los ómnibus; de dónde sale el mapa («Mapa: © colaboradores de

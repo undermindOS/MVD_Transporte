@@ -24,6 +24,13 @@ versiones: [SemVer](https://semver.org/lang/es/).
   parada y desde ella. El viaje se calcula en el teléfono con los horarios teóricos que la Intendencia publica como
   datos abiertos (Licencia de Datos Abiertos de Uruguay), que vienen dentro de la app (`assets/rutas/`): buscar no
   hace ninguna consulta. El viaje elegido se dibuja en el mapa, con sus pasos y si el primer ómnibus viene con GPS.
+- Búsqueda de lugares como en una app de mapas: «Buscar una dirección o un lugar» arriba del Mapa sugiere mientras
+  escribís números de puerta, esquinas y lugares de interés de la Intendencia, y comercios y otros lugares de
+  OpenStreetMap (Photon; Nominatim con la tecla de buscar). Lo elegido, o un punto mantenido en el mapa, cae con un
+  alfiler y una tarjeta: «Cómo llegar», o guardarlo como Casa, Trabajo o favorito, con su dirección. Solo el texto
+  escrito sale del teléfono. Glifos nuevos: `gear` y `pin`.
+- Ajustes, «Mis lugares»: Casa, Trabajo y favoritos se agregan, se mueven por dirección, se renombran y se olvidan;
+  ahí también se elige cuánto caminar hasta la parada.
 
 - Bienvenida la primera vez que abrís la app, en el mismo tablero de LED: cuatro pasos cuentan qué hace (Mis
   paradas, Mapa, «Estoy esperando»), que no hay cuentas ni registros («Lo que guardás queda en tu teléfono, no en
@@ -209,6 +216,9 @@ versiones: [SemVer](https://semver.org/lang/es/).
 - `docs/REVIEW.md`: revisión, mapa de la API de la Intendencia de Montevideo, marco legal, propuestas.
 
 ### Cambiado
+- Info pasa a llamarse Ajustes y se abre con una rueda dentada en lugar de la «i».
+- En el Mapa, Casa o Trabajo sin marcar abren la búsqueda; mantener apretado el mapa deja un alfiler con su tarjeta
+  en lugar de la hoja «Este punto».
 - El Mapa se abre también sin paradas guardadas, con tus lugares y una nota en lugar del cartel «SIN PARADAS»; sin
   paradas no pide tableros.
 - La política de privacidad cuenta los lugares y los viajes: se guardan y se calculan en el teléfono; la ubicación

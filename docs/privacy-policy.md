@@ -29,13 +29,17 @@ ningún organismo de gobierno.
 - Tus lugares (Casa, Trabajo y favoritos) y los viajes que buscás quedan en
   el teléfono: el viaje se calcula ahí, con los horarios de la Intendencia
   que vienen dentro de la app.
+- Al buscar una dirección o un lugar, solo el texto que escribís va al
+  servicio de direcciones de la Intendencia y a los de OpenStreetMap, nunca
+  tu ubicación.
 - El mapa viene dentro de la app: mirarlo no le pide nada a ningún servidor
   de mapas, y no usa tu ubicación.
 
 ## Qué datos usa la app
 
 Las versiones de la app que se publican en las tiendas hacen todas sus
-consultas a través de nuestro servidor intermediario. Las versiones de
+consultas a través de nuestro servidor intermediario, salvo la búsqueda de
+lugares (ver «Búsqueda de lugares»). Las versiones de
 prueba compiladas sin ese servidor consultan directamente a la Intendencia;
 donde eso cambia algo, se aclara en el párrafo correspondiente.
 
@@ -110,6 +114,23 @@ de la app: buscar un viaje no hace ninguna consulta. Solo cuando abrís los
 pasos de un viaje, la app pide los arribos de la parada donde tomás el
 primer ómnibus, por su número, igual que en Mis paradas, para decirte si
 viene con GPS: esa consulta no lleva tu posición ni tu destino.
+
+**Búsqueda de lugares.** Cuando escribís en «Buscar una dirección o un
+lugar» (en el Mapa o en Mis lugares de Ajustes), la app manda solo ese texto,
+directamente y sin pasar por nuestro servidor intermediario, a:
+
+- el servicio de direcciones de la Intendencia de Montevideo
+  (`api.montevideo.gub.uy`, el mismo que usa Cómo Ir), para calles, números
+  de puerta, esquinas y lugares de interés;
+- Photon (`photon.komoot.io`, de Komoot, en Alemania), un buscador sobre
+  los datos de OpenStreetMap, para comercios y otros lugares;
+- y, solo si tocás la tecla de buscar, Nominatim
+  (`nominatim.openstreetmap.org`, de la Fundación OpenStreetMap).
+
+La búsqueda se limita a Montevideo y alrededores con un área fija: no lleva
+tu ubicación. Esos servicios reciben, como cualquier servidor, tu dirección
+IP, y la tratan según sus propias políticas. Lo que elegís queda en el
+teléfono.
 
 **Mi STM, Recarga y Cómo Ir.** Se abren en el navegador de tu teléfono,
 en los sitios oficiales. Tu usuario, contraseña, ID Uruguay o datos de pago

@@ -140,7 +140,7 @@ letra del sistema más chica no los achique.
 plantilla.
 
 **Decisión.** Íconos y letras comparten la misma grilla de puntos:
-`PixelGlyphs` (42 glifos de 12 × 12 en `lib/ui/widgets/pixel_glyphs.dart`),
+`PixelGlyphs` (44 glifos de 12 × 12 en `lib/ui/widgets/pixel_glyphs.dart`),
 dibujados por `PixelIcon`. En `lib/` no queda ningún `Icons.`.
 
 **Consecuencia.** Un ícono nuevo se dibuja en la grilla
@@ -446,6 +446,29 @@ de la hoja del viaje. Sin dirección escrita: un lugar se marca en el mapa.
 
 ## Bloqueo y bienvenida
 
+
+### La búsqueda de lugares: la Intendencia y OpenStreetMap
+
+**Contexto.** El dueño del producto pidió (2026-11-01) agregar Casa, Trabajo
+y favoritos por dirección, con una búsqueda como la de Google Maps, y que el
+viaje siga siendo solo en transporte público. Marcar en el mapa no alcanza:
+hay que poder escribir «18 de Julio 1453» o el nombre de un comercio.
+
+**Decisión.** Una búsqueda híbrida (`PlaceSearch`). La Intendencia
+(`ubicacionesRest`, el servicio de Cómo Ir, sin clave) da calles, números
+de puerta, esquinas y lugares de interés; es la que mejor conoce Montevideo y
+responde en UTM 21 sur, que la app pasa a grados. OpenStreetMap da comercios y
+otros lugares: por Photon mientras escribís, porque las reglas de Nominatim
+prohíben la búsqueda letra a letra, y por Nominatim solo con la tecla de
+buscar, una vez por segundo como mucho. Va primero la Intendencia; de
+OpenStreetMap se sacan las calles y los nombres repetidos. Un número de
+puerta se busca enseguida, y una calle que no lo tiene no se ofrece.
+
+**Consecuencia.** El texto que escribís sale del teléfono hacia tres
+servicios, directo y no por el proxy; tu ubicación no, porque la búsqueda usa un
+área fija de Montevideo. La política de privacidad lo dice. Los resultados
+llevan «© OpenStreetMap». Si una fuente cae, la otra sigue; si caen las dos, la
+búsqueda lo dice.
 ### Un código propio, con la huella de atajo
 
 **Contexto.** El bloqueo de antes era el del teléfono: el pedido del sistema

@@ -1,6 +1,6 @@
 # Íconos
 
-Un solo juego de íconos: `PixelGlyphs`, 42 glifos de 12 × 12 en
+Un solo juego de íconos: `PixelGlyphs`, 44 glifos de 12 × 12 en
 `lib/ui/widgets/pixel_glyphs.dart`, dibujados por `PixelIcon`
 (`lib/ui/widgets/pixel_icon.dart`). La app no usa los íconos de Material
 (`Icons.`), ni emoji, ni íconos de línea de otros juegos.
@@ -81,9 +81,9 @@ tiene lo que está «prendido»:
 El resto de la luz del sistema está en
 [06-luz-y-movimiento.md](06-luz-y-movimiento.md).
 
-## Los 42 glifos
+## Los 44 glifos
 
-23 se dibujaron para Timbre. Los otros 19 son de pixelarticons (Gerrit
+25 se dibujaron para Timbre. Los otros 19 son de pixelarticons (Gerrit
 Halfmann, licencia MIT), pasados a la grilla de 12 × 12; en el código
 llevan `(pixelarticons)` en su comentario. La licencia está en
 `assets/licenses/MIT-pixelarticons.txt` y se registra junto con las de las
@@ -96,7 +96,7 @@ Tamaño y color de cada uso, en ese orden.
 |---|---|---|---|
 | `bus` | Timbre | Frente de un ómnibus | Pestaña Mis paradas de la navegación (24); campo «Número de parada» de Agregar parada (20, `etiquetaCartel`); nota «Sin ómnibus próximos» de la tarjeta y de la hoja de una parada del Mapa (20, `tenue`); nota «Ahora ningún ómnibus con GPS viene a tus paradas.» sobre el mapa (20, `tenue`); ómnibus de las píldoras del Mapa (12, `tinta` encendida o `etiquetaCartel` estimada, pintado por `BusLayer`); fila «Mis paradas» de «Hola» en la bienvenida (24, `etiquetaCartel`). |
 | `streets` | Timbre | Dos calles que se cruzan y un ómnibus | Pestaña Mapa de la navegación (24); fila «Mapa» de «Hola» en la bienvenida (24, `etiquetaCartel`). |
-| `info` | Timbre | Info | Botón Info de la app bar (24, `papel`); fila «Podés cambiarlo cuando quieras en Info.» de «Listo» en la bienvenida (24, `etiquetaCartel`). |
+| `info` | Timbre | Info | Sin uso desde que Info pasó a ser Ajustes (`gear`). |
 | `stop` | Timbre | Una parada: el cartel con un ómnibus arriba del poste | Subpestaña Paradas (22); origen en la tarjeta de una ruta (14, `etiquetaCartel`); paradas cercanas y resultados por calles en Agregar parada (22, `etiquetaCartel`); campo «Parada de origen» de Agregar ruta (20, `etiquetaCartel`); paradas guardadas sobre el mapa del Mapa (16, `papel`, en una baldosa `tinta`); nota «No se pudo ubicar en el mapa…» (20, `tenue`). |
 | `clock` | Timbre | Horario | Botón Horarios de la tarjeta (24, `etiquetaCartel`); botón «Desde» de Horarios (20, `ambar`); hora de una fila sin GPS o estimada en `ArrivalRow` (14, `tenue`); hora estimada en la hoja de un ómnibus del Mapa (14, `tenue`). |
 | `bell` | Timbre | Aviso apagado | Campana de una parada o ruta sin aviso (`_AlertButton`, 24, `tenue`); «Dejar de esperar» en la hoja Estoy esperando (20, `ambar`); mosaico Avisos de Servicios (48, `ambar`, brillo). |
@@ -136,6 +136,8 @@ Tamaño y color de cada uso, en ese orden.
 | `work` | Timbre | Un portafolio | El lugar Trabajo del Mapa, como `home`. |
 | `star` | Timbre | Una estrella | Un lugar favorito del Mapa, como `home`; «Guardar como favorito» y «Cambiar el nombre» (20, `ambar`). |
 | `walk` | Timbre | Una persona caminando | Los tramos a pie de un viaje: en sus opciones (20, `etiquetaCartel`, con los minutos), en sus pasos (20, `etiquetaCartel`) y en la tarjeta de un viaje solo a pie (24, `ambar`). |
+| `gear` | Timbre | Una rueda dentada | Botón Ajustes de la app bar (24, `papel`); fila «Podés cambiarlo cuando quieras en Ajustes.» de «Listo» en la bienvenida (24, `etiquetaCartel`). |
+| `pin` | Timbre | Un alfiler de mapa | El punto encontrado o mantenido sobre el Mapa (28, `ambar`, brillo) y su tarjeta (20, `ambar`); resultados de lugares en la búsqueda (20, `etiquetaCartel`). Nunca una parada: esa es `stop`. |
 
 Las pestañas de la navegación son `ambar` con brillo cuando están
 elegidas y `tenue` cuando no; las subpestañas, `ambar` y `tenue` sin
