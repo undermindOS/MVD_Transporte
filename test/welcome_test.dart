@@ -157,7 +157,7 @@ void main() {
     expect(find.byType(LedLock), findsOneWidget);
     expect(find.text('La app pide tu código al abrirse.'), findsOneWidget);
     expect(find.text('También se abre con tu huella.'), findsOneWidget);
-    expect(find.text('Podés cambiarlo cuando quieras en Info.'),
+    expect(find.text('Podés cambiarlo cuando quieras en Ajustes.'),
         findsOneWidget);
     expect(home, findsNothing);
     await tapText(tester, 'Empezar');
@@ -182,7 +182,7 @@ void main() {
     expect(find.text('LISTO'), findsOneWidget);
     expect(find.byType(LedLock), findsNothing);
     expect(find.text('La app se abre sin código.'), findsOneWidget);
-    expect(find.text('Podés cambiarlo cuando quieras en Info.'),
+    expect(find.text('Podés cambiarlo cuando quieras en Ajustes.'),
         findsOneWidget);
     expect(find.text('La app pide tu código al abrirse.'), findsNothing);
     final lock = lockOf(tester);

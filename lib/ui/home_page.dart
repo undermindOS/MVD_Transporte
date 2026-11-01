@@ -132,8 +132,8 @@ class _HomePageState extends State<HomePage> with RouteAware {
         subtitle: _tabs[_currentIndex].subtitle,
         actions: [
           IconButton(
-            icon: const PixelIcon(PixelGlyphs.info),
-            tooltip: 'Info',
+            icon: const PixelIcon(PixelGlyphs.gear),
+            tooltip: 'Ajustes',
             onPressed: _openInfoPage,
           ),
         ],

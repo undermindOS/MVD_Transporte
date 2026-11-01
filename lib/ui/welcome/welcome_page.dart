@@ -345,8 +345,8 @@ class _WelcomePageState extends State<WelcomePage> {
         ] else
           const _Line(PixelGlyphs.unlock, text: 'La app se abre sin código.'),
         _gap,
-        const _Line(PixelGlyphs.info,
-            text: 'Podés cambiarlo cuando quieras en Info.'),
+        const _Line(PixelGlyphs.gear,
+            text: 'Podés cambiarlo cuando quieras en Ajustes.'),
         if (defaultTargetPlatform == TargetPlatform.android) ...[
           const SizedBox(height: 24),
           const WidgetRefreshOptions(),

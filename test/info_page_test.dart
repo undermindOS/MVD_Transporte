@@ -69,6 +69,9 @@ void main() {
   Future<AppLockState> pumpInfo(WidgetTester tester,
       {String? code, bool quickUnlock = false, bool olderLock = false}) async {
     usePhoneScreen(tester);
+    // Ajustes grew with Mis lugares on top: a phone twice as tall keeps
+    // every card built, so each test reaches its row without scrolling
+    tester.view.physicalSize = const Size(1170, 2532 * 2);
     if (olderLock) {
       unawaited(CacheService.set(CacheService.keyBiometricEnabled, true));
     }

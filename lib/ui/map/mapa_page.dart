@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
@@ -14,6 +15,7 @@ import '../../services/mvd_api_service.dart';
 import '../../services/official_sites.dart';
 import '../../services/places_service.dart';
 import '../../services/rutas/itinerary.dart';
+import '../place_search_page.dart';
 import '../../services/stop_locations_service.dart';
 import '../stops_page.dart';
 import '../theme/timbre_text.dart';
@@ -124,6 +126,8 @@ class _MapaPageState extends State<MapaPage> with WidgetsBindingObserver {
   List<Place> _places = const [];
   // The trip chosen in the planner, drawn until closed
   ChosenTrip? _trip;
+  // A point held on the map or found by the search, with its card
+  PickedPlace? _pinned;
 
   MapaBasemap? _basemap;
   // The one load in flight; a new one starts only after a failure
@@ -160,7 +164,7 @@ class _MapaPageState extends State<MapaPage> with WidgetsBindingObserver {
     _seen = MvdApiService.latestBoards.value;
     MvdApiService.latestBoards.addListener(_onBoards);
     _stops = CacheService.getAllStops();
-    PlacesService.load();
+    PlacesService.ensureLoaded();
     _places = PlacesService.places.value;
     PlacesService.places.addListener(_onPlaces);
     if (widget.active) _start();
@@ -429,51 +433,61 @@ class _MapaPageState extends State<MapaPage> with WidgetsBindingObserver {
     if (mounted) _changed(() => _places = PlacesService.places.value);
   }
 
-  /// A long press on the map: plan a trip to that point, or keep it.
-  void _onLongPress(LatLng point) {
-    showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      builder: (sheet) => PointSheet(
-        places: _places,
-        onAction: (action) async {
-          Navigator.pop(sheet);
-          switch (action) {
-            case PlaceAction.goHere:
-              _planTo(point, 'Este punto');
-            case PlaceAction.setCasa:
-              await PlacesService.save(
-                Place.at(
-                  PlaceKind.casa,
-                  lat: point.latitude,
-                  lon: point.longitude,
-                ),
-              );
-            case PlaceAction.setTrabajo:
-              await PlacesService.save(
-                Place.at(
-                  PlaceKind.trabajo,
-                  lat: point.latitude,
-                  lon: point.longitude,
-                ),
-              );
-            case PlaceAction.addFavorite:
-              if (!mounted) return;
-              final name = await askPlaceName(context);
-              if (name == null) return;
-              await PlacesService.save(
-                Place.at(
-                  PlaceKind.favorito,
-                  lat: point.latitude,
-                  lon: point.longitude,
-                  name: name,
-                ),
-              );
-            case PlaceAction.rename:
-            case PlaceAction.delete:
-              break;
-          }
-        },
+  /// A long press on the map drops a pin there, with its card.
+  void _onLongPress(LatLng point) => setState(() {
+    _trip = null;
+    _pinned = (
+      name: 'Punto en el mapa',
+      address: null,
+      point: (lat: point.latitude, lon: point.longitude),
+    );
+  });
+
+  /// The search page; what is picked gets the pin and the card.
+  Future<void> _search() async {
+    final picked = await Navigator.of(context).push<PickedPlace>(
+      MaterialPageRoute(builder: (_) => PlaceSearchPage(places: _places)),
+    );
+    if (picked == null || !mounted) return;
+    setState(() {
+      _trip = null;
+      _pinned = picked;
+    });
+  }
+
+  /// Keeps the pinned point as Casa, Trabajo (moving the one there was)
+  /// or a named favourite.
+  Future<void> _savePinned(PlaceKind kind) async {
+    final pinned = _pinned;
+    if (pinned == null) return;
+    String? name;
+    if (kind == PlaceKind.favorito) {
+      name = await askPlaceName(
+        context,
+        initial: pinned.address == null ? '' : pinned.name,
+      );
+      if (name == null || !mounted) return;
+    }
+    await PlacesService.save(
+      Place.at(
+        kind,
+        lat: pinned.point.lat,
+        lon: pinned.point.lon,
+        name: name,
+        address: pinned.address == null
+            ? null
+            : '${pinned.name} · ${pinned.address}',
+      ),
+    );
+    if (!mounted) return;
+    setState(() => _pinned = null);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(switch (kind) {
+          PlaceKind.casa => 'Casa guardada.',
+          PlaceKind.trabajo => 'Trabajo guardado.',
+          PlaceKind.favorito => '$name guardado en tus lugares.',
+        }),
       ),
     );
   }
@@ -496,28 +510,26 @@ class _MapaPageState extends State<MapaPage> with WidgetsBindingObserver {
               if (name != null) await PlacesService.save(place.renamed(name));
             case PlaceAction.delete:
               await PlacesService.delete(place.id);
-            case PlaceAction.setCasa:
-            case PlaceAction.setTrabajo:
-            case PlaceAction.addFavorite:
-              break;
           }
         },
       ),
     );
   }
 
-  /// Casa or Trabajo, not marked yet: how to mark it.
-  void _onMissing(PlaceKind kind) {
-    final name = kind == PlaceKind.casa ? 'tu casa' : 'tu trabajo';
-    final choice = kind == PlaceKind.casa ? 'Casa' : 'Trabajo';
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          'Mantené apretado el mapa donde está $name y elegí '
-          '«Marcar como $choice».',
+  /// Casa or Trabajo, not marked yet: the search, to mark it.
+  Future<void> _onMissing(PlaceKind kind) async {
+    final picked = await Navigator.of(context).push<PickedPlace>(
+      MaterialPageRoute(
+        builder: (_) => PlaceSearchPage(
+          hint: kind == PlaceKind.casa
+              ? '¿Dónde está tu casa?'
+              : '¿Dónde está tu trabajo?',
         ),
       ),
     );
+    if (picked == null || !mounted) return;
+    setState(() => _pinned = picked);
+    await _savePinned(kind);
   }
 
   /// The planner, from the phone or a place to [to]; the option picked is
@@ -533,7 +545,10 @@ class _MapaPageState extends State<MapaPage> with WidgetsBindingObserver {
       ),
     );
     if (chosen == null || !mounted) return;
-    setState(() => _trip = chosen);
+    setState(() {
+      _trip = chosen;
+      _pinned = null;
+    });
   }
 
   void _showSteps() {
@@ -625,6 +640,7 @@ class _MapaPageState extends State<MapaPage> with WidgetsBindingObserver {
             animate: widget.active,
             places: _places,
             trip: _trip?.trip,
+            pinned: _pinned?.point,
             onStop: _showStop,
             onBus: _showBus,
             onPlace: _onPlace,
@@ -644,6 +660,12 @@ class _MapaPageState extends State<MapaPage> with WidgetsBindingObserver {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 spacing: TimbreSpace.xs,
                 children: [
+                  Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: TimbreSpace.s,
+                    ),
+                    child: MapSearchBox(onTap: _search),
+                  ),
                   PlacesBar(
                     places: _places,
                     onPlace: (p) => _planTo(LatLng(p.lat, p.lon), p.name),
@@ -661,6 +683,25 @@ class _MapaPageState extends State<MapaPage> with WidgetsBindingObserver {
             ),
           ),
         ),
+        if (_pinned case final pinned? when _trip == null)
+          Positioned(
+            left: TimbreSpace.s,
+            right: TimbreSpace.s,
+            bottom: 28,
+            child: SafeArea(
+              top: false,
+              child: PinnedCard(
+                name: pinned.name,
+                address: pinned.address,
+                onGo: () => _planTo(
+                  LatLng(pinned.point.lat, pinned.point.lon),
+                  pinned.name,
+                ),
+                onSave: _savePinned,
+                onClose: () => setState(() => _pinned = null),
+              ),
+            ),
+          ),
         if (_trip case final trip?)
           Positioned(
             left: TimbreSpace.s,
@@ -705,6 +746,7 @@ class _MapaView extends StatefulWidget {
     required this.animate,
     required this.places,
     required this.trip,
+    required this.pinned,
     required this.onStop,
     required this.onBus,
     required this.onPlace,
@@ -728,6 +770,9 @@ class _MapaView extends StatefulWidget {
 
   /// The chosen trip, under the markers; the camera takes it in.
   final Itinerary? trip;
+
+  /// A pinned point; the camera goes to it.
+  final GeoPoint? pinned;
   final ValueChanged<Place> onPlace;
 
   /// A long press on the map, where it was.
@@ -756,7 +801,8 @@ class _MapaViewState extends State<_MapaView> {
   // come along
   static CameraFit _fit(List<BusStop> stops) => CameraFit.coordinates(
     coordinates: _points(stops),
-    padding: const EdgeInsets.all(48),
+    // The search box and the places bar cover the top
+    padding: const EdgeInsets.fromLTRB(48, 140, 48, 48),
     maxZoom: Basemap.fmZoom(15),
   );
 
@@ -793,6 +839,19 @@ class _MapaViewState extends State<_MapaView> {
   @override
   void didUpdateWidget(_MapaView oldWidget) {
     super.didUpdateWidget(oldWidget);
+    final pinned = widget.pinned;
+    if (pinned != null && pinned != oldWidget.pinned) {
+      // A point just found or held: the camera goes there
+      _moved = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted || !_ready) return;
+        _map.move(
+          LatLng(pinned.lat, pinned.lon),
+          math.max(_map.camera.zoom, Basemap.fmZoom(15)),
+        );
+      });
+      return;
+    }
     final trip = widget.trip;
     if (trip != null && trip != oldWidget.trip) {
       // A trip just chosen: the camera is the trip's, whatever came before
@@ -879,6 +938,15 @@ class _MapaViewState extends State<_MapaView> {
                   place: place,
                   onTap: () => widget.onPlace(place),
                 ),
+              ),
+            if (widget.pinned case final pinned?)
+              Marker(
+                point: LatLng(pinned.lat, pinned.lon),
+                width: 28,
+                height: 28,
+                // Above the point: the tip of the pin on it
+                alignment: Alignment.topCenter,
+                child: const PinMarker(),
               ),
           ],
         ),

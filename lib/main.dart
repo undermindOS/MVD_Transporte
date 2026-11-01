@@ -9,6 +9,7 @@ import 'services/bus_wait_service.dart';
 import 'services/cache_service.dart';
 import 'services/device_auth.dart';
 import 'services/notification_service.dart';
+import 'services/places_service.dart';
 import 'services/stop_widgets_feed.dart';
 import 'ui/app_lock.dart';
 import 'ui/home_page.dart';
@@ -19,8 +20,9 @@ void main() async {
   final binding = WidgetsFlutterBinding.ensureInitialized();
   FlutterNativeSplash.preserve(widgetsBinding: binding);
 
-
   await CacheService.init();
+  // The Mapa's places, before any screen listens to them
+  PlacesService.load();
   await NotificationService.init();
   await BackgroundWorker.init();
   // The refresh button of the stop widgets runs Dart in the background

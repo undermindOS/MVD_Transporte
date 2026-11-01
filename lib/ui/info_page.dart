@@ -14,6 +14,7 @@ import 'passcode_entry.dart';
 import 'privacy_policy_page.dart';
 import 'theme/timbre_text.dart';
 import 'theme/timbre_tokens.dart';
+import 'widgets/places_settings.dart';
 import 'widgets/led_matrix.dart';
 import 'widgets/pixel_icon.dart';
 import 'widgets/timbre_app_bar.dart';
@@ -21,7 +22,8 @@ import 'widgets/timbre_bus.dart';
 import 'widgets/widget_refresh_options.dart';
 import 'widgets/project_about_link.dart';
 
-/// About the app, and its lock: the app's code and the quick unlock. The
+/// Ajustes (the gear of the app bar): the person's places, the app's lock
+/// (its code and the quick unlock), the widgets, and about the app. The
 /// lock is read with `AppLock.of`, above the Navigator, so the card follows
 /// it also under a page of the code.
 class InfoPage extends StatefulWidget {
@@ -145,7 +147,7 @@ class _InfoPageState extends State<InfoPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       // The identity bar of the tabs, with the back arrow
-      appBar: buildTimbreAppBar(context, title: 'Info'),
+      appBar: buildTimbreAppBar(context, title: 'Ajustes'),
       body: ListView(
         padding:
             const EdgeInsets.fromLTRB(TimbreSpace.l, 14, TimbreSpace.l, 28),
@@ -242,6 +244,8 @@ class _InfoPageState extends State<InfoPage> {
               ],
             ),
           ),
+          const SizedBox(height: 12),
+          _card(padding: EdgeInsets.zero, child: const PlacesSettings()),
           const SizedBox(height: 12),
           _lockCard(AppLock.of(context)),
           const SizedBox(height: 12),

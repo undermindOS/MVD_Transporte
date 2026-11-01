@@ -144,36 +144,185 @@ class PlaceMarker extends StatelessWidget {
 }
 
 /// What a sheet about a point or a place can ask for.
-enum PlaceAction { goHere, setCasa, setTrabajo, addFavorite, rename, delete }
+enum PlaceAction { goHere, rename, delete }
 
-/// A long press on the map: plan a trip there, or keep it as a place.
-class PointSheet extends StatelessWidget {
-  const PointSheet({super.key, required this.places, required this.onAction});
+/// A point held on the map or found by the search, with what can be
+/// done with it: go there, or keep it as Casa, Trabajo or a favourite.
+/// Sits at the bottom of the Mapa, as in a map app.
+class PinnedCard extends StatelessWidget {
+  const PinnedCard({
+    super.key,
+    required this.name,
+    required this.address,
+    required this.onGo,
+    required this.onSave,
+    required this.onClose,
+  });
 
-  final List<Place> places;
-  final ValueChanged<PlaceAction> onAction;
-
-  bool _has(PlaceKind kind) => places.any((p) => p.kind == kind);
+  final String name;
+  final String? address;
+  final VoidCallback onGo;
+  final ValueChanged<PlaceKind> onSave;
+  final VoidCallback onClose;
 
   @override
   Widget build(BuildContext context) {
-    return _ActionSheet(
-      title: 'Este punto',
-      actions: [
-        (PixelGlyphs.route, 'Cómo llegar acá', PlaceAction.goHere),
-        (
-          PixelGlyphs.home,
-          _has(PlaceKind.casa) ? 'Mover Casa acá' : 'Marcar como Casa',
-          PlaceAction.setCasa,
+    return Material(
+      color: TimbreColors.tinta,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(TimbreRadii.card),
+        side: const BorderSide(color: TimbreColors.lineaNoche),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(14, 10, 4, 12),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Padding(
+                  padding: EdgeInsets.only(top: 2),
+                  child: PixelIcon(
+                    PixelGlyphs.pin,
+                    size: TimbreIconSize.row,
+                    color: TimbreColors.ambar,
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Semantics(
+                        header: true,
+                        child: Text(
+                          name,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: TimbreText.stopName,
+                        ),
+                      ),
+                      if (address case final address?)
+                        Text(
+                          address,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TimbreText.caption,
+                        ),
+                    ],
+                  ),
+                ),
+                IconButton(
+                  tooltip: 'Cerrar',
+                  onPressed: onClose,
+                  icon: const PixelIcon(PixelGlyphs.close),
+                ),
+              ],
+            ),
+            const SizedBox(height: TimbreSpace.s),
+            Padding(
+              padding: const EdgeInsets.only(right: 10),
+              child: Wrap(
+                spacing: TimbreSpace.s,
+                runSpacing: TimbreSpace.xs,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  FilledButton.icon(
+                    onPressed: onGo,
+                    icon: const PixelIcon(PixelGlyphs.route),
+                    label: const Text('Cómo llegar'),
+                  ),
+                  for (final kind in PlaceKind.values)
+                    Semantics(
+                      button: true,
+                      label: switch (kind) {
+                        PlaceKind.casa => 'Guardar como Casa',
+                        PlaceKind.trabajo => 'Guardar como Trabajo',
+                        PlaceKind.favorito => 'Guardar como favorito',
+                      },
+                      excludeSemantics: true,
+                      child: ActionChip(
+                        avatar: PixelIcon(
+                          placeGlyph(kind),
+                          size: TimbreIconSize.mark,
+                          color: TimbreColors.ambar,
+                        ),
+                        label: Text(switch (kind) {
+                          PlaceKind.casa => 'Casa',
+                          PlaceKind.trabajo => 'Trabajo',
+                          PlaceKind.favorito => 'Favorito',
+                        }),
+                        onPressed: () => onSave(kind),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ],
         ),
-        (
-          PixelGlyphs.work,
-          _has(PlaceKind.trabajo) ? 'Mover Trabajo acá' : 'Marcar como Trabajo',
-          PlaceAction.setTrabajo,
+      ),
+    );
+  }
+}
+
+/// The held or found point on the map: a lit pin.
+class PinMarker extends StatelessWidget {
+  const PinMarker({super.key});
+
+  @override
+  Widget build(BuildContext context) => const ExcludeSemantics(
+    child: PixelIcon(
+      PixelGlyphs.pin,
+      size: 28,
+      color: TimbreColors.ambar,
+      glow: true,
+    ),
+  );
+}
+
+/// The search box over the Mapa: a tap opens the search page.
+class MapSearchBox extends StatelessWidget {
+  const MapSearchBox({super.key, required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      label: 'Buscar una dirección o un lugar',
+      excludeSemantics: true,
+      child: Material(
+        color: TimbreColors.tinta,
+        shape: const StadiumBorder(
+          side: BorderSide(color: TimbreColors.lineaNoche),
         ),
-        (PixelGlyphs.star, 'Guardar como favorito', PlaceAction.addFavorite),
-      ],
-      onAction: onAction,
+        child: InkWell(
+          customBorder: const StadiumBorder(),
+          onTap: onTap,
+          child: const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            child: Row(
+              children: [
+                PixelIcon(
+                  PixelGlyphs.search,
+                  size: TimbreIconSize.row,
+                  color: TimbreColors.etiquetaCartel,
+                ),
+                SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    'Buscar una dirección o un lugar',
+                    style: TextStyle(color: TimbreColors.tenue, fontSize: 16),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

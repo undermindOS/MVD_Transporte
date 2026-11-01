@@ -186,7 +186,7 @@ void main() {
   }
 
   Future<void> openInfo(WidgetTester tester) async {
-    await tester.tap(find.byTooltip('Info'));
+    await tester.tap(find.byTooltip('Ajustes'));
     await settle(tester);
   }
 

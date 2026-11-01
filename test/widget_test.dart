@@ -68,7 +68,7 @@ void main() {
     expect(find.text('Mapa'), findsOneWidget);
     expect(find.text('Servicios'), findsOneWidget);
     expect(find.text('SIN PARADAS'), findsOneWidget);
-    expect(find.byTooltip('Info'), findsOneWidget);
+    expect(find.byTooltip('Ajustes'), findsOneWidget);
   });
 
   testWidgets('Mis paradas polls only while it is on screen',
@@ -89,7 +89,7 @@ void main() {
     expect(polling(), isTrue);
 
     // A page on top
-    await tester.tap(find.byTooltip('Info'));
+    await tester.tap(find.byTooltip('Ajustes'));
     await tester.pump();
     await tester.pump(const Duration(seconds: 1));
     expect(polling(), isFalse);
@@ -308,7 +308,7 @@ void main() {
       expect(polling(), isTrue);
 
       // A page on top
-      await tester.tap(find.byTooltip('Info'));
+      await tester.tap(find.byTooltip('Ajustes'));
       await tester.pump();
       await tester.pump(const Duration(seconds: 1));
       expect(polling(), isFalse);

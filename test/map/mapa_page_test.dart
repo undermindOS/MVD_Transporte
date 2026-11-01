@@ -334,7 +334,7 @@ void main() {
       );
       expect(buses.every((b) => b.live), isTrue);
       // The buses are paint only: the markers say it all (and the
-      // places bar, Casa and Trabajo not marked yet)
+      // search box and the places bar, Casa and Trabajo not marked yet)
       expect(
         labels(),
         unorderedEquals([
@@ -342,6 +342,7 @@ void main() {
           'Parada 3140, Av Ramon Anador y Tiburcio '
               'Gomez, 1 ómnibus con GPS en camino',
           '© OpenStreetMap',
+          'Buscar una dirección o un lugar',
           'Casa, sin marcar',
           'Trabajo, sin marcar',
         ]),

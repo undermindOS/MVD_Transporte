@@ -421,7 +421,7 @@ void main() {
   // blue surfaces as boards, the bus when a list is empty
   group('Timbre identity', () {
     for (final (name, page, title) in [
-      ('Info', _info(), 'INFO'),
+      ('Info', _info(), 'AJUSTES'),
       ('Horarios', _schedule(), 'HORARIOS'),
       ('Privacidad', const PrivacyPolicyPage(), 'PRIVACIDAD'),
     ]) {

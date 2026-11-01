@@ -16,10 +16,19 @@ abstract final class PlacesService {
   /// [load] fills it; every change here updates it.
   static final places = ValueNotifier<List<Place>>(const []);
 
+  static bool _loaded = false;
+
   /// Reads the saved places into [places].
   static void load() {
+    _loaded = true;
     final raw = CacheService.get<String>(CacheService.keyPlaces);
     places.value = _sorted(_decode(raw));
+  }
+
+  /// [load], unless it ran: a screen opening never notifies the others
+  /// while they build.
+  static void ensureLoaded() {
+    if (!_loaded) load();
   }
 
   /// Keeps [place]: a Casa or Trabajo replaces the one there was, a

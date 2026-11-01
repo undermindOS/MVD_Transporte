@@ -11,6 +11,7 @@ class Place {
     required this.name,
     required this.lat,
     required this.lon,
+    this.address,
   });
 
   /// 'casa' and 'trabajo' for those two, so there is one of each; a
@@ -23,12 +24,17 @@ class Place {
   final double lat;
   final double lon;
 
+  /// Where it is in words, when it was found by the search ("Av 18 de
+  /// Julio 1453"); null for a point held on the map.
+  final String? address;
+
   /// A new Casa or Trabajo at [lat], [lon], or a favourite called [name].
   factory Place.at(
     PlaceKind kind, {
     required double lat,
     required double lon,
     String? name,
+    String? address,
     DateTime? now,
   }) => Place(
     id: switch (kind) {
@@ -45,10 +51,28 @@ class Place {
     },
     lat: lat,
     lon: lon,
+    address: address,
   );
 
-  Place renamed(String name) =>
-      Place(id: id, kind: kind, name: name.trim(), lat: lat, lon: lon);
+  Place renamed(String name) => Place(
+    id: id,
+    kind: kind,
+    name: name.trim(),
+    lat: lat,
+    lon: lon,
+    address: address,
+  );
+
+  /// The same place, somewhere else.
+  Place movedTo({required double lat, required double lon, String? address}) =>
+      Place(
+        id: id,
+        kind: kind,
+        name: name,
+        lat: lat,
+        lon: lon,
+        address: address,
+      );
 
   Map<String, Object> toJson() => {
     'id': id,
@@ -56,6 +80,7 @@ class Place {
     'name': name,
     'lat': lat,
     'lon': lon,
+    'address': ?address,
   };
 
   /// Null for a value an older or newer app wrote in a shape this one does
@@ -82,6 +107,7 @@ class Place {
       name: name,
       lat: lat.toDouble(),
       lon: lon.toDouble(),
+      address: json['address'] is String ? json['address'] as String : null,
     );
   }
 
@@ -92,8 +118,9 @@ class Place {
       other.kind == kind &&
       other.name == name &&
       other.lat == lat &&
-      other.lon == lon;
+      other.lon == lon &&
+      other.address == address;
 
   @override
-  int get hashCode => Object.hash(id, kind, name, lat, lon);
+  int get hashCode => Object.hash(id, kind, name, lat, lon, address);
 }
