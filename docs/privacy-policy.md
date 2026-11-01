@@ -11,7 +11,7 @@
 > servidor intermediario» y la sección de seguridad de los datos de
 > `docs/store-listing.md`.
 
-**Última actualización:** 29 de octubre de 2026
+**Última actualización:** 1 de noviembre de 2026
 
 Timbre MVD es una aplicación no oficial, desarrollada por Liberon Tech,
 de Khrestenkov & Co. No es una aplicación de la Intendencia de Montevideo ni de
@@ -24,8 +24,11 @@ ningún organismo de gobierno.
 - Lo que guardás en la app queda en tu teléfono. Las consultas de la app
   pasan por nuestro servidor intermediario, que pide los datos a la
   Intendencia y no guarda datos personales.
-- Tu ubicación no sale del teléfono: las paradas cercanas se buscan en el
-  dispositivo.
+- Tu ubicación no sale del teléfono: las paradas cercanas y los viajes se
+  buscan en el dispositivo.
+- Tus lugares (Casa, Trabajo y favoritos) y los viajes que buscás quedan en
+  el teléfono: el viaje se calcula ahí, con los horarios de la Intendencia
+  que vienen dentro de la app.
 - El mapa viene dentro de la app: mirarlo no le pide nada a ningún servidor
   de mapas, y no usa tu ubicación.
 
@@ -70,8 +73,11 @@ servicios directamente: las solicitudes llegan a la Intendencia, que las
 trata según sus propias políticas, e incluyen datos técnicos como tu
 dirección IP.
 
-**Ubicación.** Solo si usás «Paradas cercanas»: la app obtiene tu ubicación
-en ese momento y busca en el teléfono las paradas que están a menos de
+**Ubicación.** Solo si usás «Paradas cercanas» o buscás un viaje desde «Tu
+ubicación» en el Mapa. Para un viaje, la app obtiene tu ubicación en ese
+momento y la usa solo en el teléfono para calcularlo (ver «Lugares y
+viajes»). Para las paradas cercanas, la app obtiene tu ubicación en ese
+momento y busca en el teléfono las paradas que están a menos de
 400 m. Para eso usa la lista de todas las paradas de Montevideo, que
 descarga de nuestro servidor intermediario sin mandar tu posición: es la
 misma para todos, queda guardada en el teléfono y se actualiza como mucho
@@ -94,6 +100,16 @@ todavía no tiene su lugar, la app la busca en la misma lista de todas las
 paradas de Montevideo, y el lugar queda guardado en el teléfono. Sin el
 servidor intermediario, le pide esa parada por su número al servicio público
 de mapas de la Intendencia (`geoserver.montevideo.gub.uy`).
+
+**Lugares y viajes.** En el Mapa podés marcar tu Casa, tu Trabajo y otros
+lugares favoritos manteniendo apretado el mapa. Quedan guardados en el
+teléfono, como tus paradas, y no se envían a nadie. Un viaje en ómnibus de
+un punto a otro se calcula en el teléfono, con los horarios teóricos de
+ómnibus que la Intendencia publica como datos abiertos y que vienen dentro
+de la app: buscar un viaje no hace ninguna consulta. Solo cuando abrís los
+pasos de un viaje, la app pide los arribos de la parada donde tomás el
+primer ómnibus, por su número, igual que en Mis paradas, para decirte si
+viene con GPS: esa consulta no lleva tu posición ni tu destino.
 
 **Mi STM, Recarga y Cómo Ir.** Se abren en el navegador de tu teléfono,
 en los sitios oficiales. Tu usuario, contraseña, ID Uruguay o datos de pago

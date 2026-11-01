@@ -1,6 +1,6 @@
 # Íconos
 
-Un solo juego de íconos: `PixelGlyphs`, 38 glifos de 12 × 12 en
+Un solo juego de íconos: `PixelGlyphs`, 42 glifos de 12 × 12 en
 `lib/ui/widgets/pixel_glyphs.dart`, dibujados por `PixelIcon`
 (`lib/ui/widgets/pixel_icon.dart`). La app no usa los íconos de Material
 (`Icons.`), ni emoji, ni íconos de línea de otros juegos.
@@ -81,9 +81,9 @@ tiene lo que está «prendido»:
 El resto de la luz del sistema está en
 [06-luz-y-movimiento.md](06-luz-y-movimiento.md).
 
-## Los 38 glifos
+## Los 42 glifos
 
-19 se dibujaron para Timbre. Los otros 19 son de pixelarticons (Gerrit
+23 se dibujaron para Timbre. Los otros 19 son de pixelarticons (Gerrit
 Halfmann, licencia MIT), pasados a la grilla de 12 × 12; en el código
 llevan `(pixelarticons)` en su comentario. La licencia está en
 `assets/licenses/MIT-pixelarticons.txt` y se registra junto con las de las
@@ -132,6 +132,10 @@ Tamaño y color de cada uso, en ese orden.
 | `bolt` | pixelarticons | Cero emisiones | Marca de confort en `ArrivalRow` y en `CartelParada` (14, `etiquetaCartel`). |
 | `signal` | pixelarticons | Calidad del GPS | Panel de GPS parcial sobre Paradas y Rutas (20, `ambar`). |
 | `refresh` | Timbre | Actualizar: un arco en el sentido del reloj con la punta a la derecha | Solo fuera de la app: el botón de los widgets de parada de Android (18, `ambar`, en `widget_ic_refresh.xml`). |
+| `home` | Timbre | Una casa | El lugar Casa del Mapa: su marca sobre el mapa (16, `ambar`, en una baldosa `tinta`), su chip (14, `ambar`; `tenue` sin marcar) y «Marcar como Casa» (20, `ambar`). |
+| `work` | Timbre | Un portafolio | El lugar Trabajo del Mapa, como `home`. |
+| `star` | Timbre | Una estrella | Un lugar favorito del Mapa, como `home`; «Guardar como favorito» y «Cambiar el nombre» (20, `ambar`). |
+| `walk` | Timbre | Una persona caminando | Los tramos a pie de un viaje: en sus opciones (20, `etiquetaCartel`, con los minutos), en sus pasos (20, `etiquetaCartel`) y en la tarjeta de un viaje solo a pie (24, `ambar`). |
 
 Las pestañas de la navegación son `ambar` con brillo cuando están
 elegidas y `tenue` cuando no; las subpestañas, `ambar` y `tenue` sin

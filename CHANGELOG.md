@@ -16,6 +16,14 @@ versiones: [SemVer](https://semver.org/lang/es/).
   «88:88» de LEDs apagados, como el tablero, con el día al lado; debajo, la parada, el próximo ómnibus y los dos
   siguientes. El reloj se mantiene solo (`TextClock`), sin consultas ni alarmas, y sigue a la vista sin paradas
   guardadas.
+- Lugares en el Mapa: manteniendo apretado el mapa marcás tu Casa, tu Trabajo y lugares favoritos con nombre. Se
+  ven en el mapa con su glifo (casa, portafolio, estrella) y en una barra de chips arriba; se cambian de nombre o se
+  olvidan desde su hoja. Quedan en el teléfono. Glifos nuevos: `home`, `work`, `star` y `walk`.
+- Viajes en ómnibus: tocá un lugar (o «Cómo llegar acá» en un punto del mapa) y la app busca cómo llegar desde tu
+  ubicación o desde otro lugar, saliendo ahora o a la hora que elijas, caminando como mucho 5, 10 o 15 min hasta la
+  parada y desde ella. El viaje se calcula en el teléfono con los horarios teóricos que la Intendencia publica como
+  datos abiertos (Licencia de Datos Abiertos de Uruguay), que vienen dentro de la app (`assets/rutas/`): buscar no
+  hace ninguna consulta. El viaje elegido se dibuja en el mapa, con sus pasos y si el primer ómnibus viene con GPS.
 
 - Bienvenida la primera vez que abrís la app, en el mismo tablero de LED: cuatro pasos cuentan qué hace (Mis
   paradas, Mapa, «Estoy esperando»), que no hay cuentas ni registros («Lo que guardás queda en tu teléfono, no en
@@ -201,6 +209,10 @@ versiones: [SemVer](https://semver.org/lang/es/).
 - `docs/REVIEW.md`: revisión, mapa de la API de la Intendencia de Montevideo, marco legal, propuestas.
 
 ### Cambiado
+- El Mapa se abre también sin paradas guardadas, con tus lugares y una nota en lugar del cartel «SIN PARADAS»; sin
+  paradas no pide tableros.
+- La política de privacidad cuenta los lugares y los viajes: se guardan y se calculan en el teléfono; la ubicación
+  solo se usa ahí, al buscar un viaje desde «Tu ubicación».
 - Info: la llave del bloqueo biométrico pasa a ser «Código de acceso», con «Cambiar código» y «Desbloquear con
   huella» (o Face ID, Touch ID) cuando hay un código; apagarlo pide el código actual. El bloqueo de antes, que era solo el
   pedido del sistema, sigue para quien lo tenía hasta que termina la bienvenida, que lo cambia por un código o lo

@@ -264,7 +264,7 @@ Código: `lib/ui/map/mapa_page.dart` y `lib/ui/map/map_sheets.dart`.
 
 | Situación | Texto | Cómo se ve |
 |---|---|---|
-| Sin paradas guardadas | cartel «SIN PARADAS», «Sin paradas guardadas» y «Agregá una parada en Mis paradas para ver acá los ómnibus con GPS que se acercan.» | `TimbreEmptyState` |
+| Sin paradas guardadas | «Agregá una parada en Mis paradas para ver acá los ómnibus con GPS que se acercan.» | nota en `tenue` con el ícono `stop`, sobre el mapa |
 | No se pudo abrir el mapa base | «No se pudo abrir el mapa. Probá de nuevo.» y el botón «Reintentar» | ícono rojo y texto `papel` |
 | Ninguna parada se pudo actualizar | «No se pudo actualizar. Revisá la conexión.» y el botón «Reintentar» | panel `avisoNoche` arriba del mapa; los últimos ómnibus quedan sin encender |
 | Ningún ómnibus con GPS viene a las paradas guardadas | «Ahora ningún ómnibus con GPS viene a tus paradas.» | nota en `tenue` con el ícono `bus` |
@@ -367,7 +367,8 @@ no se muestra nada.
 - **Cargando.** Indicadores de progreso sin texto. El único texto de espera es «Buscando
   parada…».
 - **Vacío.** Cuatro carteles de `TimbreEmptyState` (ver [08-componentes.md](08-componentes.md)).
-  El Mapa repite «SIN PARADAS» con su propio detalle (ver «Mapa», arriba):
+  El Mapa no lleva cartel: sin paradas muestra igual el mapa y tus lugares, con una nota (ver
+  «Mapa», arriba):
 
   | Cartel | Lo que escucha el lector | Detalle |
   |---|---|---|

@@ -101,6 +101,12 @@ void main() {
 
   testWidgets('Mapa is not built until opened, then kept',
       (WidgetTester tester) async {
+    // No tiles: the bundled basemap is not read inside fake async
+    MapaPage.defaultBasemapLoader = () async => MapaBasemap(
+        bounds: LatLngBounds(
+            const LatLng(-34.97, -56.80), const LatLng(-34.50, -55.70)),
+        attribution: '© OpenStreetMap');
+    addTearDown(() => MapaPage.defaultBasemapLoader = MapaBasemap.bundled);
     await tester.pumpWidget(const MiTransporteMVDApp());
     await tester.pump();
     final mapa = find.byType(MapaPage, skipOffstage: false);
@@ -108,10 +114,12 @@ void main() {
 
     await tester.tap(find.text('Mapa'));
     await tester.pump();
+    await tester.pump();
     expect(find.text('MAPA'), findsOneWidget); // the header sign
     expect(mapa, findsOneWidget);
-    // No saved stops: the sign, and no basemap
-    expect(find.text('SIN PARADAS'), findsWidgets);
+    // No saved stops: the map and the places, with a note
+    expect(find.textContaining('Agregá una parada en Mis paradas'),
+        findsOneWidget);
 
     await tester.tap(find.text('Servicios'));
     await tester.pump();

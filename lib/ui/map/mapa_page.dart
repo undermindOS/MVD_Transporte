@@ -13,6 +13,7 @@ import '../../services/map/basemap.dart';
 import '../../services/mvd_api_service.dart';
 import '../../services/official_sites.dart';
 import '../../services/places_service.dart';
+import '../../services/rutas/itinerary.dart';
 import '../../services/stop_locations_service.dart';
 import '../stops_page.dart';
 import '../theme/timbre_text.dart';
@@ -22,6 +23,7 @@ import 'bus_layer.dart';
 import 'map_buses.dart';
 import 'map_sheets.dart';
 import 'places_ui.dart';
+import 'trip_ui.dart';
 
 /// Loads what the Mapa draws under its markers.
 typedef MapaBasemapLoader = Future<MapaBasemap> Function();
@@ -120,6 +122,8 @@ class _MapaPageState extends State<MapaPage> with WidgetsBindingObserver {
 
   List<BusStop> _stops = const [];
   List<Place> _places = const [];
+  // The trip chosen in the planner, drawn until closed
+  ChosenTrip? _trip;
 
   MapaBasemap? _basemap;
   // The one load in flight; a new one starts only after a failure
@@ -516,9 +520,30 @@ class _MapaPageState extends State<MapaPage> with WidgetsBindingObserver {
     );
   }
 
-  /// Plans the trip from here to [to].
-  void _planTo(LatLng to, String name) {
-    // The planner sheet comes with the trip planner
+  /// The planner, from the phone or a place to [to]; the option picked is
+  /// drawn on the map.
+  Future<void> _planTo(LatLng to, String name) async {
+    final chosen = await showModalBottomSheet<ChosenTrip>(
+      context: context,
+      isScrollControlled: true,
+      builder: (_) => TripPlannerSheet(
+        to: (name: name, point: (lat: to.latitude, lon: to.longitude)),
+        places: _places,
+        now: MapaPage.clock,
+      ),
+    );
+    if (chosen == null || !mounted) return;
+    setState(() => _trip = chosen);
+  }
+
+  void _showSteps() {
+    final trip = _trip;
+    if (trip == null) return;
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      builder: (_) => TripStepsSheet(chosen: trip),
+    );
   }
 
   Future<void> _openCopyright() async {
@@ -599,6 +624,7 @@ class _MapaPageState extends State<MapaPage> with WidgetsBindingObserver {
             buses: buses,
             animate: widget.active,
             places: _places,
+            trip: _trip?.trip,
             onStop: _showStop,
             onBus: _showBus,
             onPlace: _onPlace,
@@ -635,6 +661,21 @@ class _MapaPageState extends State<MapaPage> with WidgetsBindingObserver {
             ),
           ),
         ),
+        if (_trip case final trip?)
+          Positioned(
+            left: TimbreSpace.s,
+            right: TimbreSpace.s,
+            // Over the attribution, which stays in sight
+            bottom: 28,
+            child: SafeArea(
+              top: false,
+              child: TripBanner(
+                chosen: trip,
+                onSteps: _showSteps,
+                onClose: () => setState(() => _trip = null),
+              ),
+            ),
+          ),
         Positioned(
           left: 0,
           bottom: 0,
@@ -663,6 +704,7 @@ class _MapaView extends StatefulWidget {
     required this.buses,
     required this.animate,
     required this.places,
+    required this.trip,
     required this.onStop,
     required this.onBus,
     required this.onPlace,
@@ -683,6 +725,9 @@ class _MapaView extends StatefulWidget {
 
   /// The person's places, drawn over the stops.
   final List<Place> places;
+
+  /// The chosen trip, under the markers; the camera takes it in.
+  final Itinerary? trip;
   final ValueChanged<Place> onPlace;
 
   /// A long press on the map, where it was.
@@ -748,6 +793,22 @@ class _MapaViewState extends State<_MapaView> {
   @override
   void didUpdateWidget(_MapaView oldWidget) {
     super.didUpdateWidget(oldWidget);
+    final trip = widget.trip;
+    if (trip != null && trip != oldWidget.trip) {
+      // A trip just chosen: the camera is the trip's, whatever came before
+      _moved = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted || !_ready) return;
+        _map.fitCamera(
+          CameraFit.coordinates(
+            coordinates: tripPoints(trip),
+            padding: const EdgeInsets.fromLTRB(48, 120, 48, 140),
+            maxZoom: Basemap.fmZoom(16),
+          ),
+        );
+      });
+      return;
+    }
     if (!_moved && !_fittedIds.containsAll(_ids)) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) _follow();
@@ -792,6 +853,7 @@ class _MapaViewState extends State<_MapaView> {
       options: _options,
       children: [
         ?layer?.call(),
+        if (widget.trip case final trip?) ...tripLayers(trip),
         MarkerLayer(
           markers: [
             for (final stop in widget.located)

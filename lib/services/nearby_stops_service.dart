@@ -57,7 +57,7 @@ class NearbyStopsService {
   /// gets the position and returns stops within [radiusMeters], nearest first.
   /// Throws [NearbyStopsException].
   static Future<List<NearbyStop>> findNearMe() async {
-    final position = await _currentPosition();
+    final position = await currentPosition();
     final stops = await fetchNearby(position.latitude, position.longitude);
     if (stops == null) {
       throw const NearbyStopsException(NearbyStopsError.network);
@@ -70,7 +70,9 @@ class NearbyStopsService {
   static Future<bool> openAppSettings() =>
       ExternalApps.open(Geolocator.openAppSettings);
 
-  static Future<Position> _currentPosition() async {
+  /// The phone's position, asking for the permission first. Throws
+  /// [NearbyStopsException]. Also the start of a trip on the Mapa.
+  static Future<Position> currentPosition() async {
     if (!await Geolocator.isLocationServiceEnabled()) {
       throw const NearbyStopsException(NearbyStopsError.serviceDisabled);
     }

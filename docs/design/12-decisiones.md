@@ -140,7 +140,7 @@ letra del sistema más chica no los achique.
 plantilla.
 
 **Decisión.** Íconos y letras comparten la misma grilla de puntos:
-`PixelGlyphs` (38 glifos de 12 × 12 en `lib/ui/widgets/pixel_glyphs.dart`),
+`PixelGlyphs` (42 glifos de 12 × 12 en `lib/ui/widgets/pixel_glyphs.dart`),
 dibujados por `PixelIcon`. En `lib/` no queda ningún `Icons.`.
 
 **Consecuencia.** Un ícono nuevo se dibuja en la grilla
@@ -394,8 +394,9 @@ por `flutter_map` y `flutter_map_vector_tiles`. No hay servidor de teselas:
 caché de la app y lee las teselas de esa copia. Encima van solo las paradas
 guardadas y los ómnibus con GPS que vienen a ellas, con la posición de
 `arrivals[].location`. Un ómnibus es uno solo aunque vaya a dos paradas: se
-reconoce por su `tripId` (`bus-{idEmpresa}-{idBus}`). El Mapa no usa la
-ubicación del teléfono.
+reconoce por su `tripId` (`bus-{idEmpresa}-{idBus}`). Mirar el mapa no usa
+la ubicación del teléfono; solo la pide un viaje desde «Tu ubicación»
+([Los viajes se calculan en el teléfono](#los-viajes-se-calculan-en-el-teléfono)).
 
 **Consecuencia.** Mover o acercar el mapa no hace pedidos, tampoco sin
 conexión. Los únicos pedidos del Mapa son los arribos de las paradas
@@ -411,6 +412,35 @@ GPS. Las etiquetas del mapa salen con la fuente del sistema, no con Fira
 toda la ciudad, y no solo los ómnibus que vienen a tus paradas, pide una ruta
 nueva del contrato (por ejemplo `/v1/buses`, con la flota que ya baja
 `ImGateway`), y espera a que el proxy esté desplegado.
+
+### Los viajes se calculan en el teléfono
+
+**Contexto.** El dueño del producto pidió llevar el Mapa a un navegador
+(2026-10-31): marcar Casa, Trabajo y lugares favoritos, y buscar un viaje
+en ómnibus entre ellos caminando como mucho 5 a 10 min hasta la parada. Se
+probaron tres fuentes de viajes. Transitous (MOTIS, sin clave) solo tiene el
+GTFS metropolitano del MTOP: líneas 2xx, 7xx y C1 a C5, sin las urbanas del
+STM, y Pocitos → Ciudad Vieja no da ningún viaje; además pide código abierto,
+uso no comercial y avisar antes de mucho tráfico. El planificador de Cómo Ir
+(`comoirRest`, sin clave, no documentado) funciona, pero recibe el origen y
+el destino de cada búsqueda. Un servidor propio (MOTIS) costaría y vería las
+posiciones.
+
+**Decisión.** El viaje se calcula en el teléfono con RAPTOR
+(`lib/services/rutas/`), sobre los horarios teóricos por parada que la
+Intendencia publica como datos abiertos (`uptu_pasada_variante`, sin clave,
+Licencia de Datos Abiertos de Uruguay), reducidos a un archivo que viene con
+la app (`assets/rutas/horarios.bin`, `tool/rutas/`). Caminar se estima en
+línea recta × 1,3 a 80 m por minuto. Los lugares se guardan en el teléfono.
+La única consulta de un viaje es la del tablero de la parada donde tomás el
+primer ómnibus, al abrir sus pasos, para decir si viene con GPS.
+
+**Consecuencia.** Buscar un viaje no manda nada a nadie y funciona sin
+conexión. Los horarios son los teóricos: no saben de desvíos ni de feriados
+(un feriado se calcula como el día de la semana que es), y el archivo
+envejece con la app: se rehace con los pasos de `tool/rutas/README.md`. La
+licencia de los datos se nombra en la página de licencias de la app y al pie
+de la hoja del viaje. Sin dirección escrita: un lugar se marca en el mapa.
 
 ---
 

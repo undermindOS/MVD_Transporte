@@ -1,0 +1,16 @@
+Horarios de ómnibus urbanos, por parada (STM)
+Transporte colectivo: paradas, puntos de control y recorridos de ómnibus
+Líneas de ómnibus, origen y destino
+
+Fuente: Intendencia de Montevideo, datos abiertos.
+https://catalogodatos.gub.uy/dataset/horarios-de-omnibus-urbanos-por-parada-stm
+https://catalogodatos.gub.uy/dataset/transporte-colectivo-paradas-puntos-de-control-y-recorridos-de-omnibus
+https://catalogodatos.gub.uy/dataset/lineas-de-omnibus-origen-y-destino
+
+Licencia de Datos Abiertos de Uruguay (Licencia de DAG de Uruguay):
+https://www.gub.uy/agencia-gobierno-electronico-sociedad-informacion-conocimiento/sites/agencia-gobierno-electronico-sociedad-informacion-conocimiento/files/documentos/publicaciones/licencia_de_datos_abiertos_0.pdf
+
+Timbre MVD usa una versión reducida y transformada de estos datos para
+calcular viajes en el teléfono (assets/rutas/horarios.bin). Los horarios son
+teóricos: los publica la Intendencia y pueden cambiar. Timbre MVD no es una
+aplicación de la Intendencia de Montevideo.

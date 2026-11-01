@@ -458,10 +458,12 @@ para el día en que empezó (`AlertSchedule.allows`).
 
 Código: `lib/ui/map/mapa_page.dart` (`MapaPage`), `lib/ui/map/bus_layer.dart` (`BusLayer`),
 `lib/ui/map/map_buses.dart` (`MapBuses`), `lib/ui/map/map_sheets.dart` (`BusSheet`,
-`StopSheet`) y el mapa base en `lib/services/map/` (`Basemap`).
+`StopSheet`), `lib/ui/map/places_ui.dart` (lugares), `lib/ui/map/trip_ui.dart` (viajes) y el
+mapa base en `lib/services/map/` (`Basemap`).
 
-Un mapa nocturno de Montevideo y alrededores con tus paradas guardadas y los ómnibus con GPS que
-vienen a ellas. La barra dice «Mapa», sin subtítulo: el lugar queda para el mapa.
+Un mapa nocturno de Montevideo y alrededores con tus paradas guardadas, los ómnibus con GPS que
+vienen a ellas y tus lugares (Casa, Trabajo y favoritos), para buscar un viaje en ómnibus entre
+ellos. La barra dice «Mapa», sin subtítulo: el lugar queda para el mapa.
 
 - **Se arma la primera vez que elegís la pestaña** y después queda armada, con la cámara donde la
   dejaste. Antes no carga ni pide nada. La primera vez que se abre en el teléfono, la app copia el
@@ -473,7 +475,8 @@ vienen a ellas. La barra dice «Mapa», sin subtítulo: el lugar queda para el m
   el centro (-34.9058, -56.1913) en el zoom 14. Las paradas se ubican de a una, así que cada
   parada que aparece después vuelve a encuadrarlas todas, hasta que movés el mapa: desde ahí la
   cámara es tuya.
-- **No usa la ubicación del teléfono.**
+- **La ubicación del teléfono** solo se pide al buscar un viaje desde «Tu ubicación», y se usa
+  en el teléfono (ver «Viajes»).
 - **Las paradas guardadas** que tienen ubicación son el glifo `stop` sobre una baldosa `tinta` de
   26 px con borde `etiquetaCartel`, sin encender, en un área táctil de 44. Tocar una abre su hoja.
 - **Los ómnibus con GPS** salen de `arrivals[].location` de los tableros de las paradas guardadas.
@@ -510,7 +513,7 @@ Los datos:
 
 | Estado | Qué se ve |
 |---|---|
-| Sin paradas guardadas | el cartel «SIN PARADAS» de `TimbreEmptyState`, «Sin paradas guardadas» y «Agregá una parada en Mis paradas para ver acá los ómnibus con GPS que se acercan.». No abre el mapa base ni pide nada |
+| Sin paradas guardadas | el mapa, la barra de lugares y la nota «Agregá una parada en Mis paradas para ver acá los ómnibus con GPS que se acercan.» con el ícono `stop`. No pide tableros |
 | Abriendo el mapa base | el indicador de progreso de 18 px, sin texto |
 | No se pudo abrir el mapa base | ícono `warning` de 24 en `rojoLed`, «No se pudo abrir el mapa. Probá de nuevo.» y el botón «Reintentar»; nunca el texto del error |
 | Con datos | las paradas y los ómnibus encendidos |
@@ -537,6 +540,54 @@ Las hojas se actualizan con cada tablero mientras están abiertas:
   esperando» se abre desde Mis paradas. Mientras no hay tablero, el indicador de carga; si la
   parada falló, «No se pudo actualizar. Revisá la conexión.» en `rojoLed`; sin ómnibus, «Sin
   ómnibus próximos».
+
+### Lugares
+
+Código: `lib/models/place.dart` (`Place`), `lib/services/places_service.dart`
+(`PlacesService`) y `lib/ui/map/places_ui.dart`.
+
+- **Mantener apretado el mapa** abre la hoja «Este punto»: «Cómo llegar acá», «Marcar como Casa»
+  (o «Mover Casa acá» si ya está), lo mismo con Trabajo, y «Guardar como favorito», que pide un
+  nombre de hasta 40 letras («Nombre del lugar», «Por ejemplo, Facultad»).
+- **Una Casa y un Trabajo**, y los favoritos que quieras. Sobre el mapa, cada lugar es su glifo
+  (`home`, `work`, `star`) de 16 en `ambar` sobre una baldosa `tinta` con borde `ambarTenue`, en
+  un área táctil de 44; no es el cartel de parada. Tocarlo abre su hoja: «Cómo llegar», «Cambiar
+  el nombre» (solo favoritos) y «Olvidar este lugar».
+- **La barra de lugares**, arriba del mapa y antes de las notas: un chip por lugar, Casa y Trabajo
+  primero. Tocarlo busca el viaje hasta ahí. Casa o Trabajo sin marcar quedan apagados (`tenue`,
+  se leen «Casa, sin marcar») y al tocarlos un snack bar dice cómo marcarlos: «Mantené apretado
+  el mapa donde está tu casa y elegí «Marcar como Casa».».
+- **Se guardan en el teléfono**, en la caja de ajustes como JSON (`places`), y no salen de él.
+
+### Viajes
+
+Código: `lib/ui/map/trip_ui.dart`, `lib/services/trip_service.dart` (`TripService`) y el
+planificador en `lib/services/rutas/` (ver [12-decisiones.md](12-decisiones.md#los-viajes-se-calculan-en-el-teléfono)).
+
+- **La hoja «Cómo llegar a Casa»**: «Desde» (Tu ubicación o uno de tus lugares), «Salir» (Ahora, o
+  una hora elegida con el reloj del sistema; una hora ya pasada es la de mañana) y «Caminar hasta»
+  5, 10 o 15 min (`TimbreSegmented`), que es lo más que caminás hasta el primer ómnibus y desde el
+  último. La elección queda guardada (`walk_minutes`, 10 de entrada).
+- **Cada opción** es una tarjeta `tinta`: «14:00 → 14:31» en `scheduleTime`, la duración, los
+  tramos en fila (el glifo `walk` con los minutos, `LineBadge` sin encender para cada ómnibus) y
+  «Caminás 700 m · 1 ómnibus». Son horarios teóricos: nada se enciende. Al pie, «Horarios teóricos
+  de la Intendencia de Montevideo (31/10)…» con la fecha de los datos.
+- **Elegida una opción**, la hoja se cierra y el mapa la dibuja: lo caminado con puntos `papel`,
+  cada ómnibus en `ambar` por sus paradas, y un círculo en las paradas donde lo tomás y lo dejás. La
+  cámara la encuadra. Abajo, una tarjeta: la línea, «A Casa», «Sale 14:05 · llegás 14:31»,
+  «Pasos» y cerrar.
+- **«Pasos»** abre la lista: «Caminá 5 min (400 m) hasta la parada 574», «Tomá el 121 a las 14:05
+  en la parada 574 · … Bajá a las 14:27 en la …», y al final si el primer ómnibus viene con GPS:
+  la app pide el tablero de esa parada, como Mis paradas, y dice «Con GPS: el 121 llega en 3 min.»
+  (glifo `bus` encendido) o «Ahora ningún 121 con GPS viene a esa parada: vale el horario.».
+
+| Estado | Qué se ve |
+|---|---|
+| Buscando | el indicador de progreso de 18 px |
+| Sin viaje | «No hay un viaje en ómnibus caminando hasta 10 min en las próximas horas. Probá caminar más o salir a otra hora.» con el ícono `bus` en `tenue` |
+| Ubicación apagada | «Prendé la ubicación del teléfono, o salí desde uno de tus lugares.» en `rojoLed` |
+| Sin permiso de ubicación | «Sin permiso de ubicación. Salí desde uno de tus lugares, o dale permiso a la app en los ajustes.» |
+| No se pudo buscar | «No se pudo buscar el viaje. Probá de nuevo.» |
 
 ## Servicios
 

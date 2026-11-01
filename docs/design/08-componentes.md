@@ -151,7 +151,6 @@ abajo el `detail` en `TimbreText.subtitle`. El lector escucha `message`.
 | Rutas | «SIN RUTAS» | «Sin rutas guardadas» | «Tocá + para guardar una alerta de salida.» | no hay rutas guardadas (Hive) |
 | Novedades | «SIN NOVEDADES» | «Sin novedades» | «Los desvíos y cambios de recorrido aparecen acá.» | /v1 `news` vacío y nada guardado |
 | Horarios | «SIN PASADAS» | «Sin pasadas para este horario» | «Probá con otro día o con una hora más temprano.» | /v1 `passes` vacío |
-| Mapa | «SIN PARADAS» | «Sin paradas guardadas» | «Agregá una parada en Mis paradas para ver acá los ómnibus con GPS que se acercan.» | no hay paradas guardadas (Hive) |
 
 En Paradas y Rutas va dentro de `_EmptyTab`, que lo centra y lo deja desplazarse con la letra más
 grande; en el Mapa, dentro de `_NoStops`, que hace lo mismo.

@@ -125,12 +125,16 @@ flutter:
     - assets/fonts/OFL-FiraSansExtraCondensed.txt
     - assets/fonts/OFL-Doto.txt
     - assets/licenses/MIT-pixelarticons.txt
+    - assets/licenses/datos-abiertos-im.txt
     # The privacy policy, shown as it is (lib/ui/privacy_policy_page.dart)
     - docs/privacy-policy.md
     # The Mapa basemap and its style, nothing else from assets/map/
     # (provenance and licences: assets/map/README.md)
     - assets/map/mvd-20261028.pmtiles
     - assets/map/style_noche.json
+    # The trip planner's timetable (lib/services/rutas/; provenance:
+    # assets/rutas/README.md)
+    - assets/rutas/horarios.bin
 
   # Timbre MVD typefaces, bundled (no runtime download): Latin subsets of
   # Fira Sans, Fira Sans Extra Condensed and a static Black instance of Doto
