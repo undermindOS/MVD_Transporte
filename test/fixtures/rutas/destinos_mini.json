@@ -1,0 +1,6 @@
+{"type":"FeatureCollection","totalFeatures":4,"features":[
+{"type":"Feature","id":"d.1","geometry":null,"properties":{"cod_variante":10,"desc_linea":"121","desc_variante":"A"}},
+{"type":"Feature","id":"d.2","geometry":null,"properties":{"cod_variante":20,"desc_linea":"D10","desc_variante":"B"}},
+{"type":"Feature","id":"d.3","geometry":null,"properties":{"cod_variante":30,"desc_linea":"CA1","desc_variante":"A"}},
+{"type":"Feature","id":"d.4","geometry":null,"properties":{"cod_variante":50,"desc_linea":"999","desc_variante":"A"}}
+]}
