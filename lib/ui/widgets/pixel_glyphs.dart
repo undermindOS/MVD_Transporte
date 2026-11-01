@@ -684,19 +684,20 @@ abstract final class PixelGlyphs {
     '..#......#..',
   ]);
 
-  /// A gear: Ajustes, in the app bar.
+  /// A gear: Ajustes, in the app bar. A round body with a hole and eight
+  /// teeth, two cells wide on the axes (an oval body read as a beetle).
   static const gear = PixelGlyph([
     '.....##.....',
-    '..#.####.#..',
+    '..#..##..#..',
     '.##########.',
+    '..########..',
     '..###..###..',
-    '.###....###.',
     '####....####',
     '####....####',
-    '.###....###.',
     '..###..###..',
+    '..########..',
     '.##########.',
-    '..#.####.#..',
+    '..#..##..#..',
     '.....##.....',
   ]);
 

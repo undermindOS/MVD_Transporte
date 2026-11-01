@@ -136,7 +136,7 @@ Tamaño y color de cada uso, en ese orden.
 | `work` | Timbre | Un portafolio | El lugar Trabajo del Mapa, como `home`. |
 | `star` | Timbre | Una estrella | Un lugar favorito del Mapa, como `home`; «Guardar como favorito» y «Cambiar el nombre» (20, `ambar`). |
 | `walk` | Timbre | Una persona caminando | Los tramos a pie de un viaje: en sus opciones (20, `etiquetaCartel`, con los minutos), en sus pasos (20, `etiquetaCartel`) y en la tarjeta de un viaje solo a pie (24, `ambar`). |
-| `gear` | Timbre | Una rueda dentada | Botón Ajustes de la app bar (24, `papel`); fila «Podés cambiarlo cuando quieras en Ajustes.» de «Listo» en la bienvenida (24, `etiquetaCartel`). |
+| `gear` | Timbre | Una rueda dentada: cuerpo redondo con agujero y ocho dientes | Botón Ajustes de la app bar (24, `papel`); fila «Podés cambiarlo cuando quieras en Ajustes.» de «Listo» en la bienvenida (24, `etiquetaCartel`). |
 | `pin` | Timbre | Un alfiler de mapa | El punto encontrado o mantenido sobre el Mapa (28, `ambar`, brillo) y su tarjeta (20, `ambar`); resultados de lugares en la búsqueda (20, `etiquetaCartel`). Nunca una parada: esa es `stop`. |
 
 Las pestañas de la navegación son `ambar` con brillo cuando están
