@@ -6,20 +6,22 @@ import 'package:latlong2/latlong.dart' show LatLng;
 
 import '../../models/arrivals_board.dart';
 import '../../models/bus_stop.dart';
+import '../../models/place.dart';
 import '../../services/api/api_result.dart';
 import '../../services/cache_service.dart';
 import '../../services/map/basemap.dart';
 import '../../services/mvd_api_service.dart';
 import '../../services/official_sites.dart';
+import '../../services/places_service.dart';
 import '../../services/stop_locations_service.dart';
 import '../stops_page.dart';
 import '../theme/timbre_text.dart';
 import '../theme/timbre_tokens.dart';
-import '../widgets/empty_state.dart';
 import '../widgets/pixel_icon.dart';
 import 'bus_layer.dart';
 import 'map_buses.dart';
 import 'map_sheets.dart';
+import 'places_ui.dart';
 
 /// Loads what the Mapa draws under its markers.
 typedef MapaBasemapLoader = Future<MapaBasemap> Function();
@@ -63,14 +65,15 @@ class MapaBasemap {
   void dispose() => _onDispose?.call();
 }
 
-/// The Mapa tab: the saved stops on the bundled basemap and the GPS buses
-/// on their way to them.
+/// The Mapa tab: the saved stops on the bundled basemap, the GPS buses on
+/// their way to them, and the person's places (Casa, Trabajo, favourites)
+/// to plan trips between.
 ///
 /// Nothing is loaded before it is first [active]: no basemap, no request.
-/// Without saved stops it shows an empty sign and loads nothing. The
-/// arrivals come from the same /v1 boards as Mis paradas
+/// Without saved stops it shows the map and the places, and asks for no
+/// board. The arrivals come from the same /v1 boards as Mis paradas
 /// ([MvdApiService.latestBoards]), polled every 30 s while it is on
-/// screen; the phone's location is never used.
+/// screen. Places stay on the phone.
 class MapaPage extends StatefulWidget {
   const MapaPage({
     super.key,
@@ -116,6 +119,7 @@ class _MapaPageState extends State<MapaPage> with WidgetsBindingObserver {
   static const _busyDefault = Duration(seconds: 60);
 
   List<BusStop> _stops = const [];
+  List<Place> _places = const [];
 
   MapaBasemap? _basemap;
   // The one load in flight; a new one starts only after a failure
@@ -152,6 +156,9 @@ class _MapaPageState extends State<MapaPage> with WidgetsBindingObserver {
     _seen = MvdApiService.latestBoards.value;
     MvdApiService.latestBoards.addListener(_onBoards);
     _stops = CacheService.getAllStops();
+    PlacesService.load();
+    _places = PlacesService.places.value;
+    PlacesService.places.addListener(_onPlaces);
     if (widget.active) _start();
   }
 
@@ -170,6 +177,7 @@ class _MapaPageState extends State<MapaPage> with WidgetsBindingObserver {
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     MvdApiService.latestBoards.removeListener(_onBoards);
+    PlacesService.places.removeListener(_onPlaces);
     _timer?.cancel();
     // The map and its tile layer are unmounted by now
     _basemap?.dispose();
@@ -213,6 +221,9 @@ class _MapaPageState extends State<MapaPage> with WidgetsBindingObserver {
 
   /// On screen again: the saved stops read again (Mis paradas may have
   /// changed them), then [_start]. The caller rebuilds.
+  ///
+  /// Without saved stops nothing polls, so [_timer] stays null and this
+  /// runs at every resume: it only loads the basemap, once.
   void _resume() {
     if (!widget.active || _inBackground || _timer != null) return;
     _stops = CacheService.getAllStops();
@@ -222,8 +233,8 @@ class _MapaPageState extends State<MapaPage> with WidgetsBindingObserver {
   /// Places the stops, draws what [MvdApiService.latestBoards] has, asks
   /// for the boards unless they are fresh, then every 30 s.
   void _start() {
-    if (_stops.isEmpty) return;
     _loadBasemap();
+    if (_stops.isEmpty) return;
     _locate();
     _refresh(unlessFresh: true);
     _timer?.cancel();
@@ -410,6 +421,106 @@ class _MapaPageState extends State<MapaPage> with WidgetsBindingObserver {
     );
   }
 
+  void _onPlaces() {
+    if (mounted) _changed(() => _places = PlacesService.places.value);
+  }
+
+  /// A long press on the map: plan a trip to that point, or keep it.
+  void _onLongPress(LatLng point) {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      builder: (sheet) => PointSheet(
+        places: _places,
+        onAction: (action) async {
+          Navigator.pop(sheet);
+          switch (action) {
+            case PlaceAction.goHere:
+              _planTo(point, 'Este punto');
+            case PlaceAction.setCasa:
+              await PlacesService.save(
+                Place.at(
+                  PlaceKind.casa,
+                  lat: point.latitude,
+                  lon: point.longitude,
+                ),
+              );
+            case PlaceAction.setTrabajo:
+              await PlacesService.save(
+                Place.at(
+                  PlaceKind.trabajo,
+                  lat: point.latitude,
+                  lon: point.longitude,
+                ),
+              );
+            case PlaceAction.addFavorite:
+              if (!mounted) return;
+              final name = await askPlaceName(context);
+              if (name == null) return;
+              await PlacesService.save(
+                Place.at(
+                  PlaceKind.favorito,
+                  lat: point.latitude,
+                  lon: point.longitude,
+                  name: name,
+                ),
+              );
+            case PlaceAction.rename:
+            case PlaceAction.delete:
+              break;
+          }
+        },
+      ),
+    );
+  }
+
+  /// A place on the map: go there, rename a favourite or forget it.
+  void _onPlace(Place place) {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      builder: (sheet) => PlaceSheet(
+        place: place,
+        onAction: (action) async {
+          Navigator.pop(sheet);
+          switch (action) {
+            case PlaceAction.goHere:
+              _planTo(LatLng(place.lat, place.lon), place.name);
+            case PlaceAction.rename:
+              if (!mounted) return;
+              final name = await askPlaceName(context, initial: place.name);
+              if (name != null) await PlacesService.save(place.renamed(name));
+            case PlaceAction.delete:
+              await PlacesService.delete(place.id);
+            case PlaceAction.setCasa:
+            case PlaceAction.setTrabajo:
+            case PlaceAction.addFavorite:
+              break;
+          }
+        },
+      ),
+    );
+  }
+
+  /// Casa or Trabajo, not marked yet: how to mark it.
+  void _onMissing(PlaceKind kind) {
+    final name = kind == PlaceKind.casa ? 'tu casa' : 'tu trabajo';
+    final choice = kind == PlaceKind.casa ? 'Casa' : 'Trabajo';
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          'Mantené apretado el mapa donde está $name y elegí '
+          '«Marcar como $choice».',
+        ),
+      ),
+    );
+  }
+
+  /// Plans the trip from here to [to].
+  void _planTo(LatLng to, String name) {
+    // The planner sheet comes with the trip planner
+  }
+
   Future<void> _openCopyright() async {
     final opened = await SystemBrowser.open(MapaPage._copyright);
     if (!opened && mounted) {
@@ -425,7 +536,6 @@ class _MapaPageState extends State<MapaPage> with WidgetsBindingObserver {
 
   @override
   Widget build(BuildContext context) {
-    if (_stops.isEmpty) return const _NoStops();
     final basemap = _basemap;
     if (basemap == null) {
       return _basemapFailed
@@ -454,7 +564,14 @@ class _MapaPageState extends State<MapaPage> with WidgetsBindingObserver {
           now.difference(board.receivedAt) < MapBuses.staleFor;
     });
     final notes = <Widget>[
-      if (_refreshFailed)
+      if (_stops.isEmpty)
+        const _MapNote(
+          icon: PixelGlyphs.stop,
+          text:
+              'Agregá una parada en Mis paradas para ver acá los ómnibus '
+              'con GPS que se acercan.',
+        )
+      else if (_refreshFailed)
         _FailedBanner(onRetry: _refresh)
       else if (located.isNotEmpty && buses.isEmpty && known)
         const _MapNote(
@@ -481,28 +598,43 @@ class _MapaPageState extends State<MapaPage> with WidgetsBindingObserver {
             liveness: liveness,
             buses: buses,
             animate: widget.active,
+            places: _places,
             onStop: _showStop,
             onBus: _showBus,
+            onPlace: _onPlace,
+            onLongPress: _onLongPress,
           ),
         ),
-        if (notes.isNotEmpty)
-          Positioned(
-            top: 0,
-            left: 0,
-            right: 0,
-            child: SafeArea(
-              bottom: false,
-              child: Padding(
-                padding: const EdgeInsets.all(TimbreSpace.s),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  spacing: TimbreSpace.xs,
-                  children: notes,
-                ),
+        Positioned(
+          top: 0,
+          left: 0,
+          right: 0,
+          child: SafeArea(
+            bottom: false,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: TimbreSpace.s),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                spacing: TimbreSpace.xs,
+                children: [
+                  PlacesBar(
+                    places: _places,
+                    onPlace: (p) => _planTo(LatLng(p.lat, p.lon), p.name),
+                    onMissing: _onMissing,
+                  ),
+                  for (final note in notes)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: TimbreSpace.s,
+                      ),
+                      child: note,
+                    ),
+                ],
               ),
             ),
           ),
+        ),
         Positioned(
           left: 0,
           bottom: 0,
@@ -530,8 +662,11 @@ class _MapaView extends StatefulWidget {
     required this.liveness,
     required this.buses,
     required this.animate,
+    required this.places,
     required this.onStop,
     required this.onBus,
+    required this.onPlace,
+    required this.onLongPress,
   });
 
   final MapaBasemap basemap;
@@ -545,6 +680,13 @@ class _MapaView extends StatefulWidget {
   final bool animate;
   final ValueChanged<BusStop> onStop;
   final ValueChanged<MapBus> onBus;
+
+  /// The person's places, drawn over the stops.
+  final List<Place> places;
+  final ValueChanged<Place> onPlace;
+
+  /// A long press on the map, where it was.
+  final ValueChanged<LatLng> onLongPress;
 
   @override
   State<_MapaView> createState() => _MapaViewState();
@@ -592,6 +734,7 @@ class _MapaViewState extends State<_MapaView> {
       ),
       backgroundColor: TimbreColors.noche,
       onTap: _onTap,
+      onLongPress: (_, point) => widget.onLongPress(point),
       onPositionChanged: (_, hasGesture) {
         if (hasGesture) _moved = true;
       },
@@ -663,6 +806,16 @@ class _MapaViewState extends State<_MapaView> {
                       .where((b) => b.etas.any((e) => e.stopId == stop.id))
                       .length,
                   onTap: () => widget.onStop(stop),
+                ),
+              ),
+            for (final place in widget.places)
+              Marker(
+                point: LatLng(place.lat, place.lon),
+                width: TimbreSpace.touch,
+                height: TimbreSpace.touch,
+                child: PlaceMarker(
+                  place: place,
+                  onTap: () => widget.onPlace(place),
                 ),
               ),
           ],
@@ -883,32 +1036,6 @@ class _FailedBanner extends StatelessWidget {
                 retry,
               ],
             ),
-    );
-  }
-}
-
-/// No saved stops: a sign with nothing to announce, scrollable so the
-/// largest fonts still fit.
-class _NoStops extends StatelessWidget {
-  const _NoStops();
-
-  @override
-  Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) => SingleChildScrollView(
-        child: ConstrainedBox(
-          constraints: BoxConstraints(minHeight: constraints.maxHeight),
-          child: const Center(
-            child: TimbreEmptyState(
-              'Sin paradas guardadas',
-              sign: 'SIN PARADAS',
-              detail:
-                  'Agregá una parada en Mis paradas para ver acá los '
-                  'ómnibus con GPS que se acercan.',
-            ),
-          ),
-        ),
-      ),
     );
   }
 }

@@ -152,15 +152,16 @@ void main() {
   }
 
   for (final scale in [1.0, 1.3, 2.0]) {
-    testWidgets('Text at ${scale}x: the empty sign fits', (tester) async {
+    testWidgets('Text at ${scale}x: the note without stops and the places '
+        'bar fit', (tester) async {
       await http.runWithClient(() async {
         await pumpMapa(tester, scale);
-        whole(tester, find.text('SIN PARADAS'), scale);
         whole(
           tester,
           find.textContaining('Agregá una parada en Mis paradas'),
           scale,
         );
+        whole(tester, find.text('Casa'), scale);
       }, () => client);
     });
 

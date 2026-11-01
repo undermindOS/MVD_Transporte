@@ -279,15 +279,14 @@ void main() {
     handle.dispose();
   });
 
-  testWidgets('without saved stops: the empty sign, no basemap, no request', (
+  testWidgets('without saved stops: the map and a note, no request', (
     tester,
   ) async {
     await http.runWithClient(() async {
       final handle = tester.ensureSemantics();
       await open(tester);
 
-      expect(find.text('SIN PARADAS'), findsOneWidget);
-      expect(find.bySemanticsLabel('Sin paradas guardadas'), findsOneWidget);
+      expect(find.byType(FlutterMap), findsOneWidget);
       expect(
         find.text(
           'Agregá una parada en Mis paradas para ver acá los '
@@ -295,9 +294,11 @@ void main() {
         ),
         findsOneWidget,
       );
-      expect(find.byType(FlutterMap), findsNothing);
+      // Casa and Trabajo, not marked yet
+      expect(find.bySemanticsLabel('Casa, sin marcar'), findsOneWidget);
+      expect(find.bySemanticsLabel('Trabajo, sin marcar'), findsOneWidget);
       await tester.pump(StopsPage.autoRefreshInterval * 3);
-      expect(loads, 0);
+      expect(loads, 1);
       expect(requests, isEmpty);
       handle.dispose();
     }, () => client);
@@ -332,7 +333,8 @@ void main() {
         unorderedEquals(['bus-50-678', 'bus-50-111']),
       );
       expect(buses.every((b) => b.live), isTrue);
-      // The buses are paint only: the markers say it all
+      // The buses are paint only: the markers say it all (and the
+      // places bar, Casa and Trabajo not marked yet)
       expect(
         labels(),
         unorderedEquals([
@@ -340,6 +342,8 @@ void main() {
           'Parada 3140, Av Ramon Anador y Tiburcio '
               'Gomez, 1 ómnibus con GPS en camino',
           '© OpenStreetMap',
+          'Casa, sin marcar',
+          'Trabajo, sin marcar',
         ]),
       );
       final shared = buses.singleWhere((b) => b.key == 'bus-50-678');

@@ -37,6 +37,11 @@ class CacheService {
   static const String keyStopCatalog = 'stop_catalog';
   static const String keyStopCatalogFetchedAt = 'stop_catalog_fetched_at';
 
+  // The Mapa's places (PlacesService): Casa, Trabajo and favourites as a
+  // JSON string, and the most minutes walked at each end of a trip
+  static const String keyPlaces = 'places';
+  static const String keyWalkMinutes = 'walk_minutes';
+
   // What the settings box holds: 2 moved the catalog out of it
   static const String _keyCacheSchema = 'cache_schema';
   static const int _cacheSchema = 2;
