@@ -1,0 +1,76 @@
+{
+  "id": 3140,
+  "fetchedAt": "2026-10-19T21:58:00.000Z",
+  "arrivals": [
+    {
+      "tripId": "bus-10-27",
+      "variantId": 4414,
+      "line": "494",
+      "destination": "DELTA DEL TIGRE",
+      "state": "live",
+      "etaMinutes": 8,
+      "expectedAt": "2026-10-19T22:06:00.000Z",
+      "clockTime": "19:06",
+      "accessible": false,
+      "airConditioning": null,
+      "zeroEmission": null,
+      "location": {"lat": -34.897755, "lng": -56.12432}
+    },
+    {
+      "tripId": "bus-50-987",
+      "variantId": 8426,
+      "line": "145",
+      "destination": "BV ARTIGAS Y BV ESPAÑA",
+      "state": "live",
+      "etaMinutes": 10,
+      "expectedAt": "2026-10-19T22:08:00.000Z",
+      "clockTime": "19:08",
+      "accessible": false,
+      "airConditioning": null,
+      "zeroEmission": null,
+      "location": {"lat": -34.87971, "lng": -56.147537}
+    },
+    {
+      "tripId": "sched-4615-1909",
+      "variantId": 4615,
+      "line": "143",
+      "destination": "CIUDADELA",
+      "state": "scheduled",
+      "etaMinutes": 11,
+      "expectedAt": "2026-10-19T22:09:00.000Z",
+      "clockTime": "19:09",
+      "accessible": false,
+      "airConditioning": null,
+      "zeroEmission": null,
+      "location": null
+    },
+    {
+      "tripId": "sched-7886-1938",
+      "variantId": 7886,
+      "line": "140",
+      "destination": "CIUDADELA",
+      "state": "scheduled",
+      "etaMinutes": 40,
+      "expectedAt": "2026-10-19T22:38:00.000Z",
+      "clockTime": "19:38",
+      "accessible": false,
+      "airConditioning": null,
+      "zeroEmission": null,
+      "location": null
+    },
+    {
+      "tripId": "sched-4512-2320",
+      "variantId": 4512,
+      "line": "495",
+      "destination": "PAJAS BLANCAS",
+      "state": "scheduled",
+      "etaMinutes": 262,
+      "expectedAt": "2026-10-20T02:20:00.000Z",
+      "clockTime": "23:20",
+      "accessible": false,
+      "airConditioning": null,
+      "zeroEmission": null,
+      "location": null
+    }
+  ]
+}

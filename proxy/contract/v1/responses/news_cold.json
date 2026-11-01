@@ -1,0 +1,85 @@
+{
+  "fetchedAt": "2026-10-27T13:23:00.000Z",
+  "news": [
+    {
+      "id": 182,
+      "title": "Traslado definitivo de cuatro paradas",
+      "summary": "Sobre Av. Rondeau, Paraguay y Gral. Aguilar",
+      "body": "Por obras viales y futura ciclovía se trasladaron definitivamente cuatro paradas: Paraguay entre Santa Fe y Entre Ríos hacia Agraciada entre Entre Ríos y San Fructuoso. Rondeau entre La Paz y Galicia hacia Av. Libertador entre La Paz y Cuareim. Paraguay entre Gral. Aguilar y Gral. Luna hacia Paraguay entre Gral. Luna y Santa Fe. Gral. Aguilar entre Paraguay y Rondeau hacia Gral. Aguilar entre Av. Agraciada y Zapicán.",
+      "link": "https://montevideo.gub.uy/node/99018",
+      "publishedAt": "2026-10-26T18:28:02.591Z"
+    },
+    {
+      "id": 181,
+      "title": "Traslado de paradas de Av. Rondeau y de Paraguay",
+      "summary": "Se trasladaron tres paradas por obras viales y construcción de ciclovía.",
+      "body": "Por obras de reparación vial de la Av. Rondeau y futura ciclovía se trasladaron paradas de: Paraguay entre Santa Fe y Entre Ríos hacia Agraciada entre Entre Ríos y San Fructuoso. Rondeau esquina Galicia hacia Av. Libertador y La Paz. Paraguay y Gral. Aguilar hacia Paraguay y Gral. Luna.",
+      "link": "https://montevideo.gub.uy/node/99018",
+      "publishedAt": "2026-10-23T17:45:48.717Z"
+    },
+    {
+      "id": 180,
+      "title": "Líneas patrimoniales",
+      "summary": "Este sábado y domingo disfrutá del Día del Patrimonio en ómnibus",
+      "body": "Este sábado 3 y domingo 4 de octubre, por el Día del Patrimonio, podés elegir entre dos propuestas de circuito (PA y PB), al costo del viaje de 1 hora ($52 con la STM y $64 en efectivo).",
+      "link": "https://montevideo.gub.uy/node/98928",
+      "publishedAt": "2026-10-02T13:37:13.228Z"
+    },
+    {
+      "id": 179,
+      "title": "Desvíos por la Marcha por la Diversidad 2026",
+      "summary": "Desvíos de transporte desde las 18 horas del viernes 25/9",
+      "body": "Este viernes 25 de septiembre a partir de las 19 horas se celebrará una nueva Marcha por la Diversidad. Conocé los desvíos de tránsito y transporte implicados.",
+      "link": "https://montevideo.gub.uy/node/98866",
+      "publishedAt": "2026-09-24T16:23:57.750Z"
+    },
+    {
+      "id": 178,
+      "title": "Desvíos por Expo Prado",
+      "summary": "Sábados 12 y 19, domingos 13 y 20 de setiembre",
+      "body": "Con motivo de la Expo Prado 2026 varias líneas de transporte modificarán su recorrido los fines de semana: los días sábado 12, domingo 13, sábado 19 y domingo 20 de setiembre, en el horario de 12 a 20 horas. Líneas G, L28, 17, 76, 125, 127, 128, 130, 137, 181, 183, 306, 370, 409, 427, 494, 526, 546, 582. Durante los días hábiles continuarán con su ruta habitual.",
+      "link": "https://montevideo.gub.uy/node/98785",
+      "publishedAt": "2026-09-11T13:39:51.812Z"
+    },
+    {
+      "id": 177,
+      "title": "Horarios especiales por feriado",
+      "summary": "Servicios feriado martes 25 de agosto",
+      "body": "Consultá los horarios del transporte urbano por el feriado del martes 25 de agosto, seleccionando la opción \"Especial 25 de agosto\". Los locales de atención por tarjetas STM que estarán abiertos son los de los shoppings Tres Cruces y Nuevo Centro únicamente, de 11:15 a 17:45 horas.",
+      "link": "https://www.montevideo.gub.uy/app/stm/horarios/",
+      "publishedAt": "2026-08-24T13:50:50.979Z"
+    },
+    {
+      "id": 176,
+      "title": "Horarios especiales por feriado",
+      "summary": "Viernes 19 de junio",
+      "body": "Consultá los horarios del transporte urbano por el feriado del viernes 19 de junio, seleccionando la opción \"Especial 19 de junio\". Estarán abiertos los locales de atención integral por tarjetas STM de: Shopping Nuevocentro y Tres Cruces (11 a 18 h) e Intercambiador Belloni (9 a 13 h).",
+      "link": "https://www.montevideo.gub.uy/app/stm/horarios/",
+      "publishedAt": "2026-06-18T16:56:27.116Z"
+    },
+    {
+      "id": 175,
+      "title": "Desvíos por rodaje internacional",
+      "summary": "Del miércoles 27 al domingo 31 de mayo",
+      "body": "Con motivo de esta cuarta semana de rodaje, desde el miércoles 27 hasta el domingo 31 de mayo habrá nuevas afectaciones del tránsito y desvíos de transporte en la zona de Plaza Independencia, entre Andes, Juncal y Liniers.",
+      "link": "https://montevideo.gub.uy/node/98156",
+      "publishedAt": "2026-05-26T15:51:35.097Z"
+    },
+    {
+      "id": 174,
+      "title": "Desvíos por Marcha del Silencio",
+      "summary": "Miércoles 20/5 desde 17 h",
+      "body": "Los cortes de tránsito comenzarán a las 15 h. A las 17 h. se cortará 18 de julio entre B. Amorín y Río Negro y empezarán los desvíos de transporte. La marcha comenzará a las 19 h desde Jackson y Rivera a Plaza Libertad. A las 18 h se cortará 18 de julio de F. Crespo a Plaza Libertad. Conocé los desvíos de cada línea",
+      "link": "https://montevideo.gub.uy/node/98116",
+      "publishedAt": "2026-05-19T20:54:32.137Z"
+    },
+    {
+      "id": 173,
+      "title": "Horarios especiales por feriado",
+      "summary": "Lunes 18 de mayo",
+      "body": "Consultá los horarios del transporte urbano por el feriado del lunes 18 de mayo, seleccionando la opción \"Especial 18 de mayo\". Estarán abiertos los locales de atención por tarjetas STM de: Shopping Nuevocentro y Tres Cruces (11:15 a 17:45 h), Paso Molino (9 a 13 h) e Intercambiador Belloni (9 a 13 h).",
+      "link": "https://www.montevideo.gub.uy/app/stm/horarios/",
+      "publishedAt": "2026-05-15T20:47:55.527Z"
+    }
+  ]
+}

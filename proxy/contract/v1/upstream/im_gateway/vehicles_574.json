@@ -1,0 +1,8 @@
+{
+  "fetchedAt": "2026-10-19T22:52:08.000Z",
+  "vehicles": {
+    "50:111": { "airConditioning": true, "zeroEmission": false },
+    "50:1118": { "airConditioning": true, "zeroEmission": false },
+    "50:139": { "airConditioning": true, "zeroEmission": true }
+  }
+}

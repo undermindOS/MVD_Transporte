@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Line number on the stop widgets: an outline in dim amber, never filled.
+     Filled amber is GPS in the app; a widget only shows estimates -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <stroke
+        android:width="1.5dp"
+        android:color="@color/ambar_tenue" />
+    <corners android:radius="8dp" />
+</shape>

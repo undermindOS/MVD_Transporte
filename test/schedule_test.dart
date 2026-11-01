@@ -103,7 +103,8 @@ void main() {
     testWidgets('network error is not "no buses"', (tester) async {
       await pump(tester, answer: (_) => null);
       await tester.pumpAndSettle();
-      expect(find.text('No se pudo cargar el horario'), findsOneWidget);
+      expect(find.text('No se pudo cargar el horario. Revisá la conexión.'),
+          findsOneWidget);
       expect(find.text('Sin pasadas para este horario'), findsNothing);
     });
   });

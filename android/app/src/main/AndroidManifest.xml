@@ -1,5 +1,5 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    package="com.example.stm_app">
+    package="com.liberontech.stmapp">
 
     <uses-permission android:name="android.permission.INTERNET"/>
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
@@ -8,13 +8,16 @@
     <uses-permission android:name="android.permission.USE_FINGERPRINT"/>
     <!-- Notifications (Android 13+) -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+    <!-- "Estoy esperando": foreground service polling one stop (dataSync) -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC"/>
     <!-- WorkManager boot restore -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
     <!-- SCHEDULE_EXACT_ALARM removed: no exact alarms are scheduled, and
          Google Play restricts it to alarm/calendar apps -->
 
     <application
-        android:label="MVD Transporte"
+        android:label="Timbre MVD"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher"
         android:usesCleartextTraffic="false">
@@ -37,17 +40,117 @@
             </intent-filter>
         </activity>
 
-        <!-- Home screen widget provider -->
+        <!-- Stop widgets: Próximo, Parada and Mis paradas (TimbreStopWidget.kt) -->
         <receiver
-            android:name=".MVDTransporteWidgetProvider"
+            android:name=".TimbreProximoWidget"
+            android:label="@string/widget_proximo_label"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE"/>
             </intent-filter>
             <meta-data
                 android:name="android.appwidget.provider"
-                android:resource="@xml/mvd_transporte_widget_info"/>
+                android:resource="@xml/widget_stop_small_info"/>
         </receiver>
+        <receiver
+            android:name=".TimbreParadaWidget"
+            android:label="@string/widget_parada_label"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE"/>
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_stop_medium_info"/>
+        </receiver>
+        <receiver
+            android:name=".TimbreMisParadasWidget"
+            android:label="@string/widget_mis_paradas_label"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE"/>
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_stop_large_info"/>
+        </receiver>
+
+        <receiver
+            android:name=".TimbreAnchoWidget"
+            android:label="@string/widget_ancho_label"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE"/>
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_stop_wide_info"/>
+        </receiver>
+        <receiver
+            android:name=".TimbreFlipWidget"
+            android:label="@string/widget_flip_label"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE"/>
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_stop_cover_info"/>
+            <meta-data
+                android:name="com.samsung.android.appwidget.provider"
+                android:resource="@xml/widget_stop_cover_samsung"/>
+        </receiver>
+        <receiver
+            android:name=".TimbreRelojWidget"
+            android:label="@string/widget_reloj_label"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE"/>
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_stop_clock_info"/>
+        </receiver>
+        <receiver
+            android:name=".TimbreRelojAnchoWidget"
+            android:label="@string/widget_reloj_ancho_label"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE"/>
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_stop_clock_wide_info"/>
+        </receiver>
+
+        <!-- The refresh button of the stop widgets runs the app's Dart code in
+             the background (home_widget's interactivity callback). Only the
+             widgets send it: not exported -->
+        <receiver
+            android:name="es.antonborri.home_widget.HomeWidgetBackgroundReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="es.antonborri.home_widget.action.BACKGROUND"/>
+            </intent-filter>
+        </receiver>
+        <service
+            android:name="es.antonborri.home_widget.HomeWidgetBackgroundService"
+            android:permission="android.permission.BIND_JOB_SERVICE"
+            android:exported="false"/>
+
+        <!-- "Estoy esperando" (flutter_foreground_task; the name is fixed).
+             Started only by a tap, stops when the bus is close, after the
+             trip passes or after 60 min. -->
+        <service
+            android:name="com.pravera.flutter_foreground_task.service.ForegroundService"
+            android:foregroundServiceType="dataSync"
+            android:exported="false"/>
+
+        <!-- Status bar icon of the "Estoy esperando" notification
+             (NotificationIcon in BusWaitService) -->
+        <meta-data
+            android:name="com.liberontech.stmapp.NOTIFICATION_ICON"
+            android:resource="@drawable/ic_stat_timbre" />
 
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->

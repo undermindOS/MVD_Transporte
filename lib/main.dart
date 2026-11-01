@@ -1,46 +1,87 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 import 'package:flutter_native_splash/flutter_native_splash.dart';
 
 import 'services/background_worker.dart';
+import 'services/bus_wait_service.dart';
 import 'services/cache_service.dart';
+import 'services/device_auth.dart';
 import 'services/notification_service.dart';
+import 'services/places_service.dart';
+import 'services/stop_widgets_feed.dart';
+import 'ui/app_lock.dart';
 import 'ui/home_page.dart';
+import 'ui/theme/timbre_theme.dart';
+import 'ui/welcome/welcome_gate.dart';
 
 void main() async {
   final binding = WidgetsFlutterBinding.ensureInitialized();
   FlutterNativeSplash.preserve(widgetsBinding: binding);
 
-
   await CacheService.init();
+  // The Mapa's places, before any screen listens to them
+  PlacesService.load();
   await NotificationService.init();
   await BackgroundWorker.init();
+  // The refresh button of the stop widgets runs Dart in the background
+  await initStopWidgets();
+  // "Estoy esperando": messages from the Android service isolate
+  FlutterForegroundTask.initCommunicationPort();
+  await BusWaitService.init();
+
+  _registerFontLicenses();
 
   FlutterNativeSplash.remove();
   runApp(const MiTransporteMVDApp());
 }
 
+/// Fira and Doto (SIL OFL 1.1), part of the pixel icons (pixelarticons,
+/// MIT) and the IM's open bus timetable ship inside the app: their licenses
+/// show up in the system license page next to the packages.
+void _registerFontLicenses() {
+  LicenseRegistry.addLicense(() async* {
+    for (final (name, file) in const [
+      ('Fira Sans', 'fonts/OFL-FiraSans.txt'),
+      ('Fira Sans Extra Condensed', 'fonts/OFL-FiraSansExtraCondensed.txt'),
+      ('Doto', 'fonts/OFL-Doto.txt'),
+      ('pixelarticons', 'licenses/MIT-pixelarticons.txt'),
+      // The timetable of the trip planner (assets/rutas/horarios.bin)
+      ('Intendencia de Montevideo', 'licenses/datos-abiertos-im.txt'),
+    ]) {
+      final text = await rootBundle.loadString('assets/$file');
+      yield LicenseEntryWithLineBreaks([name], text);
+    }
+  });
+}
+
 class MiTransporteMVDApp extends StatelessWidget {
-  const MiTransporteMVDApp({super.key});
+  const MiTransporteMVDApp({
+    super.key,
+    this.deviceAuth = const LocalDeviceAuth(),
+  });
+
+  /// The system authentication prompt of the biometric lock.
+  final DeviceAuth deviceAuth;
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'MVD Transporte',
+      title: 'Timbre MVD',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        primaryColor: const Color(0xFF0066CC),
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF0066CC),
-          primary: const Color(0xFF0066CC),
-          secondary: const Color(0xFF0099FF),
-        ),
-        navigationBarTheme: const NavigationBarThemeData(
-          indicatorColor: Color(0x330066CC),
-        ),
-        scaffoldBackgroundColor: Colors.white,
-        useMaterial3: true,
-      ),
-      home: const HomePage(),
+      theme: buildTimbreTheme(),
+      navigatorObservers: [
+        // Tells Mis paradas when a page covers it, so it stops polling
+        HomePage.routeObserver,
+        // Back closes nothing while the app is locked
+        AppLock.routeGuard,
+      ],
+      // The lock covers the Navigator: every page, sheet and dialog
+      builder: (context, child) =>
+          AppLock(deviceAuth: deviceAuth, child: child!),
+      // The welcome until «Empezar», under the lock; then the app
+      home: const WelcomeGate(child: HomePage()),
     );
   }
 }

@@ -1,40 +1,136 @@
-# Política de privacidad — MVD Transporte
+# Política de privacidad — Timbre MVD
 
 > Borrador. Revisarlo con un asesor legal y actualizar la fecha antes de
 > publicarlo. Las tiendas piden una URL pública (por ejemplo GitHub Pages) y
-> Google Play también un enlace dentro de la app.
+> Google Play también un enlace dentro de la app. Revisar con el asesor el
+> uso de Cloudflare (servidores fuera de Uruguay) según la Ley N° 18.331.
+>
+> Esta política da por hecho que las versiones de las tiendas se compilan
+> con `MVD_PROXY_URL`, o sea, que usan el servidor intermediario (`proxy/`).
+> Si se publica una versión sin él, revisá los párrafos que dicen «sin el
+> servidor intermediario» y la sección de seguridad de los datos de
+> `docs/store-listing.md`.
 
-**Última actualización:** [fecha]
+**Última actualización:** 1 de noviembre de 2026
 
-MVD Transporte es una aplicación no oficial, desarrollada por undermindOS /
-Liberon.tech. No es una aplicación de la Intendencia de Montevideo ni de
+Timbre MVD es una aplicación no oficial, desarrollada por Liberon Tech,
+de Khrestenkov & Co. No es una aplicación de la Intendencia de Montevideo ni de
 ningún organismo de gobierno.
 
 ## Resumen
 
 - No tenés que crear una cuenta.
 - No usamos publicidad, analíticas ni rastreo.
-- Lo que guardás en la app queda en tu teléfono; no tenemos servidores que
-  reciban tus datos.
+- Lo que guardás en la app queda en tu teléfono. Las consultas de la app
+  pasan por nuestro servidor intermediario, que pide los datos a la
+  Intendencia y no guarda datos personales.
+- Tu ubicación no sale del teléfono: las paradas cercanas y los viajes se
+  buscan en el dispositivo.
+- Tus lugares (Casa, Trabajo y favoritos) y los viajes que buscás quedan en
+  el teléfono: el viaje se calcula ahí, con los horarios de la Intendencia
+  que vienen dentro de la app.
+- Al buscar una dirección o un lugar, solo el texto que escribís va al
+  servicio de direcciones de la Intendencia y a los de OpenStreetMap, nunca
+  tu ubicación.
+- El mapa viene dentro de la app: mirarlo no le pide nada a ningún servidor
+  de mapas, y no usa tu ubicación.
 
 ## Qué datos usa la app
 
+Las versiones de la app que se publican en las tiendas hacen todas sus
+consultas a través de nuestro servidor intermediario, salvo la búsqueda de
+lugares (ver «Búsqueda de lugares»). Las versiones de
+prueba compiladas sin ese servidor consultan directamente a la Intendencia;
+donde eso cambia algo, se aclara en el párrafo correspondiente.
+
 **Paradas, rutas y preferencias.** Los números de parada, rutas y líneas
-que guardás, y la configuración del bloqueo biométrico, se almacenan solo en
-tu dispositivo. Se borran al eliminar los datos de la app o desinstalarla.
+que guardás, y la configuración del bloqueo, se guardan en tu teléfono, no en
+servidores nuestros. Si elegís un código para abrir la app, se guarda en el
+teléfono solo como un hash con sal: la app no guarda las cifras. Si tenés
+activada la copia de seguridad del teléfono (la de Google en Android, iCloud
+en iPhone), el sistema puede incluir estos datos en esa copia, que es tuya y
+nosotros no vemos, y devolverlos si la restaurás. Al eliminar los datos de la
+app o desinstalarla, se borran del teléfono.
 
-**Consultas a la Intendencia de Montevideo.** Para mostrar tiempos de
-arribo, horarios, nombres de paradas, novedades y el estado de los datos
-GPS, la app consulta los servicios públicos de la Intendencia
-(`api.montevideo.gub.uy`, `pci.montevideo.gub.uy`), enviando como mucho el
-número de parada. Esas
-solicitudes llegan directamente a la Intendencia, que las trata según sus
-propias políticas; incluyen datos técnicos como tu dirección IP.
+**Tiempos de arribo, horarios y paradas.** La app los pide a un servidor
+intermediario de Timbre MVD, alojado en Cloudflare, que a su vez consulta
+los servicios públicos de la Intendencia (`api.montevideo.gub.uy`,
+`geoserver.montevideo.gub.uy`) y agrega datos públicos del ómnibus, como si
+tiene aire acondicionado o es de cero emisiones. Ese servidor recibe el
+número de parada y datos técnicos de la conexión, como tu dirección IP. Usa
+la IP solo para limitar la cantidad de consultas por minuto y evitar abusos;
+no la guarda ni la asocia con otros datos, y a la Intendencia no le llega tu
+IP sino la del servidor. El servidor no lleva un registro de las consultas:
+lo único que anota son avisos de error fijos, como «transporteRest: HTTP
+500», sin la dirección que pidió la app, sin números de parada y sin tu IP.
+Cloudflare actúa como proveedor de alojamiento. Sin el servidor
+intermediario, la app consulta directamente `api.montevideo.gub.uy`, y a la
+Intendencia le llegan el número de parada y tu IP.
 
-**Ubicación.** Solo si usás «Paradas cercanas»: la app obtiene tu ubicación
-en ese momento y envía un área aproximada al servicio público de mapas de la
-Intendencia para encontrar paradas. No guardamos tu ubicación ni la
-recibimos. Podés negar el permiso; el resto de la app sigue funcionando.
+**Novedades y estado de los datos GPS.** También pasan por nuestro servidor
+intermediario, que los pide a los servicios públicos de la Intendencia
+(`api.montevideo.gub.uy`, `pci.montevideo.gub.uy`). Son consultas iguales
+para todos, sin ningún dato tuyo; el servidor no guarda datos personales ni
+registra las consultas ni tu IP, y a la Intendencia le llega la IP del
+servidor, no la tuya. Sin el servidor intermediario, la app consulta esos
+servicios directamente: las solicitudes llegan a la Intendencia, que las
+trata según sus propias políticas, e incluyen datos técnicos como tu
+dirección IP.
+
+**Ubicación.** Solo si usás «Paradas cercanas» o buscás un viaje desde «Tu
+ubicación» en el Mapa. Para un viaje, la app obtiene tu ubicación en ese
+momento y la usa solo en el teléfono para calcularlo (ver «Lugares y
+viajes»). Para las paradas cercanas, la app obtiene tu ubicación en ese
+momento y busca en el teléfono las paradas que están a menos de
+400 m. Para eso usa la lista de todas las paradas de Montevideo, que
+descarga de nuestro servidor intermediario sin mandar tu posición: es la
+misma para todos, queda guardada en el teléfono y se actualiza como mucho
+una vez por día (si llega sin las líneas de cada parada, se vuelve a pedir a
+los 15 minutos). Tu ubicación no sale del dispositivo: no la
+recibimos nosotros ni la Intendencia. Sin el servidor intermediario, la app
+envía al servicio público de mapas de la Intendencia
+(`geoserver.montevideo.gub.uy`) un área de unos 950 m de lado alrededor de
+tu posición redondeada a tres decimales (unos 110 m), nunca la posición
+exacta, y elige las paradas cercanas en el teléfono. No guardamos tu
+ubicación. Podés negar el permiso; el resto de la app sigue funcionando.
+
+**Mapa.** El mapa de la pestaña Mapa viene dentro de la app, con datos de
+OpenStreetMap: moverlo o acercarlo no hace ninguna consulta. Muestra tus
+paradas guardadas y los ómnibus con GPS que se acercan a ellas, con la
+posición que la Intendencia publica para cada ómnibus y que la app recibe
+junto con los tiempos de arribo, en la misma consulta por número de parada.
+El mapa no usa tu ubicación. Para poner en el mapa una parada guardada que
+todavía no tiene su lugar, la app la busca en la misma lista de todas las
+paradas de Montevideo, y el lugar queda guardado en el teléfono. Sin el
+servidor intermediario, le pide esa parada por su número al servicio público
+de mapas de la Intendencia (`geoserver.montevideo.gub.uy`).
+
+**Lugares y viajes.** En el Mapa podés marcar tu Casa, tu Trabajo y otros
+lugares favoritos manteniendo apretado el mapa. Quedan guardados en el
+teléfono, como tus paradas, y no se envían a nadie. Un viaje en ómnibus de
+un punto a otro se calcula en el teléfono, con los horarios teóricos de
+ómnibus que la Intendencia publica como datos abiertos y que vienen dentro
+de la app: buscar un viaje no hace ninguna consulta. Solo cuando abrís los
+pasos de un viaje, la app pide los arribos de la parada donde tomás el
+primer ómnibus, por su número, igual que en Mis paradas, para decirte si
+viene con GPS: esa consulta no lleva tu posición ni tu destino.
+
+**Búsqueda de lugares.** Cuando escribís en «Buscar una dirección o un
+lugar» (en el Mapa o en Mis lugares de Ajustes), la app manda solo ese texto,
+directamente y sin pasar por nuestro servidor intermediario, a:
+
+- el servicio de direcciones de la Intendencia de Montevideo
+  (`api.montevideo.gub.uy`, el mismo que usa Cómo Ir), para calles, números
+  de puerta, esquinas y lugares de interés;
+- Photon (`photon.komoot.io`, de Komoot, en Alemania), un buscador sobre
+  los datos de OpenStreetMap, para comercios y otros lugares;
+- y, solo si tocás la tecla de buscar, Nominatim
+  (`nominatim.openstreetmap.org`, de la Fundación OpenStreetMap).
+
+La búsqueda se limita a Montevideo y alrededores con un área fija: no lleva
+tu ubicación. Esos servicios reciben, como cualquier servidor, tu dirección
+IP, y la tratan según sus propias políticas. Lo que elegís queda en el
+teléfono.
 
 **Mi STM, Recarga y Cómo Ir.** Se abren en el navegador de tu teléfono,
 en los sitios oficiales. Tu usuario, contraseña, ID Uruguay o datos de pago
@@ -43,8 +139,12 @@ los ingresás directamente en esos sitios: la app no tiene acceso a ellos.
 **Notificaciones.** Las alertas de ómnibus se generan en tu teléfono. No
 usamos servicios de notificaciones remotas.
 
-**Biometría.** La huella o Face ID las valida el sistema operativo; la app
-solo recibe si la verificación fue correcta o no.
+**Biometría.** Si activás el desbloqueo con huella, Face ID o Touch ID, el
+sistema operativo valida tu huella o tu cara; la app solo recibe si la
+verificación fue correcta o no. Si olvidás el código de la app, el bloqueo de
+pantalla de tu teléfono (PIN, patrón, contraseña, huella o cara) te deja
+elegir uno nuevo: también lo valida el sistema, y la app solo recibe sí o no.
+La app nunca ve tu huella, tu cara ni el PIN del teléfono.
 
 ## Tus derechos
 
@@ -52,7 +152,7 @@ De acuerdo con la Ley N° 18.331 de Protección de Datos Personales, tenés
 derecho de acceso, rectificación, actualización, inclusión y supresión. Como
 no conservamos datos personales en servidores propios, podés ejercerlos
 directamente borrando los datos de la app. Para consultas escribinos a
-zhongnanhaii@yahoo.com. También podés dirigirte a la Unidad Reguladora y de
+daniil@khrestenkov.com. También podés dirigirte a la Unidad Reguladora y de
 Control de Datos Personales (URCDP).
 
 ## Menores

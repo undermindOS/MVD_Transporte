@@ -1,7 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../models/transport_news.dart';
+import '../services/external_apps.dart';
 import 'safe_html.dart';
+import 'theme/timbre_text.dart';
+import 'theme/timbre_tokens.dart';
+import 'widgets/empty_state.dart';
+import 'widgets/led_matrix.dart';
+import 'widgets/pixel_icon.dart';
 
 /// Official transport news (detours, line changes), newest first.
 class NewsList extends StatelessWidget {
@@ -25,85 +31,272 @@ class NewsList extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final primary = Theme.of(context).primaryColor;
-    return RefreshIndicator(
-      onRefresh: onRefresh,
-      child: ListView(
-        padding: const EdgeInsets.only(top: 6, bottom: 24),
+    return ColoredBox(
+      color: TimbreColors.noche,
+      child: RefreshIndicator(
+        onRefresh: onRefresh,
+        // A lit dot on the plate while it reloads
+        color: TimbreColors.ambar,
+        backgroundColor: TimbreColors.tinta,
+        child: ListView(
+          padding: const EdgeInsets.only(bottom: 24),
+          children: [
+            if (isLoading && news.isEmpty)
+              const Padding(
+                padding: EdgeInsets.all(32),
+                child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+              ),
+            // Offline must not look like "no news"
+            if (failed) const _FailedBanner(),
+            if (!isLoading && !failed && news.isEmpty)
+              const TimbreEmptyState(
+                'Sin novedades',
+                sign: 'SIN NOVEDADES',
+                detail: 'Los desvíos y cambios de recorrido aparecen acá.',
+              ),
+            for (final n in news)
+              _NewsRow(
+                news: n,
+                isNew: readBefore == null || n.id > readBefore!,
+              ),
+            if (news.isNotEmpty)
+              const Padding(
+                padding: EdgeInsets.fromLTRB(16, 14, 16, 0),
+                child: Text(
+                  'Publicadas por la Intendencia de Montevideo (Cómo Ir).',
+                  style: TextStyle(color: TimbreColors.tenue, fontSize: 12),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _FailedBanner extends StatelessWidget {
+  const _FailedBanner();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(
+          TimbreSpace.l, TimbreSpace.m, TimbreSpace.l, TimbreSpace.xs),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: TimbreColors.avisoNoche,
+        border: Border.all(color: TimbreColors.ambarTenue),
+        borderRadius: BorderRadius.circular(TimbreRadii.control),
+      ),
+      child: Row(
         children: [
-          if (isLoading && news.isEmpty)
-            const Padding(
-              padding: EdgeInsets.all(32),
-              child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
-            ),
-          // Offline must not look like "no news"
-          if (failed)
-            const Padding(
-              padding: EdgeInsets.fromLTRB(16, 8, 16, 4),
-              child: Text('No se pudo actualizar. Deslizá para reintentar',
-                  style: TextStyle(color: Colors.redAccent, fontSize: 13)),
-            ),
-          if (!isLoading && !failed && news.isEmpty)
-            const Padding(
-              padding: EdgeInsets.all(32),
-              child: Text('Sin novedades',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(color: Colors.black45, fontSize: 14)),
-            ),
-          ...news.map((n) => _buildItem(context, n, primary)),
-          if (news.isNotEmpty)
-            const Padding(
-              padding: EdgeInsets.fromLTRB(16, 12, 16, 0),
-              child: Text(
-                'Publicadas por la Intendencia de Montevideo (Cómo Ir).',
-                style: TextStyle(color: Colors.black38, fontSize: 12),
+          const PixelIcon(PixelGlyphs.warning,
+              size: TimbreIconSize.row, color: TimbreColors.ambar),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              'No se pudo actualizar. Deslizá para reintentar',
+              style: TimbreText.subtitle.copyWith(
+                color: TimbreColors.ambar,
+                fontWeight: FontWeight.w600,
               ),
             ),
+          ),
         ],
       ),
     );
   }
+}
 
-  Widget _buildItem(BuildContext context, TransportNews n, Color primary) {
-    final isNew = readBefore == null || n.id > readBefore!;
-    return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
-      elevation: 1,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(12),
-        onTap: () => showNewsDetail(context, n),
-        child: Padding(
-          padding: const EdgeInsets.all(12),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(children: [
-                if (isNew) ...[
-                  Icon(Icons.circle, size: 8, color: primary,
-                      semanticLabel: 'Nueva'),
-                  const SizedBox(width: 6),
-                ],
+class _NewsRow extends StatelessWidget {
+  const _NewsRow({required this.news, required this.isNew});
+
+  final TransportNews news;
+  final bool isNew;
+
+  /// "Nueva. 2 de octubre. Título. Resumen": the row as one phrase.
+  String get _sentence => [
+        if (isNew) 'Nueva',
+        _spokenDate(news.date),
+        news.title,
+        if (news.summary.isNotEmpty) news.summary,
+      ].map((part) => part.trim().replaceFirst(_endDots, '')).join('. ');
+
+  static final _endDots = RegExp(r'[.\s]+$');
+
+  @override
+  Widget build(BuildContext context) {
+    final n = news;
+    void open() => showNewsDetail(context, n);
+    return Semantics(
+      container: true,
+      button: true,
+      label: _sentence,
+      // excludeSemantics drops the InkWell's tap action too
+      onTap: open,
+      excludeSemantics: true,
+      child: Material(
+        // Unread rows are lifted from the board
+        color: isNew ? TimbreColors.tinta : TimbreColors.noche,
+        child: InkWell(
+          onTap: open,
+          child: Container(
+            padding: const EdgeInsets.all(16),
+            decoration: const BoxDecoration(
+              border:
+                  Border(bottom: BorderSide(color: TimbreColors.lineaNoche)),
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _DateTile(date: n.date, filled: isNew),
+                const SizedBox(width: 14),
                 Expanded(
-                  child: Text(n.title,
-                      style: TextStyle(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      if (isNew) ...[
+                        const Text(
+                          'NUEVA',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 0.72,
+                            color: TimbreColors.ambar,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                      ],
+                      Text(
+                        n.title,
+                        style: TextStyle(
+                          fontSize: 17,
+                          height: 1.25,
                           fontWeight: isNew ? FontWeight.w700 : FontWeight.w600,
-                          fontSize: 15)),
+                          color: TimbreColors.papel,
+                        ),
+                      ),
+                      if (n.summary.isNotEmpty) ...[
+                        const SizedBox(height: 4),
+                        Text(
+                          n.summary,
+                          style: TimbreText.subtitle.copyWith(height: 1.4),
+                        ),
+                      ],
+                    ],
+                  ),
                 ),
-                const SizedBox(width: 8),
-                Text(formatNewsDate(n.date),
-                    style:
-                        const TextStyle(color: Colors.black38, fontSize: 12)),
-              ]),
-              if (n.summary.isNotEmpty) ...[
-                const SizedBox(height: 4),
-                Text(n.summary,
-                    style:
-                        const TextStyle(color: Colors.black54, fontSize: 13)),
               ],
-            ],
+            ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+const _monthNames = [
+  'enero',
+  'febrero',
+  'marzo',
+  'abril',
+  'mayo',
+  'junio',
+  'julio',
+  'agosto',
+  'setiembre',
+  'octubre',
+  'noviembre',
+  'diciembre',
+];
+
+/// "2 de octubre", for screen readers.
+String _spokenDate(DateTime date) =>
+    '${date.day} de ${_monthNames[date.month - 1]}';
+
+/// Day and month in a tile: a small lit LED display while unread, an
+/// empty frame after.
+class _DateTile extends StatelessWidget {
+  const _DateTile({required this.date, required this.filled});
+
+  final DateTime date;
+  final bool filled;
+
+  static const _months = [
+    'ENE',
+    'FEB',
+    'MAR',
+    'ABR',
+    'MAY',
+    'JUN',
+    'JUL',
+    'AGO',
+    'SET',
+    'OCT',
+    'NOV',
+    'DIC',
+  ];
+  static const _day = TextStyle(
+    fontFamily: TimbreFonts.firaCondensed,
+    fontWeight: FontWeight.w800,
+    fontSize: 26,
+    height: 1,
+    color: TimbreColors.etiquetaCartel,
+  );
+  static final _ledDay = TimbreText.cartel(24);
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      label: _spokenDate(date),
+      excludeSemantics: true,
+      child: Container(
+        width: 52,
+        height: 56,
+        decoration: BoxDecoration(
+          // Unread: an inset LED display; read: an empty frame
+          color: filled ? TimbreColors.noche : null,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: TimbreColors.lineaNoche, width: 1.5),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: Stack(alignment: Alignment.center, children: [
+          // Unread: a small LED board, the material of the header plate
+          if (filled)
+            const Positioned.fill(
+              child: LedMatrix(color: TimbreColors.ambar, opacity: 0.11),
+            ),
+          // Fixed tile: with the largest system fonts the date scales down
+          // inside it (the title next to it does grow)
+          Padding(
+            padding: const EdgeInsets.all(4),
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    date.day.toString().padLeft(2, '0'),
+                    style: filled ? _ledDay : _day,
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    _months[date.month - 1],
+                    style: TextStyle(
+                      fontSize: 12,
+                      height: 1,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 0.96,
+                      color: filled
+                          ? TimbreColors.etiquetaCartel
+                          : TimbreColors.tenue,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ]),
       ),
     );
   }
@@ -123,25 +316,29 @@ Future<void> showNewsDetail(BuildContext context, TransportNews n) {
         controller: scroll,
         padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
         children: [
-          Text(n.title,
-              style:
-                  const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
-          const SizedBox(height: 4),
-          Text(formatNewsDate(n.date),
-              style: const TextStyle(color: Colors.black45, fontSize: 13)),
-          const SizedBox(height: 12),
-          DefaultTextStyle.merge(
+          Text(
+            n.title,
+            style: TimbreText.dialogTitle.copyWith(height: 1.25),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            formatNewsDate(n.date),
             style: const TextStyle(
-                fontSize: 15, height: 1.45, color: Colors.black87),
+                color: TimbreColors.etiquetaCartel, fontSize: 13),
+          ),
+          const SizedBox(height: 14),
+          DefaultTextStyle.merge(
+            style: TimbreText.body.copyWith(height: 1.5),
             child: SafeHtml(n.body.trim().isNotEmpty ? n.body : n.summary),
           ),
           if (n.link != null) ...[
-            const SizedBox(height: 8),
+            const SizedBox(height: 12),
             Align(
               alignment: Alignment.centerLeft,
               child: FilledButton.icon(
                 onPressed: () => openExternalLink(ctx, n.link!),
-                icon: const Icon(Icons.open_in_new, size: 18),
+                icon: const PixelIcon(PixelGlyphs.external,
+                    size: TimbreIconSize.row),
                 label: const Text('Ver más'),
               ),
             ),
@@ -158,14 +355,18 @@ Future<void> openExternalLink(BuildContext context, String link) async {
   var ok = false;
   if (uri != null && (uri.scheme == 'https' || uri.scheme == 'http')) {
     try {
-      ok = await launchUrl(uri, mode: LaunchMode.externalApplication);
+      ok = await ExternalApps.launch(uri,
+          mode: LaunchMode.externalApplication);
     } catch (e) {
       debugPrint('❌ Open link error: $e');
     }
   }
   if (!ok && context.mounted) {
-    ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No se pudo abrir el enlace')));
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(
+        content:
+            Text('No se pudo abrir el enlace. Probá de nuevo más tarde.')));
   }
 }
 

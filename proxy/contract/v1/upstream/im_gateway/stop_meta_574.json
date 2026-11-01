@@ -1,0 +1,8 @@
+{
+  "builtAt": "2026-10-27T13:22:26.000Z",
+  "complete": true,
+  "lines": ["116", "117", "121", "141", "142", "144", "538"],
+  "directions": [
+    { "line": "116", "destination": "POCITOS", "variantIds": [630] }
+  ]
+}

@@ -24,13 +24,18 @@ class BusStopAdapter extends TypeAdapter<BusStop> {
       lines: (fields[4] as List).cast<String>(),
       notificationsEnabled: fields[5] as bool,
       etaAlertMinutes: fields[6] as int,
+      alertDays: fields[7] == null
+          ? [1, 2, 3, 4, 5, 6, 7]
+          : (fields[7] as List).cast<int>(),
+      alertFromMinute: fields[8] == null ? 0 : fields[8] as int,
+      alertToMinute: fields[9] == null ? 1440 : fields[9] as int,
     );
   }
 
   @override
   void write(BinaryWriter writer, BusStop obj) {
     writer
-      ..writeByte(7)
+      ..writeByte(10)
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
@@ -44,7 +49,13 @@ class BusStopAdapter extends TypeAdapter<BusStop> {
       ..writeByte(5)
       ..write(obj.notificationsEnabled)
       ..writeByte(6)
-      ..write(obj.etaAlertMinutes);
+      ..write(obj.etaAlertMinutes)
+      ..writeByte(7)
+      ..write(obj.alertDays)
+      ..writeByte(8)
+      ..write(obj.alertFromMinute)
+      ..writeByte(9)
+      ..write(obj.alertToMinute);
   }
 
   @override

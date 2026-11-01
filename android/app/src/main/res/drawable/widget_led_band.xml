@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The unlit LEDs behind the top of a stop widget, as on the app bar:
+     brightest on the right, fading to the ink on the left and below -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item>
+        <bitmap
+            android:src="@drawable/widget_led_dot"
+            android:tileMode="repeat" />
+    </item>
+    <item>
+        <shape android:shape="rectangle">
+            <gradient
+                android:angle="0"
+                android:startColor="@color/tinta"
+                android:centerX="0.8"
+                android:centerColor="#000A1A3A"
+                android:endColor="#000A1A3A" />
+        </shape>
+    </item>
+    <item>
+        <shape android:shape="rectangle">
+            <gradient
+                android:angle="270"
+                android:startColor="#000A1A3A"
+                android:centerY="0.6"
+                android:centerColor="#000A1A3A"
+                android:endColor="@color/tinta" />
+        </shape>
+    </item>
+</layer-list>

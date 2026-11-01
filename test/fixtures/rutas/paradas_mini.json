@@ -1,0 +1,9 @@
+{"type":"FeatureCollection","totalFeatures":7,"features":[
+{"type":"Feature","id":"p.1","geometry":{"type":"Point","coordinates":[-56.153,-34.9118]},"geometry_name":"the_geom","properties":{"cod_ubic_parada":101,"calle":"BV ESPAÑA","esquina":"LIBERTAD"}},
+{"type":"Feature","id":"p.2","geometry":{"type":"Point","coordinates":[-56.153,-34.9118]},"geometry_name":"the_geom","properties":{"cod_ubic_parada":101,"calle":"BV ESPAÑA","esquina":"LIBERTAD"}},
+{"type":"Feature","id":"p.3","geometry":{"type":"Point","coordinates":[-56.198255,-34.90739436]},"geometry_name":"the_geom","properties":{"cod_ubic_parada":102,"calle":"SAN JOSE","esquina":"ANDES"}},
+{"type":"Feature","id":"p.4","geometry":{"type":"Point","coordinates":[-56.203,-34.907]},"geometry_name":"the_geom","properties":{"cod_ubic_parada":103,"calle":"RAMBLA","esquina":null}},
+{"type":"Feature","id":"p.5","geometry":{"type":"Point","coordinates":[-56.2037,-34.9067]},"geometry_name":"the_geom","properties":{"cod_ubic_parada":104,"calle":"CIUDADELA","esquina":"RINCON"}},
+{"type":"Feature","id":"p.6","geometry":null,"geometry_name":"the_geom","properties":{"cod_ubic_parada":105,"calle":"SIN","esquina":"PUNTO"}},
+{"type":"Feature","id":"p.7","geometry":{"type":"Point","coordinates":[-56.1,-34.8]},"geometry_name":"the_geom","properties":{"cod_ubic_parada":999,"calle":"FUERA","esquina":"DEL HORARIO"}}
+]}

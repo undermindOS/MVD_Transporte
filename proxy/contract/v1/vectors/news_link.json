@@ -1,0 +1,29 @@
+{
+  "rule": "newsLink",
+  "notes": [
+    "Se recorta con trimText y se busca ^(https?)://([^/?#]+)(.*)$ sin distinguir mayúsculas. El esquema y el host pasan a minúsculas; el resto queda igual.",
+    "Cualquier otra cosa (vacío, \"null\", otro esquema, sin host, null) da null."
+  ],
+  "cases": [
+    {"in": "https://Montevideo.gub.uy/node/99018", "out": "https://montevideo.gub.uy/node/99018"},
+    {
+      "in": "https://x.com/mvdtransporte/status/1970061760104399150?s=48",
+      "out": "https://x.com/mvdtransporte/status/1970061760104399150?s=48"
+    },
+    {"in": "https://www.montevideo.gub.uy/app/stm/horarios/", "out": "https://www.montevideo.gub.uy/app/stm/horarios/"},
+    {"in": "  https://montevideo.gub.uy/node/98928 \n", "out": "https://montevideo.gub.uy/node/98928"},
+    {"in": "HTTPS://WWW.Montevideo.GUB.UY/App/STM/", "out": "https://www.montevideo.gub.uy/App/STM/"},
+    {"in": "http://montevideo.gub.uy", "out": "http://montevideo.gub.uy"},
+    {"in": "https://Montevideo.gub.uy?Q=Uno", "out": "https://montevideo.gub.uy?Q=Uno"},
+    {"in": "https://Montevideo.gub.uy#Arriba", "out": "https://montevideo.gub.uy#Arriba"},
+    {"in": "", "out": null},
+    {"in": "null", "out": null},
+    {"in": null, "out": null},
+    {"in": "ftp://montevideo.gub.uy/x", "out": null},
+    {"in": "montevideo.gub.uy/node/1", "out": null},
+    {"in": "https://", "out": null},
+    {"in": "https:///node/1", "out": null},
+    {"in": "javascript:alert(1)", "out": null},
+    {"in": "mailto:stm@imm.gub.uy", "out": null}
+  ]
+}

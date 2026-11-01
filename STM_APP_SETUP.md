@@ -1,79 +1,79 @@
-# STM Montevideo - Flutter App Setup Guide
+# STM Montevideo - Guía de configuración de la app Flutter
 
-A production-ready Flutter wrapper application for the Montevideo STM transit card website.
+Una aplicación Flutter lista para producción que funciona como contenedor (wrapper) del sitio web de la tarjeta de transporte STM de Montevideo.
 
-## Features
+## Funcionalidades
 
-✅ Full WebView integration with STM website
-✅ Quick access to Top-Up (Recarga) section
-✅ Bottom navigation bar for easy navigation
-✅ Floating Action Button for instant top-up access
-✅ Loading indicator while pages load
-✅ Android hardware back button support
-✅ STM branding colors (Blue/White theme)
-✅ Full-screen immersive experience
-✅ Proper error handling and navigation delegation
+✅ Integración completa por WebView con el sitio web del STM
+✅ Acceso rápido a la sección Recarga
+✅ Barra de navegación inferior para moverte fácilmente
+✅ Botón de acción flotante para acceder a la recarga al instante
+✅ Indicador de carga mientras cargan las páginas
+✅ Soporte para el botón físico de volver de Android
+✅ Colores de marca del STM (tema azul/blanco)
+✅ Experiencia inmersiva en pantalla completa
+✅ Manejo de errores y delegación de navegación adecuados
 
 ---
 
-## Quick Start
+## Inicio rápido
 
-### Prerequisites
+### Requisitos previos
 
-- Flutter SDK (3.0.0 or higher)
+- Flutter SDK (3.0.0 o superior)
 - Android Studio / Xcode
-- Android device/emulator or iOS device/simulator
+- Dispositivo/emulador Android o dispositivo/simulador iOS
 
-### Installation Steps
+### Pasos de instalación
 
-1. **Install dependencies:**
+1. **Instalar las dependencias:**
    ```bash
    flutter pub get
    ```
 
-2. **Run on device:**
+2. **Ejecutar en el dispositivo:**
    ```bash
-   # For Android
+   # Para Android
    flutter run
 
-   # For iOS
+   # Para iOS
    flutter run -d ios
    ```
 
-3. **Build release APK (Android):**
+3. **Compilar el APK de release (Android):**
    ```bash
    flutter build apk --release
    ```
 
-4. **Build release IPA (iOS):**
+4. **Compilar el IPA de release (iOS):**
    ```bash
    flutter build ios --release
    ```
 
 ---
 
-## File Structure
+## Estructura de archivos
 
 ```
 stm_montevideo/
 ├── lib/
-│   └── main.dart                 # Main application code
+│   └── main.dart                 # Código principal de la aplicación
 ├── android/
 │   └── app/src/main/
-│       └── AndroidManifest.xml   # Android permissions
+│       └── AndroidManifest.xml   # Permisos de Android
 ├── ios/
 │   └── Runner/
-│       └── Info.plist            # iOS permissions
-└── pubspec.yaml                  # Dependencies
+│       └── Info.plist            # Permisos de iOS
+└── pubspec.yaml                  # Dependencias
 ```
 
 ---
 
-## Permissions Configuration
+## Configuración de permisos
 
-### Android Permissions (AndroidManifest.xml)
+### Permisos de Android (AndroidManifest.xml)
 
-The following permissions are configured in `android/app/src/main/AndroidManifest.xml`:
+Los siguientes permisos están configurados en `android/app/src/main/AndroidManifest.xml`:
 
 ```xml
 <!-- REQUIRED: Internet access for WebView -->
@@ -83,13 +83,13 @@ The following permissions are configured in `android/app/src/main/AndroidManifes
 <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
 ```
 
-**Key Android Settings:**
-- `android:usesCleartextTraffic="false"` - Ensures HTTPS-only connections
-- `android:hardwareAccelerated="true"` - Enables hardware acceleration for smooth WebView performance
+**Configuración clave de Android:**
+- `android:usesCleartextTraffic="false"` - Garantiza conexiones solo por HTTPS
+- `android:hardwareAccelerated="true"` - Activa la aceleración por hardware para que el WebView funcione con fluidez
 
-### iOS Permissions (Info.plist)
+### Permisos de iOS (Info.plist)
 
-The following configurations are set in `ios/Runner/Info.plist`:
+Las siguientes configuraciones están definidas en `ios/Runner/Info.plist`:
 
 ```xml
 <!-- App Transport Security - Internet access -->
@@ -112,147 +112,147 @@ The following configurations are set in `ios/Runner/Info.plist`:
 </dict>
 ```
 
-**Key iOS Settings:**
-- Allows secure HTTPS connections to `stm.gub.uy`
-- Enforces minimum TLS 1.2 for security
-- Includes camera/photo permissions for potential future QR code scanning
+**Configuración clave de iOS:**
+- Permite conexiones HTTPS seguras a `stm.gub.uy`
+- Exige como mínimo TLS 1.2 por seguridad
+- Incluye permisos de cámara/fotos para un posible escaneo de códigos QR en el futuro
 
 ---
 
-## Dependencies (pubspec.yaml)
+## Dependencias (pubspec.yaml)
 
 ```yaml
 dependencies:
   flutter:
     sdk: flutter
 
-  webview_flutter: ^4.4.2              # Core WebView functionality
-  webview_flutter_android: ^3.12.1     # Android-specific WebView
-  webview_flutter_wkwebview: ^3.9.4    # iOS WKWebView implementation
-  url_launcher: ^6.2.1                 # External link handling
-  cupertino_icons: ^1.0.6              # iOS-style icons
+  webview_flutter: ^4.4.2              # Funcionalidad principal de WebView
+  webview_flutter_android: ^3.12.1     # WebView específico de Android
+  webview_flutter_wkwebview: ^3.9.4    # Implementación de WKWebView para iOS
+  url_launcher: ^6.2.1                 # Manejo de enlaces externos
+  cupertino_icons: ^1.0.6              # Íconos estilo iOS
 ```
 
 ---
 
-## App Features Explained
+## Explicación de las funcionalidades de la app
 
-### 1. WebView Implementation
-- Loads the STM website: `https://stm.gub.uy/app/mistm/cuenta/`
-- JavaScript enabled for full website functionality
-- Proper navigation handling and back button support
+### 1. Implementación del WebView
+- Carga el sitio web del STM: `https://stm.gub.uy/app/mistm/cuenta/`
+- JavaScript habilitado para que el sitio funcione por completo
+- Manejo adecuado de la navegación y soporte para el botón de volver
 
-### 2. Navigation Options
+### 2. Opciones de navegación
 
-**Bottom Navigation Bar:**
-- **Inicio (Home):** Navigate to the main STM account page
-- **Recarga (Top-Up):** Direct access to the recharge section (highlighted in blue)
-- **Actualizar (Reload):** Refresh the current page
+**Barra de navegación inferior:**
+- **Inicio:** Lleva a la página principal de la cuenta del STM
+- **Recarga:** Acceso directo a la sección de recarga (resaltada en azul)
+- **Actualizar:** Vuelve a cargar la página actual
 
-**Floating Action Button:**
-- Quick access to the Top-Up page from anywhere in the app
-- Positioned at the bottom-right for easy thumb access
+**Botón de acción flotante:**
+- Acceso rápido a la página de Recarga desde cualquier parte de la app
+- Ubicado abajo a la derecha para alcanzarlo fácilmente con el pulgar
 
-### 3. User Experience
-- Loading spinner with "Cargando STM..." text while pages load
-- Clean white background during loading
-- STM blue color scheme (#0066CC)
-- Smooth transitions between pages
+### 3. Experiencia de usuario
+- Spinner de carga con el texto "Cargando STM..." mientras cargan las páginas
+- Fondo blanco limpio durante la carga
+- Esquema de colores azul STM (#0066CC)
+- Transiciones suaves entre páginas
 
-### 4. Android Back Button
-- Pressing back navigates through browser history
-- Only exits app when no more history available
-- Prevents accidental app closure
+### 4. Botón de volver de Android
+- Al tocar volver, se navega por el historial del navegador
+- Solo sale de la app cuando no queda más historial
+- Evita que la app se cierre por accidente
 
 ---
 
-## Customization
+## Personalización
 
-### Change Colors
-Edit the color values in [main.dart](lib/main.dart):
+### Cambiar los colores
+Editá los valores de color en [main.dart](lib/main.dart):
 ```dart
 primaryColor: const Color(0xFF0066CC), // STM Blue
 ```
 
-### Modify URLs
-Change the URLs in [main.dart](lib/main.dart):
+### Modificar las URLs
+Cambiá las URLs en [main.dart](lib/main.dart):
 ```dart
 static const String _baseUrl = 'https://stm.gub.uy/app/mistm/cuenta/';
 static const String _topUpUrl = 'https://stm.gub.uy/app/mistm/cuenta/#/recarga';
 ```
 
-### Hide/Show FAB
-Remove or comment out the `floatingActionButton` section in [main.dart](lib/main.dart).
+### Ocultar/mostrar el FAB
+Eliminá o comentá la sección `floatingActionButton` en [main.dart](lib/main.dart).
 
 ---
 
-## Troubleshooting
+## Solución de problemas
 
-### WebView not loading
-- Check internet connection
-- Verify permissions in AndroidManifest.xml and Info.plist
-- Check if STM website is accessible in a browser
+### El WebView no carga
+- Revisá la conexión a internet
+- Verificá los permisos en AndroidManifest.xml e Info.plist
+- Comprobá si el sitio web del STM abre en un navegador
 
-### Android build errors
+### Errores de compilación en Android
 ```bash
 flutter clean
 flutter pub get
 flutter build apk
 ```
 
-### iOS build errors
-- Ensure you have a valid Apple Developer account
-- Check Xcode is properly installed
-- Run `pod install` in the ios directory if needed
+### Errores de compilación en iOS
+- Asegurate de tener una cuenta válida de Apple Developer
+- Comprobá que Xcode esté bien instalado
+- Ejecutá `pod install` en el directorio ios si hace falta
 
-### Loading indicator stuck
-- The website might be taking longer to load
-- Check console for JavaScript errors
-- Verify network connectivity
+### El indicador de carga se queda trabado
+- Puede que el sitio web esté tardando más en cargar
+- Revisá la consola por errores de JavaScript
+- Verificá la conectividad de red
 
 ---
 
-## Production Deployment
+## Despliegue en producción
 
 ### Android (Google Play Store)
-1. Update `applicationId` in `android/app/build.gradle`
-2. Create a keystore for signing
-3. Build signed APK/AAB:
+1. Actualizá `applicationId` en `android/app/build.gradle`
+2. Creá un keystore para la firma
+3. Compilá el APK/AAB firmado:
    ```bash
    flutter build appbundle --release
    ```
 
 ### iOS (App Store)
-1. Update bundle identifier in Xcode
-2. Configure signing certificates
-3. Build and archive in Xcode
-4. Submit via App Store Connect
+1. Actualizá el bundle identifier en Xcode
+2. Configurá los certificados de firma
+3. Compilá y archivá en Xcode
+4. Enviá la app a través de App Store Connect
 
 ---
 
-## Support & Maintenance
+## Soporte y mantenimiento
 
-- **Flutter Version:** Keep Flutter updated for latest WebView improvements
-- **Dependencies:** Run `flutter pub upgrade` periodically
-- **Testing:** Test on both Android and iOS devices before release
-
----
-
-## License
-
-This is a wrapper application for the official STM Montevideo website.
-All STM branding and content belongs to the Sistema de Transporte Metropolitano de Montevideo.
+- **Versión de Flutter:** Mantené Flutter actualizado para tener las últimas mejoras del WebView
+- **Dependencias:** Ejecutá `flutter pub upgrade` periódicamente
+- **Pruebas:** Probá en dispositivos Android e iOS antes de publicar
 
 ---
 
-## Contact & Updates
+## Licencia
 
-For issues or improvements, refer to the Flutter documentation:
-- [Flutter WebView Package](https://pub.dev/packages/webview_flutter)
-- [Flutter Documentation](https://docs.flutter.dev)
+Esta es una aplicación contenedora (wrapper) del sitio web oficial de STM Montevideo.
+Toda la marca y el contenido del STM pertenecen al Sistema de Transporte Metropolitano de Montevideo.
 
 ---
 
-**Ready to deploy!** 🚀
+## Contacto y actualizaciones
 
-Simply run `flutter run` to test the app, or `flutter build apk` for a production Android build.
+Para problemas o mejoras, consultá la documentación de Flutter:
+- [Paquete WebView de Flutter](https://pub.dev/packages/webview_flutter)
+- [Documentación de Flutter](https://docs.flutter.dev)
+
+---
+
+**¡Listo para desplegar!** 🚀
+
+Simplemente ejecutá `flutter run` para probar la app, o `flutter build apk` para una compilación de producción para Android.

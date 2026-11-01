@@ -1,0 +1,28 @@
+{
+  "rule": "gpsOperator",
+  "notes": [
+    "in es un elemento crudo de pci/buses/control. company = empresa recortada con trimText; percent = clamp(round(valor), 0, 100); partial = percent < 70.",
+    "Se descarta (null) si no es un objeto, si company queda vacío o si valor no es un número finito (un texto como \"80\" tampoco sirve)."
+  ],
+  "cases": [
+    {"in": {"empresa": "COETC", "valor": 100}, "out": {"company": "COETC", "percent": 100, "partial": false}},
+    {"in": {"empresa": "UCOT", "valor": 55}, "out": {"company": "UCOT", "percent": 55, "partial": true}},
+    {"in": {"empresa": "COME", "valor": 69.5}, "out": {"company": "COME", "percent": 70, "partial": false}},
+    {"in": {"empresa": "COME", "valor": 69.4}, "out": {"company": "COME", "percent": 69, "partial": true}},
+    {"in": {"empresa": "COETC", "valor": 70}, "out": {"company": "COETC", "percent": 70, "partial": false}},
+    {"in": {"empresa": "CUTCSA", "valor": 99.5}, "out": {"company": "CUTCSA", "percent": 100, "partial": false}},
+    {"in": {"empresa": "CUTCSA", "valor": 130}, "out": {"company": "CUTCSA", "percent": 100, "partial": false}},
+    {"in": {"empresa": "CUTCSA", "valor": -2}, "out": {"company": "CUTCSA", "percent": 0, "partial": true}},
+    {"in": {"empresa": "COETC", "valor": 0}, "out": {"company": "COETC", "percent": 0, "partial": true}},
+    {"in": {"empresa": "  UCOT ", "valor": 70}, "out": {"company": "UCOT", "percent": 70, "partial": false}},
+    {"in": {"empresa": "", "valor": 50}, "out": null},
+    {"in": {"empresa": "   ", "valor": 50}, "out": null},
+    {"in": {"empresa": null, "valor": 50}, "out": null},
+    {"in": {"valor": 50}, "out": null},
+    {"in": {"empresa": "COME", "valor": "80"}, "out": null},
+    {"in": {"empresa": "COME", "valor": null}, "out": null},
+    {"in": {"empresa": "COME"}, "out": null},
+    {"in": "COETC", "out": null},
+    {"in": null, "out": null}
+  ]
+}

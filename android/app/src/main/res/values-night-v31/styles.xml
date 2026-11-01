@@ -6,9 +6,9 @@
         <item name="android:windowFullscreen">false</item>
         <item name="android:windowDrawsSystemBarBackgrounds">false</item>
         <item name="android:windowLayoutInDisplayCutoutMode">shortEdges</item>
-        <item name="android:windowSplashScreenBackground">#004499</item>
+        <item name="android:windowSplashScreenBackground">#070F22</item>
         <item name="android:windowSplashScreenAnimatedIcon">@drawable/android12splash</item>
-        <item name="android:windowSplashScreenIconBackgroundColor">#004499</item>
+        <item name="android:windowSplashScreenIconBackgroundColor">#070F22</item>
     </style>
     <!-- Theme applied to the Android Window as soon as the process has started.
          This theme determines the color of the Android Window while your
@@ -17,6 +17,9 @@
          
          This Theme is only used starting with V2 of Flutter's Android embedding. -->
     <style name="NormalTheme" parent="@android:style/Theme.Black.NoTitleBar">
-        <item name="android:windowBackground">?android:colorBackground</item>
+        <!-- The night board, not the light or black system color: no
+             white strip when the keyboard opens. flutter_native_splash:create
+             rewrites this file; put @color/noche back after running it. -->
+        <item name="android:windowBackground">@color/noche</item>
     </style>
 </resources>

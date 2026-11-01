@@ -1,0 +1,753 @@
+# Decisiones
+
+Por qué el sistema es como es. Antes de cambiar una regla, leé por qué
+apareció. Cada decisión tiene tres partes: el contexto (qué problema había),
+la decisión (qué se eligió) y la consecuencia (qué implica, también lo
+incómodo).
+
+Las doce primeras vienen del diseño original de Timbre y están corregidas
+según el código. Las siguientes salieron de la reconstrucción del proxy como
+Backend-for-Frontend (`/v1`), de la revisión de diseño de la misma rama, de
+la pestaña Mapa y de la bienvenida con el código propio de la app. El contrato
+completo está en [contrato-v1.md](contrato-v1.md).
+
+Índice:
+
+- Identidad: [No copiamos la app oficial](#no-copiamos-la-app-oficial) ·
+  [Siempre oscuro](#siempre-oscuro-sin-tema-claro) ·
+  [El ámbar es luz](#el-ámbar-es-luz-y-la-luz-es-lo-vivo) ·
+  [El GPS se distingue por la forma](#el-gps-se-distingue-por-la-forma-no-solo-por-el-color) ·
+  [Doto desde 19 px](#doto-nunca-por-debajo-de-19-px) ·
+  [Íconos de píxeles](#íconos-de-píxeles-en-vez-de-material) ·
+  [La parada es un cartel](#la-parada-es-un-cartel-en-un-poste-no-un-marcador-de-mapa) ·
+  [Acento de las notificaciones](#el-acento-de-las-notificaciones-es-el-azul-del-tablero) ·
+  [Ningún símbolo oficial](#ningún-símbolo-oficial) ·
+  [Ámbar solo sobre azul noche](#el-ámbar-solo-como-luz-de-led-sobre-azul-noche) ·
+  [La letra grande no corta nada](#la-letra-grande-no-corta-nada) ·
+  [Riesgo: el sol](#riesgo-el-sol)
+- Datos y pantallas: [Datos viejos como estimado](#los-datos-viejos-se-muestran-como-estimado) ·
+  [«NUEVA» en ámbar](#nueva-y-la-fecha-de-lo-no-leído-van-en-ámbar) ·
+  [El brillo de `LiveDot`](#el-brillo-de-livedot) ·
+  [Los widgets de parada encienden la línea, no la hora](#los-widgets-de-parada-encienden-la-línea-no-la-hora) ·
+  [El bloqueo va encima del `Navigator`](#el-bloqueo-va-encima-del-navigator) ·
+  [El bloqueo vuelve solo después del segundo plano](#el-bloqueo-vuelve-solo-después-del-segundo-plano) ·
+  [El mapa viene dentro de la app](#el-mapa-viene-dentro-de-la-app)
+- Bloqueo y bienvenida: [Un código propio](#un-código-propio-con-la-huella-de-atajo) ·
+  [Si olvidás el código](#si-olvidás-el-código-abre-el-bloqueo-del-teléfono) ·
+  [La bienvenida, antes que todo](#la-bienvenida-va-antes-que-todo-una-sola-vez) ·
+  [El bloqueo anterior, hasta la bienvenida](#el-bloqueo-anterior-sigue-hasta-la-bienvenida) ·
+  [Solo un «sí» abre](#solo-un-sí-abre) ·
+  [Android dice «huella»](#android-dice-huella) ·
+  [Los ajustes no esperan al disco](#los-ajustes-del-bloqueo-no-esperan-al-disco)
+- Backend: [Sin ruta por lotes](#sin-ruta-por-lotes) ·
+  [Cercanas en el teléfono](#las-paradas-cercanas-se-calculan-en-el-teléfono) ·
+  [Sin cambio automático al modo directo](#sin-cambio-automático-al-modo-directo) ·
+  [Rutas públicas eliminadas](#rutas-públicas-eliminadas) ·
+  [Horarios solo con H:MM](#la-ruta-de-horarios-acepta-una-sola-forma-de-hora-hmm) ·
+  [Rutas por variante o por destino](#las-rutas-reconocen-el-ómnibus-por-variante-o-por-destino)
+
+---
+
+## Identidad
+
+### No copiamos la app oficial
+
+**Contexto.** Si la app se parece a la oficial, la primera pregunta del
+usuario es «¿y cuál es la diferencia?».
+
+**Decisión.** La respuesta es el producto: el tablero de tu parada en el
+bolsillo, el GPS separado del horario y «Estoy esperando» con su aviso. El
+tablero oscuro lo muestra antes del primer toque.
+
+**Consecuencia.** Cada pantalla es un tablero con carteles
+([01-principios.md](01-principios.md)). Un componente que solo imita a la app
+oficial no entra.
+
+### Siempre oscuro, sin tema claro
+
+**Contexto.** El tablero de una parada es oscuro. Dos temas son dos
+revisiones de contraste y el doble de trabajo.
+
+**Decisión.** Un solo tema oscuro: `buildTimbreTheme()` arma un
+`ColorScheme` con `Brightness.dark` y `MaterialApp` no tiene `darkTheme` ni
+`themeMode` (`lib/main.dart`). La pantalla de inicio, el ícono, el widget y
+la ventana de Android detrás de la app también son oscuros
+([10-superficies.md](10-superficies.md)), para que la app no destelle en
+blanco al abrir.
+
+**Consecuencia.** No hay superficies blancas en ningún lado. El riesgo de
+esta decisión es el sol ([Riesgo: el sol](#riesgo-el-sol)).
+
+### El ámbar es luz, y la luz es lo vivo
+
+**Contexto.** Si todo brilla, el brillo no significa nada.
+
+**Decisión.** `ambar` se enciende solo donde algo está vivo, encendido o
+pide una acción:
+
+- los datos en vivo: los minutos con GPS (`MinutosEnVivo`), «LLEGANDO»
+  (`LlegandoChip`), el número de línea relleno (`LineBadge(live: true)`),
+  el ómnibus que estás esperando, los ómnibus con GPS sobre el Mapa;
+- los carteles de la marca: «TIMBRE», el título de página, el candado de
+  bloqueo, el cartel de una lista vacía;
+- las acciones: el relleno del botón principal, el texto de los botones de
+  contorno y de texto, y la tecla que se presiona en el teclado del código;
+- lo elegido o encendido: chip y segmento elegidos, interruptor encendido,
+  pestaña elegida, campanita de un aviso activado, las cifras ya escritas del
+  código y el paso actual de la bienvenida;
+- el foco de un campo, el cursor y los indicadores de carga;
+- los contadores (ver [la excepción de «NUEVA»](#nueva-y-la-fecha-de-lo-no-leído-van-en-ámbar))
+  y el ícono de los avisos sobre `avisoNoche`;
+- los LED apagados de `LedMatrix`, al 10 % más o menos.
+
+Los horarios, los estimados y los datos viejos nunca van en ámbar.
+
+**Consecuencia.** Una hora de horario se escribe con `TimbreText.scheduleTime`
+en `etiquetaCartel`, nunca en Doto ni en ámbar. Las reglas completas están en
+[02-color.md](02-color.md).
+
+### El GPS se distingue por la forma, no solo por el color
+
+**Contexto.** Hay usuarios con daltonismo, pantallas al sol y lectores en
+escala de grises.
+
+**Decisión.** Un ómnibus con GPS y uno de horario se diferencian también por
+la forma: número relleno contra contorno (`LineBadge`), punto encendido y
+dígitos Doto (`LiveDot` + `TimbreText.liveMinutes`) contra reloj y Fira
+Sans Extra Condensed (`PixelGlyphs.clock` + `TimbreText.scheduleTime`), en
+`ArrivalRow`.
+
+**Consecuencia.** Un estado nuevo de llegada necesita su propia forma, no
+solo un color. El lector de pantalla también lo dice con palabras («con
+GPS», «sin GPS», «estimado»).
+
+### Doto nunca por debajo de 19 px
+
+**Contexto.** Más chicos, los puntos de Doto se mezclan y dejan de leerse
+como letras.
+
+**Decisión.** `TimbreFonts.dotoMinSize` = 19. `TimbreText.liveMinutes` y
+`TimbreText.cartel` suben a 19 cualquier tamaño menor, y los carteles en Doto
+usan `MediaQuery.withClampedTextScaling(minScaleFactor: 1)` para que una
+letra del sistema más chica no los achique.
+
+**Consecuencia.** Lo que no entra en 19 px no va en Doto: se escribe en Fira
+([03-tipografia.md](03-tipografia.md)).
+
+### Íconos de píxeles en vez de Material
+
+**Contexto.** Los íconos de Material hacen que cualquier app parezca una
+plantilla.
+
+**Decisión.** Íconos y letras comparten la misma grilla de puntos:
+`PixelGlyphs` (44 glifos de 12 × 12 en `lib/ui/widgets/pixel_glyphs.dart`),
+dibujados por `PixelIcon`. En `lib/` no queda ningún `Icons.`.
+
+**Consecuencia.** Un ícono nuevo se dibuja en la grilla
+([04-iconos.md](04-iconos.md)). Los íconos de los widgets de Android son
+copias vectoriales de glifos y hay que rehacerlas a mano si el glifo cambia
+([10-superficies.md](10-superficies.md#cómo-se-ven)).
+
+### La parada es un cartel en un poste, no un marcador de mapa
+
+**Contexto.** Un marcador de mapa dice «un lugar en el mapa», y una parada es
+otra cosa: el cartel donde esperás el ómnibus. La regla original decía que la
+app no muestra mapas, que muestra paradas. Con la pestaña Mapa la app dibuja
+un mapa propio, y ahí lo fácil era la gota de siempre.
+
+**Decisión.** La parada es `PixelGlyphs.stop`, un cartel con un ómnibus
+arriba de un poste, en la pestaña Paradas, las listas, el origen de una ruta
+y sobre el mapa de la pestaña Mapa. La pestaña Mapa tiene su propio glifo,
+`streets` (dos calles que se cruzan y un ómnibus). El glifo `map` sigue solo
+en «Ver en Cómo Ir» y en la baldosa Cómo Ir de Servicios, que abren el mapa
+del sitio oficial.
+
+**Consecuencia.** En el mapa no hay gotas ni alfileres: cada parada guardada
+es `stop` sobre una baldosa `tinta`, sin encender, y cada ómnibus con GPS es
+una píldora con el ómnibus de píxeles y su número de línea (de lejos, un
+punto). `StopResponse`
+sigue sin la ubicación de la parada: el Mapa la toma del catálogo con proxy,
+o de geoserver por número sin proxy, y la guarda en la parada
+([El mapa viene dentro de la app](#el-mapa-viene-dentro-de-la-app)).
+
+### El acento de las notificaciones es el azul del tablero
+
+**Contexto.** Android oscurece el ámbar en la cortina clara hasta un marrón.
+
+**Decisión.** El acento es `TimbreColors.tinta` (`color:` en
+`NotificationService` y `NotificationIcon.backgroundColor` en
+`AndroidBusWait`). Contra blanco tiene 17:1, y coincide con el widget y con
+la baldosa del ícono. `test/brand_assets_test.dart` comprueba que
+`notification_service.dart` no use `TimbreColors.ambar`.
+
+**Consecuencia.** Las notificaciones no llevan ámbar. El fondo de la
+notificación no se pinta ([10-superficies.md](10-superficies.md#ícono-y-color)).
+
+### Ningún símbolo oficial
+
+**Contexto.** Las tiendas tratan una app no oficial con escudo o logo del
+STM como falsa afiliación y la bajan.
+
+**Decisión.** Nada de escudo de Montevideo, bandera, Sol de Mayo, logos del
+STM, de la Intendencia ni de las empresas de ómnibus, ni en la app ni en el
+ícono, el widget, las capturas o la ficha de la tienda. Los accesos a Mi STM y
+Recarga son texto, no logos.
+
+**Consecuencia.** La app se presenta como no oficial en la ficha y en Info
+([docs/store-listing.md](../store-listing.md)).
+
+### El ámbar solo como luz de LED sobre azul noche
+
+**Contexto.** Bloques planos amarillos y negros se leen en Uruguay como los
+colores de un club de fútbol, y la app tiene que ser para todas las
+hinchadas.
+
+**Decisión.** El ámbar aparece como luz de LED sobre `noche` o `tinta`,
+nunca como franjas o bloques sobre negro, y nunca sobre blanco.
+
+**Consecuencia.** El texto sobre un relleno ámbar es siempre `tinta` (9.5:1),
+nunca blanco ([02-color.md](02-color.md)).
+
+### La letra grande no corta nada
+
+**Contexto.** Muchas personas mayores usan la letra grande del sistema. Un
+destino cortado o «MIS PARAD…» son usuarios perdidos, no un detalle.
+
+**Decisión.** Desde 150 % (`TimbreText.largeFrom` = 1.5) las filas apilan
+la hora debajo del destino y las barras de pestañas se desplazan. El título
+de página se achica al ancho (`FittedBox`) en vez de terminar en «…». Las
+pantallas se prueban con fuentes reales en un teléfono de 390 × 844 a 1×,
+1.3× y 2× (`test/support/layout.dart`).
+
+**Consecuencia.** Un texto nuevo tiene que pasar esas pruebas
+([11-accesibilidad.md](11-accesibilidad.md)). Los widgets de Android son la
+excepción: tienen celdas fijas y cortan el destino con «…» en una línea (en
+Próximo, en dos) ([10-superficies.md](10-superficies.md#cómo-se-ven)).
+
+### Riesgo: el sol
+
+**Contexto.** Una pantalla oscura refleja en la calle.
+
+**Decisión.** La apuesta es el contraste alto y los minutos grandes. No hay
+modo de día.
+
+**Consecuencia.** Si las reseñas dicen «no se ve», el modo de día se hace con
+el mismo tema y los mismos tokens, no con colores sueltos.
+
+---
+
+## Datos y pantallas
+
+### Los datos viejos se muestran como estimado
+
+**Contexto.** Antes, si una actualización fallaba, la tarjeta perdía los
+ómnibus y mostraba solo el error, aunque los datos de hace un minuto
+siguieran sirviendo. Pero mostrarlos tal cual haría pasar minutos viejos por
+datos en vivo.
+
+**Decisión.** Si la actualización falla y el último tablero bueno tiene menos
+de 5 min (`_staleFor` en `lib/ui/stops_page.dart`, contados desde que llegó
+al teléfono, con el reloj del teléfono), la tarjeta muestra la nota en
+`rojoLed` «No se pudo actualizar. Datos de las H:MM. Deslizá para
+reintentar.» y debajo los ómnibus de ese tablero cuya hora esperada no pasó
+hace más de 1 min (`_staleRowGrace`) en el reloj de la fuente (`fetchedAt`
+más lo que el tablero lleva en el teléfono), como `ArrivalRow(stale: true)`: número en contorno, reloj
+y «~20:01» en `TimbreText.scheduleTime`, sin `MinutosEnVivo` y sin ámbar,
+aunque antes tuvieran GPS. Con 5 min o más, solo la nota «No se pudo
+actualizar. Deslizá para reintentar».
+
+Sin fallo, un tablero también envejece: al volver a Mis paradas desde
+Horarios, Info o Servicios, hasta que llega el nuevo, o mientras el proxy
+contesta 429 (`busy` deja el tablero como está). Si llegó hace 1 min o más
+(`_liveFor`, dos vueltas de 30 s), sus filas pasan a estimado igual, sin las
+que debían pasar hace más de 1 min y sin nota: `busy` no dice nada y un
+refresco que está por llegar no es «No se pudo actualizar». Con 5 min o más,
+o si no queda ninguna fila, la tarjeta muestra el indicador de carga, como
+antes del primer tablero. Esta edad se cuenta desde que el tablero llegó al
+teléfono (`_BoardView.receivedAt`, con `StopsPage.clock`), no desde
+`fetchedAt`, que es la hora del servidor.
+
+**Consecuencia.** Una fila vieja no se puede tocar ni muestra la campanita de
+«Estoy esperando». El lector de pantalla dice «alrededor de las 20:01,
+estimado». El mismo formato «~H:MM» es el del widget
+([08-componentes.md](08-componentes.md), [07-textos.md](07-textos.md)). El
+Mapa sigue la misma regla con sus ómnibus: sin encender después de un fallo o
+con un tablero de 1 min o más, y fuera del mapa desde los 5 min. Como en Mis
+paradas, la edad se cuenta desde que el tablero llegó al teléfono, con el
+reloj del teléfono, para que uno con la hora corrida no apague los ómnibus
+([09-pantallas.md](09-pantallas.md#mapa)).
+
+### «NUEVA» y la fecha de lo no leído van en ámbar
+
+**Contexto.** En Novedades, una noticia sin leer muestra el día en dígitos
+Doto ámbar sobre una baldosa de LED y la etiqueta «NUEVA» en ámbar
+(`_DateTile` y `_NewsRow` en `lib/ui/news_list.dart`). No son datos en vivo,
+así que en principio la regla del ámbar no los permite.
+
+**Decisión.** Se dejan así y cuentan como contador, igual que la insignia de
+Novedades: marcan algo que todavía no viste. Cuando la noticia se lee, la
+baldosa queda vacía, el día pasa a Fira Sans Extra Condensed en
+`etiquetaCartel` y el mes a `tenue`.
+
+**Consecuencia.** La lista de usos permitidos del ámbar incluye los
+contadores ([02-color.md](02-color.md)). Un indicador de «no leído» nuevo
+puede usar ámbar; un dato sin novedad, no.
+
+### El brillo de `LiveDot`
+
+**Contexto.** La regla original decía que no hay sombras salvo la luz de LED
+de «LLEGANDO». Pero el punto de `LiveDot`, que acompaña los minutos con GPS,
+también tiene un halo.
+
+**Decisión.** Se deja: es luz de LED sobre un dato en vivo, lo mismo que
+«LLEGANDO». En el código son dos valores distintos: `LlegandoChip` usa el
+token `TimbreShadow.ledGlow` (ámbar al 35 %, desenfoque de 12 px) y `LiveDot`
+calcula su propio halo (su color al 60 %, desenfoque de `0.45 × size`, 5.4 px
+con el tamaño por defecto de 12).
+
+**Consecuencia.** Solo brilla lo encendido: los datos en vivo y, con el
+brillo de `PixelIcon(glow: true)`, la pestaña elegida, la campana de un
+aviso activado y los mosaicos de Servicios. Una sombra nueva que no sea luz
+de algo encendido no entra ([06-luz-y-movimiento.md](06-luz-y-movimiento.md)).
+
+### Los widgets de parada encienden la línea, no la hora
+
+**Contexto.** Un widget se redibuja con datos de hasta 15 min (la consulta
+de fondo) o de cuando tocaste actualizar: nunca es GPS en vivo. Con todo
+apagado, en la pantalla de inicio se veía como una lista gris, no como
+Timbre. El dueño del producto pidió más ámbar (2026-10-29).
+
+**Decisión.** Se encienden la identidad y la acción: el número de línea
+(contorno `ambarTenue`, cifras `ambar`), el cartel `stop`, el botón de
+actualizar y los LEDs apagados del encabezado. La hora queda en `papel`,
+con «~» y reloj `ambarTenue`, y nunca es un conteo («5 min»).
+
+**Consecuencia.** En los widgets la forma separa lo vivo de lo estimado,
+no el color: el relleno ámbar sigue siendo solo GPS en la app. Es la
+excepción 3 de [02-color.md](02-color.md#excepciones-documentadas).
+
+### El bloqueo va encima del `Navigator`
+
+**Contexto.** La pantalla de bloqueo la dibujaba `HomePage` en lugar de sus
+pestañas. Lo que estaba abierto encima —Horarios, Info, un diálogo, una
+hoja— quedaba por encima del bloqueo, a la vista y al alcance.
+
+**Decisión.** `AppLock` (`lib/ui/app_lock.dart`) va en `MaterialApp.builder`
+(`lib/main.dart`), encima del `Navigator`. Antes del primer desbloqueo no
+arma la app. Después la deja armada debajo de la pantalla de bloqueo, dentro
+de `Offstage`, `TickerMode(enabled: false)` y `ExcludeFocus`: no se pinta, no
+recibe toques ni foco, no anima y no está en el árbol de semántica.
+`AppLock.routeGuard`, en `navigatorObservers`, le registra a cada ruta abierta
+encima de la primera un `PopEntry` que no la deja cerrar mientras la app está
+bloqueada. La pantalla de bloqueo tiene su propio `ScaffoldMessenger`, así que
+los snack bars de la app se quedan con la app.
+
+**Consecuencia.** Al desbloquear volvés a la misma página, hoja o diálogo, y
+Mis paradas no se carga de cero. Como sigue armada, tiene que saber que está
+tapada: `HomePage` le pasa `active: false`, a Mis paradas y al Mapa, mientras
+`AppLock.of(context).locked`,
+y el refresco al volver del segundo plano espera al primer cuadro
+(`WidgetsBinding.endOfFrame`) para no pedir nada justo cuando aparece el
+bloqueo. Con solo la pantalla principal debajo, el atrás de Android sigue
+saliendo de la app. Lo que se agregue en `MaterialApp.builder` fuera de
+`AppLock` no queda tapado.
+
+### El bloqueo vuelve solo después del segundo plano
+
+**Contexto.** Antes, cualquier estado que no fuera `resumed` contaba como una
+salida, también `inactive`: un pedido de permiso del sistema alcanzaba para
+que la app se bloqueara al volver. Y solo el navegador abierto desde
+`HomePage` (Servicios, «Ver en Cómo Ir») marcaba la salida como propia: volver
+del correo, de un enlace de Info o de «Ver más» de una novedad bloqueaba otra
+vez.
+
+**Decisión.** Solo bloquea `hidden` o `paused` seguido de `resumed`
+(`AppLockState.didChangeAppLifecycleState`). Siguen las protecciones de antes:
+no bloquea mientras está abierto el pedido del sistema (`_isAuthenticating`)
+ni en los 2 s después de que se cerró. Toda apertura de otra app pasa por
+`ExternalApps` (`lib/services/external_apps.dart`): `launch` para una URL
+(`SystemBrowser.open`, el correo de Info, «Ver más» de una novedad) y `open`
+para una llamada de plugin (los ajustes de la app desde «Paradas cercanas»).
+`AppLock` escucha `ExternalApps.launches`, y una salida que empieza menos de
+3 s después de una apertura no bloquea a la vuelta.
+
+**Consecuencia.** Un enlace nuevo que se abra con `launchUrl` directo, sin
+`ExternalApps`, vuelve a bloquear la app a la vuelta.
+`test/app_lock_test.dart` prueba las salidas de hoy: navegador, correo,
+enlace de una novedad y ajustes del sistema. Lo que cuenta es cuándo empezó
+la salida, no cuánto duró: si desde la app que abriste vas a la pantalla de
+inicio y volvés a Timbre MVD horas después, tampoco bloquea.
+
+### El mapa viene dentro de la app
+
+**Contexto.** La app no dibujaba mapas, y los arribos de `/v1` no traían la
+posición de los ómnibus. La pestaña Mapa necesita un mapa base. Pedirle
+teselas a un servidor de mapas (el de OpenStreetMap, uno pago o la
+cartografía de la Intendencia) le diría a ese servidor qué zona mirás cada vez
+que movés el mapa, y la app dependería de un servicio más.
+
+**Decisión.** El mapa base viene con la app: un recorte de Protomaps de
+Montevideo y alrededores (`assets/map/mvd-20261028.pmtiles`, 14,86 MB, zoom 0
+a 15) con el estilo «Timbre Noche» (`assets/map/style_noche.json`), dibujado
+por `flutter_map` y `flutter_map_vector_tiles`. No hay servidor de teselas:
+`Basemap` (`lib/services/map/basemap.dart`) copia el archivo una vez a la
+caché de la app y lee las teselas de esa copia. Encima van solo las paradas
+guardadas y los ómnibus con GPS que vienen a ellas, con la posición de
+`arrivals[].location`. Un ómnibus es uno solo aunque vaya a dos paradas: se
+reconoce por su `tripId` (`bus-{idEmpresa}-{idBus}`). Mirar el mapa no usa
+la ubicación del teléfono; solo la pide un viaje desde «Tu ubicación»
+([Los viajes se calculan en el teléfono](#los-viajes-se-calculan-en-el-teléfono)).
+
+**Consecuencia.** Mover o acercar el mapa no hace pedidos, tampoco sin
+conexión. Los únicos pedidos del Mapa son los arribos de las paradas
+guardadas, cada 30 s mientras está a la vista, y la ubicación de una parada
+guardada que todavía no la tiene. La app pesa unos 15 MB más, y en el
+teléfono el archivo está dos veces: en la app y en su copia de la caché, que
+la app vuelve a copiar si el sistema la borra. El recorte envejece: se rehace
+con los pasos de `assets/map/README.md`. «© OpenStreetMap» se ve siempre en
+una esquina del mapa (licencia ODbL). El estilo está modificado y por eso no
+se llama Protomaps. El mapa base no usa ámbar: queda para los ómnibus con
+GPS. Las etiquetas del mapa salen con la fuente del sistema, no con Fira
+([03-tipografia.md](03-tipografia.md)). Tema abierto: mostrar la flota de
+toda la ciudad, y no solo los ómnibus que vienen a tus paradas, pide una ruta
+nueva del contrato (por ejemplo `/v1/buses`, con la flota que ya baja
+`ImGateway`), y espera a que el proxy esté desplegado.
+
+### Los viajes se calculan en el teléfono
+
+**Contexto.** El dueño del producto pidió llevar el Mapa a un navegador
+(2026-10-31): marcar Casa, Trabajo y lugares favoritos, y buscar un viaje
+en ómnibus entre ellos caminando como mucho 5 a 10 min hasta la parada. Se
+probaron tres fuentes de viajes. Transitous (MOTIS, sin clave) solo tiene el
+GTFS metropolitano del MTOP: líneas 2xx, 7xx y C1 a C5, sin las urbanas del
+STM, y Pocitos → Ciudad Vieja no da ningún viaje; además pide código abierto,
+uso no comercial y avisar antes de mucho tráfico. El planificador de Cómo Ir
+(`comoirRest`, sin clave, no documentado) funciona, pero recibe el origen y
+el destino de cada búsqueda. Un servidor propio (MOTIS) costaría y vería las
+posiciones.
+
+**Decisión.** El viaje se calcula en el teléfono con RAPTOR
+(`lib/services/rutas/`), sobre los horarios teóricos por parada que la
+Intendencia publica como datos abiertos (`uptu_pasada_variante`, sin clave,
+Licencia de Datos Abiertos de Uruguay), reducidos a un archivo que viene con
+la app (`assets/rutas/horarios.bin`, `tool/rutas/`). Caminar se estima en
+línea recta × 1,3 a 80 m por minuto. Los lugares se guardan en el teléfono.
+La única consulta de un viaje es la del tablero de la parada donde tomás el
+primer ómnibus, al abrir sus pasos, para decir si viene con GPS.
+
+**Consecuencia.** Buscar un viaje no manda nada a nadie y funciona sin
+conexión. Los horarios son los teóricos: no saben de desvíos ni de feriados
+(un feriado se calcula como el día de la semana que es), y el archivo
+envejece con la app: se rehace con los pasos de `tool/rutas/README.md`. La
+licencia de los datos se nombra en la página de licencias de la app y al pie
+de la hoja del viaje. Sin dirección escrita: un lugar se marca en el mapa.
+
+---
+
+## Bloqueo y bienvenida
+
+
+### La búsqueda de lugares: la Intendencia y OpenStreetMap
+
+**Contexto.** El dueño del producto pidió (2026-11-01) agregar Casa, Trabajo
+y favoritos por dirección, con una búsqueda como la de Google Maps, y que el
+viaje siga siendo solo en transporte público. Marcar en el mapa no alcanza:
+hay que poder escribir «18 de Julio 1453» o el nombre de un comercio.
+
+**Decisión.** Una búsqueda híbrida (`PlaceSearch`). La Intendencia
+(`ubicacionesRest`, el servicio de Cómo Ir, sin clave) da calles, números
+de puerta, esquinas y lugares de interés; es la que mejor conoce Montevideo y
+responde en UTM 21 sur, que la app pasa a grados. OpenStreetMap da comercios y
+otros lugares: por Photon mientras escribís, porque las reglas de Nominatim
+prohíben la búsqueda letra a letra, y por Nominatim solo con la tecla de
+buscar, una vez por segundo como mucho. Va primero la Intendencia; de
+OpenStreetMap se sacan las calles y los nombres repetidos. Un número de
+puerta se busca enseguida, y una calle que no lo tiene no se ofrece.
+
+**Consecuencia.** El texto que escribís sale del teléfono hacia tres
+servicios, directo y no por el proxy; tu ubicación no, porque la búsqueda usa un
+área fija de Montevideo. La política de privacidad lo dice. Los resultados
+llevan «© OpenStreetMap». Si una fuente cae, la otra sigue; si caen las dos, la
+búsqueda lo dice.
+### Un código propio, con la huella de atajo
+
+**Contexto.** El bloqueo de antes era el del teléfono: el pedido del sistema
+aceptaba la huella, la cara, el PIN o el patrón. La app no tenía nada propio:
+la abría cualquiera que pudiera desbloquear el teléfono. Una contraseña de
+letras o una cuenta no van con una app sin cuentas que se usa en la calle, con
+una mano.
+
+**Decisión.** La app tiene su propio código de 4 cifras (`AppPasscode.length`),
+que se escribe en un teclado de LED (`LedKeypad`). La huella o Face ID la abren
+más rápido (`keyLockBiometric`) y el código queda de respaldo. No hay
+contraseñas de letras, ni códigos de 6 cifras, ni reglas de «código débil». El
+código se guarda como un hash PBKDF2-HMAC-SHA256 con una sal de 16 bytes y
+20 000 vueltas (`AppPasscode.iterations`), calculado en un isolate, fuera de la
+interfaz; cada hash guardado lleva su cantidad de vueltas. Cuatro cifras son
+10 000 códigos, y lo que las sostiene es la espera: cinco códigos equivocados
+seguidos no cuestan nada, y desde el quinto cada código equivocado hace esperar
+30 s antes del siguiente (`freeTries`, `wait`). Probar los 10 000 a mano son
+más de tres días de esperas.
+
+**Consecuencia.** El hash saca el código de los archivos de la app: quien mire
+la caja `settings` de Hive no lee las cifras. No impide que alguien que puede
+leer el almacenamiento del teléfono pruebe los 10 000 códigos contra el hash,
+fuera del teléfono y sin la espera: con 20 000 vueltas por código, una
+computadora los recorre en minutos. La espera tampoco es una barrera dura:
+confía en el reloj del teléfono, y adelantarlo la termina. El código protege de
+quien tiene el teléfono desbloqueado en la mano; no de quien puede leer sus
+archivos, ni de quien sabe el PIN del teléfono
+([la decisión que sigue](#si-olvidás-el-código-abre-el-bloqueo-del-teléfono)).
+Un valor guardado que no se lee como hash cuenta como código puesto: ningún
+código coincide, y el bloqueo del teléfono abre la app.
+
+### Si olvidás el código, abre el bloqueo del teléfono
+
+**Contexto.** Un código se olvida. Sin cuentas ni servidor no hay un mail de
+recuperación, y borrar la app para volver a entrar se lleva las paradas y las
+rutas guardadas.
+
+**Decisión.** «¿Olvidaste el código?» abre el pedido del sistema con el bloqueo
+del teléfono («Usá el bloqueo de tu teléfono para entrar a Timbre MVD», sin
+`biometricOnly`). Si responde que sí, la app pide un código nuevo («CÓDIGO
+NUEVO»); «Ahora no» la abre con el código de antes. Los datos quedan. La app
+solo se entera de sí o no: nunca ve el PIN, la huella ni la cara.
+
+**Consecuencia.** Quien sabe el PIN del teléfono también entra, por este
+camino. El pedido acepta además la huella y la cara del teléfono (no hay un
+modo solo con PIN): cualquiera que el teléfono reconozca puede elegir un código
+nuevo, aunque el desbloqueo rápido esté apagado. Un teléfono sin bloqueo de
+pantalla no puede confirmar quién es: la app lo dice y explica la única salida,
+borrar sus datos (Android) o reinstalarla (iOS), que se lleva las paradas y las
+rutas.
+
+### La bienvenida va antes que todo, una sola vez
+
+**Contexto.** La app no se presentaba. Había que decir, antes de usarla, que no
+hay cuentas ni registros, y ofrecer el código cuando tiene sentido, no
+escondido en Info.
+
+**Decisión.** `WelcomeGate` (`lib/ui/welcome/`) va en `home` de `MaterialApp`,
+debajo de `AppLock`. Al abrir, el orden es el bloqueo, si hay; la bienvenida,
+hasta que termina; y `HomePage`. Mientras la bienvenida no termina, `HomePage`
+no se arma: ni Mis paradas ni el Mapa existen, así que no consultan ni piden
+nada. Al tocar «Empezar», la app guarda `keyWelcomeDone` y no la vuelve a
+mostrar. Ningún camino de `lib/` abre una pantalla desde afuera (una
+notificación o el widget), así que nada saltea la bienvenida.
+
+**Consecuencia.** Quien actualiza la app también la ve una vez: `keyWelcomeDone`
+es nuevo. Si la app se cierra en el medio, la bienvenida vuelve a empezar; con
+un código ya guardado, saltea «Tu código». Las pruebas que arman la app entera
+ponen `keyWelcomeDone` antes de empezar. Una pantalla que algún día se abra
+desde una notificación o desde el widget tiene que pasar también por
+`WelcomeGate`.
+
+### El bloqueo anterior sigue hasta la bienvenida
+
+**Contexto.** Antes del código, Info encendía un bloqueo que era solo el pedido
+del sistema (`keyBiometricEnabled`). Quien lo tenía no podía quedar sin bloqueo
+al actualizar la app, ni ver la bienvenida sin desbloquear.
+
+**Decisión.** Mientras no hay código, ese bloqueo sigue: la app abre con la
+pantalla de antes (`LockScreen`, «Autenticate para acceder a Timbre MVD») y
+después muestra la bienvenida. En «Tu código», elegir un código lo reemplaza
+(`setCode` apaga el anterior) y «Ahora no» lo apaga (`removeLock`).
+
+**Consecuencia.** Para terminar la bienvenida hay que pasar por «Tu código», o
+tener ya un código, así que después de ella no queda el bloqueo anterior. Info
+ya no lo enciende. `LockScreen` y sus textos quedan solo para ese paso.
+
+### Solo un «sí» abre
+
+**Contexto.** El pedido del sistema termina de muchas maneras: sí, no,
+cancelado, «Usar código», atrás, tiempo agotado, o con un error
+(`UserCancelled`, `UserFallback`, `LockedOut`, `PermanentlyLockedOut`,
+`BiometricNotAvailable`, `NotEnrolled`, `NotAvailable`, `PasscodeNotSet`). El
+bloqueo anterior abría la app con los errores que parecían decir «este
+teléfono no tiene método de bloqueo» (`_authUnavailableCodes`), y en iOS
+`NotAvailable` llega también después de un intento fallido.
+
+**Decisión.** Solo `true` abre algo: el desbloqueo rápido, «¿Olvidaste el
+código?» y el bloqueo anterior. Cualquier otra respuesta deja el bloqueo como
+estaba. Un código de error nunca alcanza para decir que el teléfono no tiene
+método de bloqueo: la app lo vuelve a preguntar con `DeviceAuth.isAvailable()`.
+Si no tiene, el bloqueo anterior se abre (si no, quedarías encerrado) y
+«¿Olvidaste el código?» muestra la nota de un teléfono sin bloqueo de pantalla.
+
+**Consecuencia.** En iPhone el bloqueo anterior ya no se abre con un
+`NotAvailable` que era un intento fallido. Con el código, un error del pedido
+nunca abre: queda el teclado. `isAvailable()` es ahora solo
+`isDeviceSupported()`: un lector de huellas sin ninguna cargada no cuenta como
+método de bloqueo.
+
+### Android dice «huella»
+
+**Contexto.** Android no le dice a la app si el teléfono se desbloquea con una
+huella o con la cara: `getAvailableBiometrics` devuelve solo biometría «débil»
+o «fuerte». iOS sí distingue Face ID de Touch ID.
+
+**Decisión.** `DeviceAuth.biometrics()` devuelve `BiometricKind.fingerprint`
+en todo Android con biometría cargada, `faceId` o `touchId` en iOS, y `null` si
+no hay nada cargado. Cada uno trae dos textos: `label` va después de «con» en
+un rótulo («Desbloquear con huella») y `phrase`, en una frase («Abrí Timbre MVD
+con tu huella»).
+
+**Consecuencia.** Un Android que se desbloquea con la cara también dice
+«huella» y muestra el glifo `fingerprint`. El pedido del sistema, que dibuja
+Android, muestra igual lo que el teléfono usa.
+
+### Un pedido abierto desde la app no la deja abierta
+
+**Contexto.** Con el código puesto, tres pedidos del sistema se abren con la
+app abierta: encender la huella en Info o en la bienvenida, y «¿Olvidaste el
+código?» en la página del código de Info. Con `stickyAuth` el pedido sobrevive
+a un viaje al segundo plano y su respuesta espera, y mientras hay un pedido
+abierto la vuelta no bloquea (`_isAuthenticating`). Quien se iba con uno de
+esos pedidos a la vista encontraba la app abierta a la vuelta, con sus
+paradas, hasta el viaje siguiente. En Android, además, la pantalla del PIN del
+teléfono pausa la app mientras se escribe, así que una pausa sola no dice si
+la persona se fue.
+
+**Decisión.** Esos pedidos no son pegajosos (`sticky: false` en
+`DeviceAuth.authenticate`): salir de la app los cierra con un «no», y la vuelta
+bloquea como cualquier otra. Si al volver un pedido de esos sigue abierto (la
+respuesta llegó tarde, o era la pantalla del PIN), la app se bloquea cuando se
+cierra sin un «sí» (`_tripDuringPrompt`): un «sí» solo lo da quien tiene el
+teléfono. Los pedidos de la pantalla de bloqueo siguen pegajosos: la app está
+bloqueada mientras tanto. Y cada bloqueo empieza con el teclado vacío: las
+cifras escritas antes de irse no quedan.
+
+**Consecuencia.** Cancelar la pantalla del PIN de Android desde Info bloquea
+la app: hay que volver a entrar con el código o con «¿Olvidaste el código?».
+`test/app_lock_test.dart` prueba los dos pedidos con un viaje en el medio,
+con un «no» y con un «sí».
+
+### Los ajustes del bloqueo no esperan al disco
+
+**Contexto.** En las pruebas de widgets, solo la primera prueba de cada archivo
+puede esperar una escritura de Hive en una caja: las siguientes se quedan
+esperando para siempre, porque el futuro terminó en la zona `FakeAsync` de una
+prueba anterior. El código, el desbloqueo rápido y la bienvenida escriben
+varios ajustes seguidos, y hay que poder probarlos en cualquier orden.
+
+**Decisión.** Los ajustes del bloqueo y de la bienvenida se escriben sin
+esperar al disco: `unawaited(CacheService.set(…))` y
+`unawaited(CacheService.remove(…))`. Hive cambia su copia en memoria antes de
+su primer `await`, así que un `CacheService.get` justo después ya lee el valor
+nuevo, y el disco lo recibe enseguida, en orden. `AppPasscode` hace lo mismo.
+
+**Consecuencia.** En los caminos de la interfaz de esta parte no se espera
+ninguna escritura de ajustes, y cada flujo se prueba en cualquier archivo y en
+cualquier orden. Tampoco se usa `pumpAndSettle` mientras gira un indicador de
+progreso sin fin: no termina nunca.
+
+---
+
+## Backend
+
+### Sin ruta por lotes
+
+**Contexto.** Mis paradas muestra varias paradas a la vez. Una ruta que
+devolviera todas juntas ahorraría pedidos, pero cada usuario tendría su
+propia combinación, y la caché compartida del borde dejaría de servir.
+
+**Decisión.** Una URL por parada (`GET /v1/stops/{id}/arrivals`, 15 s en la
+caché del borde). La app pide cada parada una sola vez y todas en paralelo:
+`MvdApiService.getBoards` quita los ids repetidos y comparte un pedido en
+curso para la misma parada. Lo usan Mis paradas, el Mapa y la consulta de
+fondo.
+
+**Consecuencia.** Una parada popular se sirve a todos desde la misma copia
+del borde. Con N paradas la app hace N pedidos; el límite por IP del proxy
+es de 300 por minuto, contado solo en los pedidos que no salen de la caché
+(`proxy/wrangler.jsonc`).
+
+### Las paradas cercanas se calculan en el teléfono
+
+**Contexto.** Para buscar paradas cercanas hay que comparar la posición con
+las paradas. Mandar la posición a un servidor, aunque sea el del proyecto,
+haría falsa la promesa de la política de privacidad.
+
+**Decisión.** Con proxy, «Paradas cercanas» baja el catálogo de paradas
+(`/v1/catalog/stops`, unos 660 KB, guardado un día en la caja `catalog` de
+Hive) y busca en el teléfono las que están a 400 m o menos
+(`NearbyStopsService.nearbyFrom`). No existe `/v1/stops/near`. Sin proxy,
+la app pide a geoserver una caja centrada en la posición redondeada a 3
+decimales, de 472 m de medio lado (los 400 m más 72 m, la media diagonal de
+una celda de 0.001°), y filtra en el teléfono con la posición exacta.
+
+**Consecuencia.** En una build con proxy la posición no sale del teléfono;
+`test/proxy_privacy_test.dart` lo comprueba. Si el catálogo llega con
+`linesAvailable: false`, no se recurre a geoserver. Ese catálogo no reemplaza
+una copia del teléfono que tiene líneas, y la lista sigue con esa copia; sin
+una copia con líneas, la lista se muestra sin líneas y el catálogo vence a los
+15 min, lo mismo que en la caché del proxy.
+
+### Sin cambio automático al modo directo
+
+**Contexto.** Mientras el proxy no esté desplegado, la app puede hablar
+directamente con los servicios de la Intendencia (modo directo). Se podría
+caer al modo directo cuando el proxy falla.
+
+**Decisión.** El modo se elige al compilar: con `--dart-define=MVD_PROXY_URL=…`
+todo va al proxy; sin eso, todo va directo (`MvdApiService.source` en
+`lib/services/mvd_api_service.dart`). No hay cambio en tiempo de ejecución.
+
+**Consecuencia.** Una build con proxy nunca contacta `api.montevideo.gub.uy`,
+`pci.montevideo.gub.uy` ni `geoserver.montevideo.gub.uy`
+(`test/proxy_privacy_test.dart`, `test/proxy_bff_test.dart`). Si el proxy no
+responde, la app muestra el error. Por eso el orden de despliegue es primero
+el proxy y después la app ([contrato-v1.md](contrato-v1.md)).
+
+### Rutas públicas eliminadas
+
+**Contexto.** El proxy tenía `GET /v1/lines/{line}/buses` y
+`GET /v1/catalog/lines`, que la app nunca llamaba. La primera era la única
+ruta pública que podía hacer que el Durable Object cargara la flota de la API
+oficial a pedido, y esa API permite 14 pedidos por minuto para todos.
+
+**Decisión.** Se sacaron de `ROUTES` (`proxy/src/index.js`); ahora dan 404
+`not_found`. El Durable Object `ImGateway` conserva `/lines/{line}/buses` y
+`/catalog/lines` para uso interno, sin ruta pública que llegue a ellas.
+
+**Consecuencia.** Los casos `removed.lines_buses` y `removed.catalog_lines`
+de `proxy/contract/v1/cases.json` fijan el 404. Si alguna pantalla las
+necesita, vuelven como ruta nueva del contrato.
+
+### La ruta de horarios acepta una sola forma de hora: H:MM
+
+**Contexto.** `8:05`, `08:05` y `8:5` serían tres claves de caché para el
+mismo horario.
+
+**Decisión.** La ruta es `/v1/stops/{id}/schedule/{day}/{H:MM}`: hora sin
+cero adelante y minutos con dos cifras (`TIME` en `proxy/src/index.js`). Otra
+forma, como `08:05`, da 404 `not_found` sin consultar la fuente; una hora
+mayor que 23 da 400 `bad_request`. La app arma la ruta con
+`ContractRules.schedulePath` (`lib/services/api/contract_rules.dart`).
+
+**Consecuencia.** Cada horario tiene una sola copia en la caché. El vector
+`proxy/contract/v1/vectors/schedule_path.json` y el caso
+`schedule.noncanonical` fijan la regla en los dos lados.
+
+### Las rutas reconocen el ómnibus por variante o por destino
+
+**Contexto.** Las direcciones de una parada salen del índice de paradas del
+proxy: las variantes de la capa WFS de geoserver unidas con `linevariants`
+de la API oficial. Su nombre de destino puede no coincidir con el `destino`
+de transporteRest, y los ids de variante tampoco son del todo consistentes
+entre fuentes.
+
+**Decisión.** Al guardar una ruta, cada chip HACIA guarda su destino en
+`preferredDestinations` y sus variantes en `preferredVariantIds` (campo 11 de
+Hive en `RouteAlert`). `RouteAlert.accepts` acepta un ómnibus si su línea
+está en la ruta y coincide su variante o su destino. Las llegadas nunca se
+cruzan con la flota de la API oficial por variante.
+
+**Consecuencia.** Una ruta reconoce el ómnibus aunque el nombre del destino
+cambie entre fuentes. Tema abierto: una ruta creada solo con datos de la API
+oficial cuyo id de variante cambie después puede dejar de coincidir sin
+avisar.
+
+---
+
+Ver también: [README.md](README.md), [13-en-el-codigo.md](13-en-el-codigo.md).

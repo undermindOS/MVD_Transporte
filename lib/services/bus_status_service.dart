@@ -1,30 +1,16 @@
-import 'dart:convert';
 import 'package:flutter/foundation.dart';
-import 'package:http/http.dart' as http;
+import '../models/gps_status.dart';
+import 'api/direct/pci_adapter.dart';
+import 'api/v1_parser.dart';
+import 'mvd_api_service.dart';
 
-/// Share of an operator's buses whose GPS data is reaching the system.
-class OperatorGpsStatus {
-  /// Below this Cómo Ir stops showing the operator as OK.
-  static const partialThreshold = 70;
+export '../models/gps_status.dart';
 
-  final String company;
-
-  /// 0–100.
-  final int percent;
-
-  const OperatorGpsStatus(this.company, this.percent);
-
-  bool get isPartial => percent < partialThreshold;
-}
-
-/// GPS data quality per operator — the open endpoint Cómo Ir reads
+/// GPS data quality per operator — through the proxy (`/v1/status/gps`) or,
+/// without it, the open endpoint Cómo Ir reads
 /// (`pci.montevideo.gub.uy/buses/control`), no credentials.
 /// Explains why some ETAs fall back to the timetable.
 class BusStatusService {
-  static const _url = 'https://pci.montevideo.gub.uy/buses/control';
-  static const _timeout = Duration(seconds: 10);
-  static const _headers = {'Accept': 'application/json'};
-
   /// Requests (successful or not) are at least this far apart.
   static const minInterval = Duration(seconds: 60);
 
@@ -32,7 +18,8 @@ class BusStatusService {
   static DateTime? _lastAttempt;
 
   /// Latest status, from memory if fetched less than [minInterval] ago.
-  /// Null if it has never been fetched successfully.
+  /// Null if it has never been fetched successfully; after a failure the
+  /// last good status.
   static Future<List<OperatorGpsStatus>?> getStatus() async {
     final last = _lastAttempt;
     if (last != null && DateTime.now().difference(last) < minInterval) {
@@ -40,43 +27,33 @@ class BusStatusService {
     }
     _lastAttempt = DateTime.now();
 
-    try {
-      final response = await http
-          .get(Uri.parse(_url), headers: _headers)
-          .timeout(_timeout);
-      if (response.statusCode != 200) {
-        debugPrint('❌ GPS status ${response.statusCode}: ${response.body}');
-        return _cached;
-      }
-      return _cached = parse(jsonDecode(utf8.decode(response.bodyBytes)));
-    } catch (e) {
-      debugPrint('❌ GPS status error: $e');
-      return _cached;
-    }
+    final status = (await MvdApiService.getGpsStatus()).valueOrNull;
+    if (status != null) _cached = status;
+    return _cached;
   }
 
-  /// Sets the status as if just fetched (no request for [minInterval]).
+  /// Sets the status as if fetched [at] (default now: no request for
+  /// [minInterval]).
   @visibleForTesting
-  static void seed(List<OperatorGpsStatus> status) {
+  static void seed(List<OperatorGpsStatus> status, {DateTime? at}) {
     _cached = status;
-    _lastAttempt = DateTime.now();
+    _lastAttempt = at ?? DateTime.now();
   }
 
-  /// Parses `[{"empresa":"CUTCSA","valor":100}, …]`; values are clamped
-  /// to 0–100 as Cómo Ir does.
+  /// Forgets the status and the last request, as at app start.
   @visibleForTesting
-  static List<OperatorGpsStatus> parse(dynamic data) {
-    final list = <OperatorGpsStatus>[];
-    if (data is! List) return list;
-    for (final item in data) {
-      if (item is! Map) continue;
-      final company = item['empresa']?.toString().trim() ?? '';
-      final value = item['valor'];
-      if (company.isEmpty || value is! num) continue;
-      list.add(OperatorGpsStatus(company, value.round().clamp(0, 100)));
-    }
-    return list;
+  static void reset() {
+    _cached = null;
+    _lastAttempt = null;
   }
+
+  /// Parses `[{"empresa":"CUTCSA","valor":100}, …]` through the direct-mode
+  /// adapter and V1Parser; values are clamped to 0–100 as Cómo Ir does.
+  @visibleForTesting
+  static List<OperatorGpsStatus> parse(dynamic data) =>
+      V1Parser.gpsStatus(
+          PciAdapter.controlToV1(data, fetchedAt: DateTime.now())) ??
+      [];
 
   /// "Datos GPS parciales" text, or null when every operator is fine.
   static String? partialWarning(List<OperatorGpsStatus>? status) {

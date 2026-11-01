@@ -1,0 +1,13 @@
+{
+  "rule": "stopId",
+  "notes": ["Válido si y solo si 1 ≤ id ≤ 9999999. Un id inválido no genera ningún pedido."],
+  "cases": [
+    {"in": 0, "out": false},
+    {"in": 1, "out": true},
+    {"in": 574, "out": true},
+    {"in": 9999999, "out": true},
+    {"in": 10000000, "out": false},
+    {"in": -1, "out": false},
+    {"in": -574, "out": false}
+  ]
+}

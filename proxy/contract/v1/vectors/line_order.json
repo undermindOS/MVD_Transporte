@@ -1,0 +1,20 @@
+{
+  "rule": "compareLines",
+  "notes": [
+    "Cada caso ordena la lista de entrada con compareLines. Primero el número inicial como entero; una línea con número va antes que una sin número; los empates se resuelven por unidades de código UTF-16 (< y > de JS, compareTo de Dart), nunca localeCompare."
+  ],
+  "cases": [
+    {
+      "in": ["124 SD", "124", "CE1", "21", "D10", "D9", "104", "M-A", "PA"],
+      "out": ["21", "104", "124", "124 SD", "CE1", "D10", "D9", "M-A", "PA"]
+    },
+    {"in": ["2", "10", "1"], "out": ["1", "2", "10"]},
+    {"in": ["17", "G", "L28", "125", "D1"], "out": ["17", "125", "D1", "G", "L28"]},
+    {"in": ["7", "70", "007"], "out": ["007", "7", "70"]},
+    {"in": ["124A", "124 SD", "124"], "out": ["124", "124 SD", "124A"]},
+    {"in": ["d1", "D10", "D1"], "out": ["D1", "D10", "d1"]},
+    {"in": ["B", "Á", "A"], "out": ["A", "B", "Á"]},
+    {"in": ["M-B", "CE1", "M-A"], "out": ["CE1", "M-A", "M-B"]},
+    {"in": ["538", "116", "144", "117", "142", "121", "141"], "out": ["116", "117", "121", "141", "142", "144", "538"]}
+  ]
+}

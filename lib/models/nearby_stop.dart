@@ -1,5 +1,5 @@
-/// A bus stop found around the user. Not persisted: saving goes through
-/// MvdApiService.resolveStop → CacheService.saveStop like a typed number.
+/// A bus stop found around the user. Not persisted: picking it saves its
+/// name and lines with CacheService.saveStop at once, with no lookup.
 class NearbyStop {
   /// Stop code (`cod_ubic_parada`) — the same number transporteRest uses.
   final int id;
